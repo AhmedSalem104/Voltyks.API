@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voltyks.API", "Voltyks.API\Voltyks.API.csproj", "{066E1818-E92B-4CA4-B576-119C9D487E73}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voltyks.Infrastructure", "Voltyks.Infrastructure\Voltyks.Infrastructure.csproj", "{0FBA8930-FB5E-4EB5-92D2-A5D944296974}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voltyks.Core", "Voltyks.Core\Voltyks.Core.csproj", "{D76F5BD8-240F-4AE9-9C25-BFFCF42BC195}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voltyks.Application", "Voltyks.Application\Voltyks.Application.csproj", "{C5F17345-9B45-4296-B8CA-701E927453F6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Voltyks.Persistence", "Voltyks.Persistence\Voltyks.Persistence.csproj", "{3A978833-128B-4FC3-9FAC-91B655B645D2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{066E1818-E92B-4CA4-B576-119C9D487E73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{066E1818-E92B-4CA4-B576-119C9D487E73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{066E1818-E92B-4CA4-B576-119C9D487E73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{066E1818-E92B-4CA4-B576-119C9D487E73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0FBA8930-FB5E-4EB5-92D2-A5D944296974}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0FBA8930-FB5E-4EB5-92D2-A5D944296974}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0FBA8930-FB5E-4EB5-92D2-A5D944296974}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0FBA8930-FB5E-4EB5-92D2-A5D944296974}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D76F5BD8-240F-4AE9-9C25-BFFCF42BC195}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D76F5BD8-240F-4AE9-9C25-BFFCF42BC195}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D76F5BD8-240F-4AE9-9C25-BFFCF42BC195}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D76F5BD8-240F-4AE9-9C25-BFFCF42BC195}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5F17345-9B45-4296-B8CA-701E927453F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5F17345-9B45-4296-B8CA-701E927453F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5F17345-9B45-4296-B8CA-701E927453F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5F17345-9B45-4296-B8CA-701E927453F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A978833-128B-4FC3-9FAC-91B655B645D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A978833-128B-4FC3-9FAC-91B655B645D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A978833-128B-4FC3-9FAC-91B655B645D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A978833-128B-4FC3-9FAC-91B655B645D2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0632EF8D-5A98-4F61-924B-04786EF8FA3B}
+	EndGlobalSection
+EndGlobal
