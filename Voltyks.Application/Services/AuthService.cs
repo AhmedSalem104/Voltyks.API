@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.ServicesManager;
+using Microsoft.Extensions.Configuration;
 
 namespace Voltyks.Application
 {
@@ -29,7 +30,8 @@ namespace Voltyks.Application
         IHttpContextAccessor httpContextAccessor
         , IOptions<JwtOptions> options
         , IOptions<TwilioSettings> twilioSettings
-        , IRedisService redisService) : IAuthService
+        , IRedisService redisService
+        , IConfiguration configuration ) : IAuthService
     {
 
 
@@ -274,30 +276,39 @@ namespace Voltyks.Application
 
 
 
-    
 
-        // التحقق من الـ Token باستخدام Google
-        private async Task<GoogleJsonWebSignature.Payload> VerifyExternalToken(ExternalAuthDto dto)
+
+        private async Task<FacebookUserDto> VerifyExternalToken(ExternalAuthDto dto)
         {
             if (dto.Provider.ToLower() == "google")
             {
+                var googleClientId = configuration["Authentication:Google:client_id"];
+
                 var settings = new GoogleJsonWebSignature.ValidationSettings()
                 {
-                    Audience = new List<string>() { "your-google-client-id" }
+                    Audience = new List<string> { googleClientId }
                 };
 
                 var payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
-                return payload;
+
+                return new FacebookUserDto
+                {
+                    Email = payload.Email,
+                    Name = payload.Name
+                };
             }
             else if (dto.Provider.ToLower() == "facebook")
             {
-                // أرسل طلب لـ Facebook Graph API للتحقق من التوكن
-                var http = new HttpClient();
-                var verifyRes = await http.GetAsync($"https://graph.facebook.com/me?access_token={dto.IdToken}&fields=id,name,email");
-                var content = await verifyRes.Content.ReadAsStringAsync();
+                using var http = new HttpClient();
+                var response = await http.GetAsync($"https://graph.facebook.com/me?access_token={dto.IdToken}&fields=id,name,email");
 
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var content = await response.Content.ReadAsStringAsync();
                 dynamic fbData = JsonConvert.DeserializeObject(content);
-                return new GoogleJsonWebSignature.Payload
+
+                return new FacebookUserDto
                 {
                     Email = fbData.email,
                     Name = fbData.name

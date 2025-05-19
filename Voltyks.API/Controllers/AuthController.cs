@@ -6,6 +6,7 @@ using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.Exceptions;
 using System;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace Voltyks.Presentation
 {
@@ -19,6 +20,22 @@ namespace Voltyks.Presentation
         {
             this.serviceManager = serviceManager;
         }
+
+
+
+        [HttpGet]
+        public IActionResult GetInfo()
+        {
+            var info = new
+            {
+                OS = RuntimeInformation.OSDescription,
+                Architecture = RuntimeInformation.OSArchitecture.ToString()
+            };
+            return Ok(info);
+        }
+
+
+
 
         // تسجيل الدخول
         [HttpPost("Login")]

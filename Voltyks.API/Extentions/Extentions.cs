@@ -32,6 +32,19 @@ namespace Voltyks.API.Extentions
             services.ConfigureServices();
             services.ConfigureJwtServices(configuration);
 
+            services.AddAuthentication()
+            .AddGoogle("Google", options =>
+            {
+                options.ClientId = configuration["Authentication:Google:client_id"];
+                options.ClientSecret = configuration["Authentication:Google:client_secret"];
+            })
+            .AddFacebook("Facebook", options =>
+            {
+                options.AppId = configuration["Authentication:Facebook:client_id"];
+                options.AppSecret = configuration["Authentication:Facebook:client_secret"];
+            });
+
+
 
             return services;
 
@@ -99,6 +112,9 @@ namespace Voltyks.API.Extentions
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+            app.UseRouting();
+
+
             return app;
 
         }
