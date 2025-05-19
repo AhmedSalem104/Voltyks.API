@@ -13,7 +13,6 @@ namespace Voltyks.Persistence
 {
     public class DbInitializer : IDbInitializer
     {
-
         private readonly VoltyksDbContext _context;
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
