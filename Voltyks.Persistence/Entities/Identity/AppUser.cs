@@ -15,7 +15,10 @@ namespace Voltyks.Persistence.Entities.Identity
         public DateTime DateOfBirth { get; set; } 
         public string? NationalId { get; set; }
         public string? RefreshToken { get; set; }
-        public Address Address { get; set; }
+        public int? Vcode { get; set; }
+        public DateTime? VcodeExpirationDate { get; set; }
+
+        public Address Address { get; set; } = new Address();  // تهيئة افتراضية
 
     }
 }

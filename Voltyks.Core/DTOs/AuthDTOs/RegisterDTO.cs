@@ -11,13 +11,6 @@ namespace Voltyks.Core.DTOs.AuthDTOs
 
     public class RegisterDTO
     {
-       // [Required(ErrorMessage = "UserName is required")]
-       // [RegularExpression(@"^[a-zA-Z0-9]+$", ErrorMessage = "UserName can only contain letters and digits")]
-        public string? UserName { get; set; }
-
-        //[Required(ErrorMessage = "DisplayName is required")]
-        public string? DisplayName { get; set; }
-
         [Required(ErrorMessage = "FirstName is required")]
         public string FirstName { get; set; }
 
@@ -32,15 +25,13 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         [MinLength(6, ErrorMessage = "Password must be at least 6 characters")]
         public string Password { get; set; }
 
-        [Required(ErrorMessage = "Confirm Password is required")]
-        [Compare("Password", ErrorMessage = "Password and Confirm Password do not match")]
-        public string ConfirmPassword { get; set; }
-
-        [Phone(ErrorMessage = "Invalid phone number")]
+        [Required(ErrorMessage = "Phone number is required")]
+        [RegularExpression(@"^\+\d{10,15}$", ErrorMessage = "Phone number must start with '+' and contain only digits")]
         public string PhoneNumber { get; set; }
 
-        public string? Street { get; set; }
+        [Required(ErrorMessage = "City is required")]
         public string City { get; set; }
     }
+
 
 }

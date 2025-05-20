@@ -22,6 +22,9 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.ServicesManager;
+using Microsoft.Extensions.Configuration;
+using System.Text.RegularExpressions;
+using Voltyks.Core.DTOs;
 
 namespace Voltyks.Application
 {
@@ -29,12 +32,13 @@ namespace Voltyks.Application
         IHttpContextAccessor httpContextAccessor
         , IOptions<JwtOptions> options
         , IOptions<TwilioSettings> twilioSettings
-        , IRedisService redisService) : IAuthService
+        , IRedisService redisService
+        , IConfiguration configuration ) : IAuthService
     {
 
 
         // دالة تسجيل الدخول بالايميل او رقم التليفون
-        public async Task<UserResultDto> LoginAsync(LoginDTO model)
+        public async Task<UserLoginResultDto> LoginAsync(LoginDTO model)
         {
             var user = await GetUserByUsernameOrPhoneAsync(model.UsernameOrPhone);
 
@@ -52,41 +56,54 @@ namespace Voltyks.Application
 
             SetCookies(accessToken, refreshToken);
 
-            return new UserResultDto()
+            var userWithAddress = userManager.Users
+                                .Include(u => u.Address)  // هنا بنعمل Include للـ Address المرتبط
+                                .FirstOrDefault(u => u.Id == user.Id);
+
+            return new UserLoginResultDto()
             {
-                FullName = user.FullName,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                City = userWithAddress.Address?.City,  
+                PhoneNumber = user.PhoneNumber,
                 Email = user.Email,
                 Token = accessToken
             };
+
         }
 
         // دالة تسجيل مستخدم جديد
-        public async Task<UserResultDto> RegisterAsync(RegisterDTO model)
+        public async Task<UserRegisterationResultDto> RegisterAsync(RegisterDTO model)
         {
-            // تحقق من صحة البيانات حسب DataAnnotations في الـ DTO
+            // تحقق من صحة الـ DataAnnotations
             var validationContext = new ValidationContext(model);
             var validationResults = new List<ValidationResult>();
             bool isValid = Validator.TryValidateObject(model, validationContext, validationResults, true);
 
             if (!isValid)
             {
-                // رمي استثناء مع كل الأخطاء التي تم جمعها
                 var errors = validationResults.Select(r => r.ErrorMessage).ToList();
                 throw new V_Exception.ValidationException(errors);
             }
 
-            // تحقق من وجود البريد الإلكتروني مسبقًا
-            await CheckEmailExistsAsync(new EmailDto { Email = model.Email });
+            // ✅ تحقق من تنسيق رقم الهاتف
+            if (!Regex.IsMatch(model.PhoneNumber ?? "", @"^\+20\d{10}$"))
+            {
+                throw new V_Exception.ValidationException(new[] { "Phone number must start with '+20' followed by 10 digits." });
+            }
 
-            // تحقق من وجود رقم الهاتف مسبقًا
+
+            // ✅ تحقق من عدم تكرار الإيميل والرقم
+            await CheckEmailExistsAsync(new EmailDto { Email = model.Email });
             await CheckPhoneNumberExistsAsync(new PhoneNumberDto { PhoneNumber = model.PhoneNumber });
 
+            // إنشاء المستخدم
             var user = CreateUserFromRegisterModel(model);
-
             await CreateUserAsync(user, model.Password);
 
             return MapToUserResultDto(user);
         }
+
 
         public async Task<string> RefreshJwtTokenAsync(RefreshTokenDto dto)
         {
@@ -118,6 +135,7 @@ namespace Voltyks.Application
 
             return newAccessToken;
         }
+
 
         // دالة ارسال  ال OTP 
         public async Task SendOtpAsync(PhoneNumberDto phoneNumberDto)
@@ -170,25 +188,25 @@ namespace Voltyks.Application
             await userManager.UpdateAsync(user);
         }
 
-        // دالة للتحقق من وجود البريد الإلكتروني
-        public async Task CheckEmailExistsAsync(EmailDto emailDto)
-        {
-            var existingEmailUser = await userManager.FindByEmailAsync(emailDto.Email);
-            if (existingEmailUser is not null)
-                throw new V_Exception.ValidationException(new[] { " The Email is already use " });
-        }
-
-        // دالة للتحقق من وجود رقم الهاتف
         public async Task CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
         {
             var existingPhoneUser = await userManager.Users
                 .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumberDto.PhoneNumber);
+
             if (existingPhoneUser is not null)
-                throw new V_Exception.ValidationException(new[] { " The phone number is already use " });
+                throw new V_Exception.ValidationException(new[] { "The phone number is already in use" });
+        }
+        public async Task CheckEmailExistsAsync(EmailDto emailDto)
+        {
+            var existingEmailUser = await userManager.Users.FirstOrDefaultAsync(e => e.Email == emailDto.Email);
+
+            if (existingEmailUser is not null)
+                throw new V_Exception.ValidationException(new[] { "The Email is already in use" });
         }
 
-       // دالة تسجيل الدخول الخارجي
-        public async Task<UserResultDto> ExternalLoginAsync(ExternalAuthDto model)
+
+        // دالة تسجيل الدخول الخارجي
+        public async Task<UserLoginResultDto> ExternalLoginAsync(ExternalAuthDto model)
         {
            
             if (model.Provider.ToLower() == "google")
@@ -224,9 +242,8 @@ namespace Voltyks.Application
 
                 var token = await GenerateJwtTokenAsync(user);
 
-                return new UserResultDto
+                return new UserLoginResultDto
                 {
-                    FullName = user.FullName,
                     Email = user.Email,
                     Token = token
                 };
@@ -274,30 +291,38 @@ namespace Voltyks.Application
 
 
 
-    
 
-        // التحقق من الـ Token باستخدام Google
-        private async Task<GoogleJsonWebSignature.Payload> VerifyExternalToken(ExternalAuthDto dto)
+        private async Task<FacebookUserDto> VerifyExternalToken(ExternalAuthDto dto)
         {
             if (dto.Provider.ToLower() == "google")
             {
+                var googleClientId = configuration["Authentication:Google:client_id"];
+
                 var settings = new GoogleJsonWebSignature.ValidationSettings()
                 {
-                    Audience = new List<string>() { "your-google-client-id" }
+                    Audience = new List<string> { googleClientId }
                 };
 
                 var payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
-                return payload;
+
+                return new FacebookUserDto
+                {
+                    Email = payload.Email,
+                    Name = payload.Name
+                };
             }
             else if (dto.Provider.ToLower() == "facebook")
             {
-                // أرسل طلب لـ Facebook Graph API للتحقق من التوكن
-                var http = new HttpClient();
-                var verifyRes = await http.GetAsync($"https://graph.facebook.com/me?access_token={dto.IdToken}&fields=id,name,email");
-                var content = await verifyRes.Content.ReadAsStringAsync();
+                using var http = new HttpClient();
+                var response = await http.GetAsync($"https://graph.facebook.com/me?access_token={dto.IdToken}&fields=id,name,email");
 
+                if (!response.IsSuccessStatusCode)
+                    return null;
+
+                var content = await response.Content.ReadAsStringAsync();
                 dynamic fbData = JsonConvert.DeserializeObject(content);
-                return new GoogleJsonWebSignature.Payload
+
+                return new FacebookUserDto
                 {
                     Email = fbData.email,
                     Name = fbData.name
@@ -349,8 +374,6 @@ namespace Voltyks.Application
             return tokenHandler.WriteToken(token);
         }
 
-
-
         private async Task<AppUser?> GetUserByUsernameOrPhoneAsync(string usernameOrPhone)
         {
             if (usernameOrPhone.Contains("@"))
@@ -391,24 +414,18 @@ namespace Voltyks.Application
             });
         }
 
-
-
-
-
-
         private AppUser CreateUserFromRegisterModel(RegisterDTO model)
         {
             return new AppUser
             {
+                UserName = model.FirstName + model.LastName + Guid.NewGuid().ToString("N").Substring(0, 8),
                 Email = model.Email,
-                FullName = model.FirstName + model.LastName,
-                UserName = model.UserName,
                 PhoneNumber = model.PhoneNumber,
                 FirstName = model.FirstName,
                 LastName = model.LastName,
                 Address = new Address
                 {
-                    Street = model.Street,    // ديناميكي من DTO
+
                     City = model.City,        // ديناميكي من DTO
                     Country = "Egypt"         // قيمة ثابتة
                 }
@@ -422,16 +439,14 @@ namespace Voltyks.Application
                 throw new V_Exception.ValidationException(result.Errors.Select(e => e.Description));
         }
 
-        private UserResultDto MapToUserResultDto(AppUser user)
+        private UserRegisterationResultDto MapToUserResultDto(AppUser user)
         {
-            return new UserResultDto
+            return new UserRegisterationResultDto
             {
-                FullName = user.FullName,
                 Email = user.Email
             };
         }
 
-
-
+      
     }
 }
