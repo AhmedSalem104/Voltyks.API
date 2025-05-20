@@ -18,7 +18,7 @@ namespace Voltyks.Persistence.Entities.Identity
         public int? Vcode { get; set; }
         public DateTime? VcodeExpirationDate { get; set; }
 
-        public Address Address { get; set; }
+        public Address Address { get; set; } = new Address();  // تهيئة افتراضية
 
     }
 }
