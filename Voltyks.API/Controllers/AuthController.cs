@@ -127,7 +127,23 @@ namespace Voltyks.Presentation
 
 
 
-   
+        [HttpPost("SendOtp")]
+        public async Task<IActionResult> SendOtp([FromBody] SendOtpDto dto)
+        {
+            await _twilioService.SendOtpAsync(dto);
+            return Ok(new { message = "OTP sent successfully" });
+        }
+
+        [HttpPost("VerifyOtp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDto dto)
+        {
+            var result = await _twilioService.VerifyOtpAsync(dto.PhoneNumber, dto.Code);
+            if (!result)
+                return BadRequest("Invalid or expired OTP.");
+
+            return Ok(new { message = "OTP verified successfully" });
+        }
+
         //// إرسال OTP
         //[HttpPost("SendOtp")]
         //public async Task<IActionResult> SendOtp([FromBody] PhoneNumberDto phoneNumberDto)
