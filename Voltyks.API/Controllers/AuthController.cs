@@ -127,51 +127,7 @@ namespace Voltyks.Presentation
 
 
 
-        [HttpPost("SendOtp")]
-        public async Task<IActionResult> SendOtp([FromBody] SendOtpDto dto)
-        {
-
-            await _twilioService.SendOtpAsync(dto);
-            return Ok(new { message = "OTP sent successfully" });
-
-            try
-            {
-                await serviceManager.AuthService.SendOtpAsync(phoneNumberDto);
-                return Ok(new ApiResponse<string>("OTP sent successfully."));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse<string>(ex.Message, false));
-            }
-
-        }
-
-        [HttpPost("VerifyOtp")]
-        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDto dto)
-        {
-
-            var result = await _twilioService.VerifyOtpAsync(dto.PhoneNumber, dto.Code);
-            if (!result)
-                return BadRequest("Invalid or expired OTP.");
-
-            return Ok(new { message = "OTP verified successfully" });
-
-            try
-            {
-                bool isValid = await serviceManager.AuthService.VerifyOtpAsync(verifyOtpDto);
-                return isValid
-                    ? Ok(new ApiResponse<string>("OTP verified successfully."))
-                    : Unauthorized(new ApiResponse<string>("Invalid OTP.", false));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse<string>(ex.Message, false));
-            }
-
-        }
-
-
-
+   
         //// إرسال OTP
         //[HttpPost("SendOtp")]
         //public async Task<IActionResult> SendOtp([FromBody] PhoneNumberDto phoneNumberDto)
