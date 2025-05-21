@@ -6,9 +6,15 @@ using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.Exceptions;
 using System;
 using System.Threading.Tasks;
+
+using Voltyks.Core.DTOs.TwilioConfDTOs;
+using Voltyks.Application.Interfaces;
+using VerifyOtpDto = Voltyks.Core.DTOs.TwilioConfDTOs.VerifyOtpDto;
+
 using System.Runtime.InteropServices;
 using Voltyks.Core.DTOs;
 using Microsoft.IdentityModel.Tokens;
+
 
 namespace Voltyks.Presentation
 {
@@ -17,10 +23,14 @@ namespace Voltyks.Presentation
     public class AuthController : ControllerBase
     {
         private readonly IServiceManager serviceManager;
+        private readonly ITwilioService _twilioService;
 
-        public AuthController(IServiceManager serviceManager)
+
+        public AuthController(IServiceManager serviceManager , ITwilioService twilioService)
         {
             this.serviceManager = serviceManager;
+            this._twilioService = twilioService;
+
         }
 
         [HttpGet]
@@ -115,10 +125,15 @@ namespace Voltyks.Presentation
             }
         }
 
-        // إرسال OTP
+
+
         [HttpPost("SendOtp")]
-        public async Task<IActionResult> SendOtp([FromBody] PhoneNumberDto phoneNumberDto)
+        public async Task<IActionResult> SendOtp([FromBody] SendOtpDto dto)
         {
+
+            await _twilioService.SendOtpAsync(dto);
+            return Ok(new { message = "OTP sent successfully" });
+
             try
             {
                 await serviceManager.AuthService.SendOtpAsync(phoneNumberDto);
@@ -128,12 +143,19 @@ namespace Voltyks.Presentation
             {
                 return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
+
         }
 
-        // التحقق من OTP
         [HttpPost("VerifyOtp")]
-        public async Task<IActionResult> VerifyOtp([FromQuery] VerifyOtpDto verifyOtpDto)
+        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDto dto)
         {
+
+            var result = await _twilioService.VerifyOtpAsync(dto.PhoneNumber, dto.Code);
+            if (!result)
+                return BadRequest("Invalid or expired OTP.");
+
+            return Ok(new { message = "OTP verified successfully" });
+
             try
             {
                 bool isValid = await serviceManager.AuthService.VerifyOtpAsync(verifyOtpDto);
@@ -145,7 +167,40 @@ namespace Voltyks.Presentation
             {
                 return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
+
         }
+
+
+
+        //// إرسال OTP
+        //[HttpPost("SendOtp")]
+        //public async Task<IActionResult> SendOtp([FromBody] PhoneNumberDto phoneNumberDto)
+        //{
+        //    try
+        //    {
+        //        await serviceManager.AuthService.SendOtpAsync(phoneNumberDto);
+        //        return Ok("OTP sent successfully.");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(ex.Message);
+        //    }
+        //}
+
+        //// التحقق من OTP
+        //[HttpPost("VerifyOtp")]
+        //public async Task<IActionResult> VerifyOtp([FromQuery] VerifyOtpDto verifyOtpDto)
+        //{
+        //    try
+        //    {
+        //        bool isValid = await serviceManager.AuthService.VerifyOtpAsync(verifyOtpDto);
+        //        return isValid ? Ok("OTP verified successfully.") : Unauthorized("Invalid OTP.");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(ex.Message);
+        //    }
+        //}
 
         // إرسال OTP لاستعادة كلمة المرور
         [HttpPost("ForgotPassword")]

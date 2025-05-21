@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Twilio.TwiML.Voice;
+using Voltyks.Application.Interfaces;
 using Voltyks.Application.ServicesManager;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
@@ -24,6 +25,8 @@ namespace Voltyks.Application.Services.AllowServices
             services.Configure<JwtOptions>(configuration.GetSection("JwtOptions"));
             services.Configure<TwilioSettings>(configuration.GetSection("Twilio"));
             services.Configure<ChatApiSettings>(configuration.GetSection("ChatApi"));
+            services.AddScoped<ITwilioService, TwilioService>();
+
             return services;
 
         }
