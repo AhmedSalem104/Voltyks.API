@@ -6,9 +6,15 @@ using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.Exceptions;
 using System;
 using System.Threading.Tasks;
+
 using Voltyks.Core.DTOs.TwilioConfDTOs;
 using Voltyks.Application.Interfaces;
 using VerifyOtpDto = Voltyks.Core.DTOs.TwilioConfDTOs.VerifyOtpDto;
+
+using System.Runtime.InteropServices;
+using Voltyks.Core.DTOs;
+using Microsoft.IdentityModel.Tokens;
+
 
 namespace Voltyks.Presentation
 {
@@ -27,41 +33,72 @@ namespace Voltyks.Presentation
 
         }
 
-        // تسجيل الدخول
+        [HttpGet]
+        public IActionResult GetInfo()
+        {
+            var info = new
+            {
+                OS = RuntimeInformation.OSDescription,
+                Architecture = RuntimeInformation.OSArchitecture.ToString()
+            };
+            return Ok(info);
+        }
+
+
+        // تسجيل الدخول    
         [HttpPost("Login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO loginDTO)
         {
             try
             {
                 var result = await serviceManager.AuthService.LoginAsync(loginDTO);
-                return Ok(result);
+                return Ok(new ApiResponse<object>(result, "Login successful."));
             }
             catch (UnAuthorizedException ex)
             {
-                return Unauthorized(ex.Message);
+                return Unauthorized(new ApiResponse<string>(ex.Message, false));
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
         }
 
         // تسجيل مستخدم جديد
-        [HttpPost("Register")]
+        [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDTO registerDTO)
         {
             try
             {
                 var result = await serviceManager.AuthService.RegisterAsync(registerDTO);
-                return Ok($"Welcome, {result.FullName}! Your email has been successfully registered");
+
+                var response = new ApiResponse<UserRegisterationResultDto>(
+                    data: result,
+                    message: $"Welcome, {result.Email}! Your email has been successfully registered."
+                );
+
+                return Ok(response);
             }
             catch (ValidationException ex)
             {
-                return BadRequest(ex.Errors);
+                var response = new ApiResponse<string>(
+                    message: "Validation failed",
+                    status: false
+                )
+                {
+                    Data = string.Join("; ", ex.Errors)
+                };
+
+                return BadRequest(response);
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                var response = new ApiResponse<string>(
+                    message: ex.Message,
+                    status: false
+                );
+
+                return StatusCode(500, response);
             }
         }
 
@@ -71,16 +108,20 @@ namespace Voltyks.Presentation
         {
             try
             {
-                var result = await serviceManager.AuthService.RefreshJwtTokenAsync(refreshTokenDto);
-                return Ok(result);
+                var token = await serviceManager.AuthService.RefreshJwtTokenAsync(refreshTokenDto);
+                return Ok(new ApiResponse<string>(token, "Token refreshed successfully"));
+            }
+            catch (SecurityTokenExpiredException ex)
+            {
+                return Unauthorized(new ApiResponse<string>(ex.Message, false));
             }
             catch (UnAuthorizedException ex)
             {
-                return Unauthorized(ex.Message);
+                return Unauthorized(new ApiResponse<string>(ex.Message, false));
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
         }
 
@@ -89,18 +130,44 @@ namespace Voltyks.Presentation
         [HttpPost("SendOtp")]
         public async Task<IActionResult> SendOtp([FromBody] SendOtpDto dto)
         {
+
             await _twilioService.SendOtpAsync(dto);
             return Ok(new { message = "OTP sent successfully" });
+
+            try
+            {
+                await serviceManager.AuthService.SendOtpAsync(phoneNumberDto);
+                return Ok(new ApiResponse<string>("OTP sent successfully."));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
+            }
+
         }
 
         [HttpPost("VerifyOtp")]
         public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDto dto)
         {
+
             var result = await _twilioService.VerifyOtpAsync(dto.PhoneNumber, dto.Code);
             if (!result)
                 return BadRequest("Invalid or expired OTP.");
 
             return Ok(new { message = "OTP verified successfully" });
+
+            try
+            {
+                bool isValid = await serviceManager.AuthService.VerifyOtpAsync(verifyOtpDto);
+                return isValid
+                    ? Ok(new ApiResponse<string>("OTP verified successfully."))
+                    : Unauthorized(new ApiResponse<string>("Invalid OTP.", false));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
+            }
+
         }
 
 
@@ -142,15 +209,15 @@ namespace Voltyks.Presentation
             try
             {
                 await serviceManager.AuthService.ForgotPasswordAsync(phoneNumberDto);
-                return Ok("OTP sent to reset your password.");
+                return Ok(new ApiResponse<string>("OTP sent to reset your password."));
             }
             catch (NotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFound(new ApiResponse<string>(ex.Message, false));
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
         }
 
@@ -161,82 +228,92 @@ namespace Voltyks.Presentation
             try
             {
                 await serviceManager.AuthService.ResetPasswordAsync(resetPasswordDto);
-                return Ok("Password reset successfully.");
+                return Ok(new ApiResponse<string>("Password reset successfully."));
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Unauthorized(ex.Message);
+                return Unauthorized(new ApiResponse<string>(ex.Message, false));
             }
             catch (NotFoundException ex)
             {
-                return NotFound(ex.Message);
+                return NotFound(new ApiResponse<string>(ex.Message, false));
             }
             catch (Exception ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
         }
 
         // تسجيل الدخول بواسطة مزود خارجي
         [HttpPost("external-login")]
         [AllowAnonymous]
-        public async Task<ActionResult<UserResultDto>> ExternalLogin([FromBody] ExternalAuthDto dto)
+        public async Task<IActionResult> ExternalLogin([FromBody] ExternalAuthDto dto)
         {
-            return await serviceManager.AuthService.ExternalLoginAsync(dto);
+            try
+            {
+                var result = await serviceManager.AuthService.ExternalLoginAsync(dto);
+                return Ok(new ApiResponse<UserLoginResultDto>(result, "External login successful."));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
+            }
         }
 
         // إرسال OTP عبر Twilio
         [HttpPost("send-otp/twilio")]
         public async Task<IActionResult> SendOtpViaTwilio([FromBody] PhoneNumberDto phoneNumberDto)
         {
-            await serviceManager.AuthService.SendOtpUsingTwilioAsync(phoneNumberDto);
-            return Ok("OTP sent via Twilio");
-        }
-
-        // التحقق من توفر البريد الإلكتروني
-        [HttpPost("CheckEmailExists")]
-        public async Task<IActionResult> CheckEmailExists([FromBody] EmailDto emailDto)
-        {
-            if (string.IsNullOrWhiteSpace(emailDto?.Email))
-            {
-                return BadRequest("Email is required.");
-            }
-
             try
             {
-                await serviceManager.AuthService.CheckEmailExistsAsync(emailDto);
-                return Ok("✅ The email is available.");
+                await serviceManager.AuthService.SendOtpUsingTwilioAsync(phoneNumberDto);
+                return Ok(new ApiResponse<string>("OTP sent via Twilio."));
             }
-            catch (ValidationException ex)
+            catch (Exception ex)
             {
-                return BadRequest(new
-                {
-                    Message = "❌ Email is already use.",
-                    Details = ex.Errors
-                });
+                return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
         }
+        // التحقق من توفر  رقم التليفون
 
-        // التحقق من توفر رقم الهاتف
         [HttpPost("CheckPhoneNumberExists")]
         public async Task<IActionResult> CheckPhoneNumberExists([FromBody] PhoneNumberDto phoneNumberDto)
         {
             if (string.IsNullOrWhiteSpace(phoneNumberDto?.PhoneNumber))
-            {
-                return BadRequest("Phone number is required.");
-            }
+                return BadRequest(new ApiResponse<string>("Phone number is required", false));
 
             try
             {
                 await serviceManager.AuthService.CheckPhoneNumberExistsAsync(phoneNumberDto);
-                return Ok("✅ The phone number is available.");
+                return Ok(new ApiResponse<string>("✅ The phone number is available."));
             }
             catch (ValidationException ex)
             {
-                return BadRequest(new
+                return BadRequest(new ApiResponse<object>("❌ The phone number is already in use", false)
                 {
-                    Message = "❌ Phone number is already use.",
-                    Details = ex.Errors
+                    
+                });
+            }
+        }
+
+        // التحقق من توفر البريد الإلكتروني
+
+        [HttpPost("CheckEmailExists")]
+        public async Task<IActionResult> CheckEmailExists([FromBody] EmailDto emailDto)
+        {
+            if (string.IsNullOrWhiteSpace(emailDto?.Email))
+                return BadRequest(new ApiResponse<string>("Email is required", false));
+
+            try
+            {
+                await serviceManager.AuthService.CheckEmailExistsAsync(emailDto);
+                return Ok(new ApiResponse<string>("✅ The email is available."));
+            }
+            catch (ValidationException ex)
+            {
+                return BadRequest(new ApiResponse<object>("❌ The email is already in use", false)
+                {
+                    
                 });
             }
         }

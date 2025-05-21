@@ -7,12 +7,13 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.AuthDTOs
 {
-    public class FacebookUserDto
+    public class UserRegisterationResultDto
     {
-       
-        public string Name { get; set; }
-        [EmailAddress]
+        
         public string Email { get; set; }
-    }
+        
+       
+        
 
+    }
 }
