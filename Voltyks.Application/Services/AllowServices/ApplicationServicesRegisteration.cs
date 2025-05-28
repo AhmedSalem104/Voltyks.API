@@ -24,8 +24,14 @@ namespace Voltyks.Application.Services.AllowServices
             services.AddScoped<IServiceManager, ServiceManager>();
             services.Configure<JwtOptions>(configuration.GetSection("JwtOptions"));
             services.Configure<TwilioSettings>(configuration.GetSection("Twilio"));
+            services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsEgyptSettings"));
+            services.Configure<SmsBeOnSettings>(configuration.GetSection("SmsBeOnSettings"));
             services.Configure<ChatApiSettings>(configuration.GetSection("ChatApi"));
             services.AddScoped<ITwilioService, TwilioService>();
+            services.AddScoped<ISmsEgyptService, SmsEgyptService>();
+            services.AddScoped<ISmsBeOnService, SmsBeOnService>();
+            services.AddHttpClient();
+
 
             return services;
 

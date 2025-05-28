@@ -28,15 +28,44 @@ namespace Voltyks.Application.Services
 
         public async Task SendWhatsAppMessageAsync(WhatsAppMessageDto dto)
         {
-            var messageOptions = new CreateMessageOptions(
-                new PhoneNumber($"whatsapp:{dto.To}"))
+            try
             {
-                From = new PhoneNumber($"whatsapp:{_settings.FromNumber}"),
-                Body = dto.Message
-            };
+                // Step 1: Init the Twilio client
+                TwilioClient.Init(_settings.AccountSid, _settings.AuthToken);
 
-            await MessageResource.CreateAsync(messageOptions);
+                // Step 2: Prepare the message
+                var messageOptions = new CreateMessageOptions(
+                    new PhoneNumber($"whatsapp:{dto.To}"))
+                {
+                    From = new PhoneNumber($"whatsapp:{_settings.FromNumber}"),
+                    Body = dto.Message
+                };
+
+                // Step 3: Send it
+                var message = await MessageResource.CreateAsync(messageOptions);
+
+                // Optional: Log the message SID
+                Console.WriteLine($"Message SID: {message.Sid}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Twilio Error: {ex.Message}");
+                throw;
+            }
         }
+
+
+        //public async Task SendWhatsAppMessageAsync(WhatsAppMessageDto dto)
+        //{
+        //    var messageOptions = new CreateMessageOptions(
+        //        new PhoneNumber($"whatsapp:{dto.To}"))
+        //    {
+        //        From = new PhoneNumber($"whatsapp:{_settings.FromNumber}"),
+        //        Body = dto.Message
+        //    };
+
+        //    await MessageResource.CreateAsync(messageOptions);
+        //}
 
         public async Task SendOtpAsync(SendOtpDto dto)
         {

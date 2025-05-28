@@ -14,6 +14,7 @@ using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.API.Extentions
 {
@@ -43,6 +44,9 @@ namespace Voltyks.API.Extentions
                 options.AppId = configuration["Authentication:Facebook:client_id"];
                 options.AppSecret = configuration["Authentication:Facebook:client_secret"];
             });
+
+            services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsSettings"));
+
 
 
 

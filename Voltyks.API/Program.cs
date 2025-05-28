@@ -14,12 +14,6 @@ namespace Voltyks.API
 
             builder.Services.RegisterAllServices(builder.Configuration);
 
-
-            var connectionString = builder.Configuration.GetConnectionString("Redis");
-            ConnectionMultiplexer redis = ConnectionMultiplexer.Connect(connectionString);
-            builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
-
-
             var app = builder.Build();
 
             await app.ConfigurMiddleWares();

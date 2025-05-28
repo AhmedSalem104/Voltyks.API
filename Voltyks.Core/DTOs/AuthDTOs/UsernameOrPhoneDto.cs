@@ -7,11 +7,9 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.AuthDTOs
 {
-    public class VerifyOtpDto
+    public class UsernameOrPhoneDto
     {
-        [Phone]
-        public string PhoneNumber { get; set; }
-        public string OtpCode { get; set; }
+ 
+        public string UsernameOrPhone { get; set; }
     }
-
 }

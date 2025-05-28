@@ -1,19 +1,22 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Voltyks.Application;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.Exceptions;
-using System;
-using System.Threading.Tasks;
-
-using Voltyks.Core.DTOs.TwilioConfDTOs;
 using Voltyks.Application.Interfaces;
-using VerifyOtpDto = Voltyks.Core.DTOs.TwilioConfDTOs.VerifyOtpDto;
+using SendSmsEgyptOtpDto = Voltyks.Core.DTOs.SmsEgyptDTOs.SendOtpDto;
+using SendSmsBeOnOtpDto = Voltyks.Core.DTOs.SmsBeOnDTOs.SendOtpDto;
+
+using SmsEgyptVerifyOtpDto = Voltyks.Core.DTOs.SmsEgyptDTOs.VerifyOtpDto;
+using SmsBeOnVerifyOtpDto = Voltyks.Core.DTOs.SmsBeOnDTOs.VerifyOtpDto;
 
 using System.Runtime.InteropServices;
 using Voltyks.Core.DTOs;
 using Microsoft.IdentityModel.Tokens;
+using Voltyks.Application;
+using Voltyks.Core.DTOs.TwilioConfDTOs;
+
+
 
 
 namespace Voltyks.Presentation
@@ -31,19 +34,19 @@ namespace Voltyks.Presentation
             this.serviceManager = serviceManager;
             this._twilioService = twilioService;
 
+
         }
 
-        [HttpGet]
-        public IActionResult GetInfo()
-        {
-            var info = new
-            {
-                OS = RuntimeInformation.OSDescription,
-                Architecture = RuntimeInformation.OSArchitecture.ToString()
-            };
-            return Ok(info);
-        }
-
+        //[HttpGet]
+        //public IActionResult GetInfo()
+        //{
+        //    var info = new
+        //    {
+        //        OS = RuntimeInformation.OSDescription,
+        //        Architecture = RuntimeInformation.OSArchitecture.ToString()
+        //    };
+        //    return Ok(info);
+        //}
 
         // تسجيل الدخول    
         [HttpPost("Login")]
@@ -124,98 +127,7 @@ namespace Voltyks.Presentation
                 return BadRequest(new ApiResponse<string>(ex.Message, false));
             }
         }
-
-
-
-        [HttpPost("SendOtp")]
-        public async Task<IActionResult> SendOtp([FromBody] SendOtpDto dto)
-        {
-            await _twilioService.SendOtpAsync(dto);
-            return Ok(new { message = "OTP sent successfully" });
-        }
-
-        [HttpPost("VerifyOtp")]
-        public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDto dto)
-        {
-            var result = await _twilioService.VerifyOtpAsync(dto.PhoneNumber, dto.Code);
-            if (!result)
-                return BadRequest("Invalid or expired OTP.");
-
-            return Ok(new { message = "OTP verified successfully" });
-        }
-
-        //// إرسال OTP
-        //[HttpPost("SendOtp")]
-        //public async Task<IActionResult> SendOtp([FromBody] PhoneNumberDto phoneNumberDto)
-        //{
-        //    try
-        //    {
-        //        await serviceManager.AuthService.SendOtpAsync(phoneNumberDto);
-        //        return Ok("OTP sent successfully.");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(ex.Message);
-        //    }
-        //}
-
-        //// التحقق من OTP
-        //[HttpPost("VerifyOtp")]
-        //public async Task<IActionResult> VerifyOtp([FromQuery] VerifyOtpDto verifyOtpDto)
-        //{
-        //    try
-        //    {
-        //        bool isValid = await serviceManager.AuthService.VerifyOtpAsync(verifyOtpDto);
-        //        return isValid ? Ok("OTP verified successfully.") : Unauthorized("Invalid OTP.");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return BadRequest(ex.Message);
-        //    }
-        //}
-
-        // إرسال OTP لاستعادة كلمة المرور
-        [HttpPost("ForgotPassword")]
-        public async Task<IActionResult> ForgotPassword([FromBody] PhoneNumberDto phoneNumberDto)
-        {
-            try
-            {
-                await serviceManager.AuthService.ForgotPasswordAsync(phoneNumberDto);
-                return Ok(new ApiResponse<string>("OTP sent to reset your password."));
-            }
-            catch (NotFoundException ex)
-            {
-                return NotFound(new ApiResponse<string>(ex.Message, false));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse<string>(ex.Message, false));
-            }
-        }
-
-        // إعادة تعيين كلمة المرور
-        [HttpPost("ResetPassword")]
-        public async Task<IActionResult> ResetPassword([FromQuery] ResetPasswordDto resetPasswordDto)
-        {
-            try
-            {
-                await serviceManager.AuthService.ResetPasswordAsync(resetPasswordDto);
-                return Ok(new ApiResponse<string>("Password reset successfully."));
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new ApiResponse<string>(ex.Message, false));
-            }
-            catch (NotFoundException ex)
-            {
-                return NotFound(new ApiResponse<string>(ex.Message, false));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse<string>(ex.Message, false));
-            }
-        }
-
+     
         // تسجيل الدخول بواسطة مزود خارجي
         [HttpPost("external-login")]
         [AllowAnonymous]
@@ -232,22 +144,7 @@ namespace Voltyks.Presentation
             }
         }
 
-        // إرسال OTP عبر Twilio
-        [HttpPost("send-otp/twilio")]
-        public async Task<IActionResult> SendOtpViaTwilio([FromBody] PhoneNumberDto phoneNumberDto)
-        {
-            try
-            {
-                await serviceManager.AuthService.SendOtpUsingTwilioAsync(phoneNumberDto);
-                return Ok(new ApiResponse<string>("OTP sent via Twilio."));
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new ApiResponse<string>(ex.Message, false));
-            }
-        }
         // التحقق من توفر  رقم التليفون
-
         [HttpPost("CheckPhoneNumberExists")]
         public async Task<IActionResult> CheckPhoneNumberExists([FromBody] PhoneNumberDto phoneNumberDto)
         {
@@ -269,7 +166,6 @@ namespace Voltyks.Presentation
         }
 
         // التحقق من توفر البريد الإلكتروني
-
         [HttpPost("CheckEmailExists")]
         public async Task<IActionResult> CheckEmailExists([FromBody] EmailDto emailDto)
         {
@@ -311,5 +207,127 @@ namespace Voltyks.Presentation
         }
 
 
+
+
+
+        [HttpPost("forget-password")]
+        public async Task<IActionResult> ForgetPassword([FromBody] ForgetPasswordDto model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var response = await serviceManager.SmsEgyptService.ForgetPasswordAsync(model);
+
+            if (!response.Status)
+                return BadRequest(response);
+
+            return Ok(response);
+        }
+
+        [HttpPost("verify-forget-password-otp")]
+        public async Task<IActionResult> VerifyForgetPasswordOtp([FromBody] VerifyForgetPasswordOtpDto model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var response = await serviceManager.SmsEgyptService.VerifyForgetPasswordOtpAsync(model);
+
+            if (!response.Status)
+                return BadRequest(response);
+
+            return Ok(response);
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // ممكن تتحقق من OTP هنا لو حابب double check
+            var response = await serviceManager.SmsEgyptService.ResetPasswordAsync(model);
+
+            if (!response.Status)
+                return BadRequest(response);
+
+            return Ok(response);
+        }
+
+
+
+
+        #region SmsEgypt
+
+        [HttpPost("SendSmsEgyptOtp")]
+        public async Task<IActionResult> SendOtp([FromBody] SendSmsEgyptOtpDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var result = await serviceManager.SmsEgyptService.SendOtpAsync(dto);
+            return result.Status ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpPost("VerifySmsEgyptOtp")]
+        public async Task<IActionResult> VerifyOtp([FromBody] SmsEgyptVerifyOtpDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var result = await serviceManager.SmsEgyptService.VerifyOtpAsync(dto);
+            return result.Status ? Ok(result) : BadRequest(result);
+        }
+
+        #endregion
+
+        #region SmsBeOn
+
+        //// Endpoint لإرسال OTP
+        //[HttpPost("SendBeOnOtp")]
+        //public async Task<IActionResult> SendOtp([FromBody] SendSmsBeOnOtpDto dto)
+        //{
+        //    if (!ModelState.IsValid)
+        //        return BadRequest(ModelState);
+
+        //    var result = await serviceManager.SmsBeOnService.SendOtpAsync(dto);
+        //    return result.Status ? Ok(result) : BadRequest(result);
+        //}
+
+        //// Endpoint للتحقق من OTP
+        //[HttpPost("VerifyBeOnOtp")]
+        //public async Task<IActionResult> VerifyOtp([FromBody] SmsBeOnVerifyOtpDto dto)
+        //{
+        //    if (!ModelState.IsValid)
+        //        return BadRequest(ModelState);
+
+        //    var result = await serviceManager.SmsBeOnService.VerifyOtpAsync(dto);
+        //    return result.Status ? Ok(result) : BadRequest(result);
+        //}
+
+        #endregion
+
+        #region Twilio
+
+
+        //[HttpPost("SendOtp")]
+        //public async Task<IActionResult> SendOtp([FromBody] SendOtpDto dto)
+        //{
+        //    await _twilioService.SendOtpAsync(dto);
+        //    return Ok(new ApiResponse<string>("OTP sent successfully", true));
+        //}
+
+        //[HttpPost("VerifyOtp")]
+        //public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDto dto)
+        //{
+        //    var result = await _twilioService.VerifyOtpAsync(dto.PhoneNumber, dto.Code);
+        //    if (!result)
+        //        return BadRequest(new ApiResponse<string>("Invalid or expired OTP.", true));
+
+        //    return Ok(new ApiResponse<string>("OTP verified successfully.", true));
+
+        //}
+
+
+        #endregion
     }
 }

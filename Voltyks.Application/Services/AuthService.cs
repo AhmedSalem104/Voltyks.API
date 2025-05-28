@@ -18,25 +18,27 @@ using Twilio.Types;
 using Twilio;
 using Twilio.Rest.Api.V2010.Account;
 using Voltyks.Persistence.Entities.Main;
-using Microsoft.AspNetCore.Http.HttpResults;
 using System.ComponentModel.DataAnnotations;
-using Microsoft.AspNetCore.Mvc;
-using Voltyks.Application.ServicesManager;
 using Microsoft.Extensions.Configuration;
 using System.Text.RegularExpressions;
+using  Voltyks.Core.DTOs.SmsEgyptDTOs;
+using VerifyOtpDto = Voltyks.Core.DTOs.SmsEgyptDTOs.VerifyOtpDto;
+using Voltyks.Application.Services;
 using Voltyks.Core.DTOs;
+using Voltyks.Application.ServicesManager.ServicesManager;
+
 
 namespace Voltyks.Application
 {
     public class AuthService(UserManager<AppUser> userManager ,
         IHttpContextAccessor httpContextAccessor
         , IOptions<JwtOptions> options
-        , IOptions<TwilioSettings> twilioSettings
+        , IOptions<TwilioSettings> twilioSettings       
         , IRedisService redisService
-        , IConfiguration configuration ) : IAuthService
+        , IConfiguration configuration
+        ) : IAuthService
     {
-
-
+      
         // دالة تسجيل الدخول بالايميل او رقم التليفون
         public async Task<UserLoginResultDto> LoginAsync(LoginDTO model)
         {
@@ -71,7 +73,6 @@ namespace Voltyks.Application
             };
 
         }
-
         // دالة تسجيل مستخدم جديد
         public async Task<UserRegisterationResultDto> RegisterAsync(RegisterDTO model)
         {
@@ -103,8 +104,6 @@ namespace Voltyks.Application
 
             return MapToUserResultDto(user);
         }
-
-
         public async Task<string> RefreshJwtTokenAsync(RefreshTokenDto dto)
         {
             var request = httpContextAccessor.HttpContext.Request;
@@ -135,59 +134,7 @@ namespace Voltyks.Application
 
             return newAccessToken;
         }
-
-
-        // دالة ارسال  ال OTP 
-        public async Task SendOtpAsync(PhoneNumberDto phoneNumberDto)
-        {
-            var phoneNumber = phoneNumberDto.PhoneNumber;
-            var otpCode = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
-            await redisService.SetAsync($"otp:{phoneNumber}", otpCode, TimeSpan.FromMinutes(5));
-            Console.WriteLine($"OTP sent to {phoneNumber}: {otpCode}");
-        }
-
-        // دالة التحقق من ال OTP المرسل
-        public async Task<bool> VerifyOtpAsync(VerifyOtpDto dto)
-        {
-            var cachedOtp = await redisService.GetAsync($"otp:{dto.PhoneNumber}");
-            if (cachedOtp == null || cachedOtp != dto.OtpCode)
-                return false;
-
-            await redisService.RemoveAsync($"otp:{dto.PhoneNumber}");
-            return true;
-        }
-
-        // دالة  نسيت كلمة المرور
-        public async Task ForgotPasswordAsync(PhoneNumberDto phoneNumberDto)
-        {
-            var phoneNumber = phoneNumberDto.PhoneNumber;
-            var user = await userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
-            if (user == null)
-                throw new NotFoundException("User not found");
-
-            await SendOtpAsync(phoneNumberDto); // استدعاء الدالة المعدّلة
-        }
-
-        // دالة  تغيير كلمة المرور
-        public async Task ResetPasswordAsync(ResetPasswordDto dto)
-        {
-            bool isOtpValid = await VerifyOtpAsync(new VerifyOtpDto
-            {
-                PhoneNumber = dto.PhoneNumber,
-                OtpCode = dto.OtpCode
-            });
-
-            if (!isOtpValid)
-                throw new UnauthorizedAccessException("Invalid OTP");
-
-            var user = await userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == dto.PhoneNumber);
-            if (user == null)
-                throw new NotFoundException("User not found");
-
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
-            await userManager.UpdateAsync(user);
-        }
-
+      
         public async Task CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
         {
             var existingPhoneUser = await userManager.Users
@@ -203,8 +150,6 @@ namespace Voltyks.Application
             if (existingEmailUser is not null)
                 throw new V_Exception.ValidationException(new[] { "The Email is already in use" });
         }
-
-
         // دالة تسجيل الدخول الخارجي
         public async Task<UserLoginResultDto> ExternalLoginAsync(ExternalAuthDto model)
         {
@@ -250,24 +195,7 @@ namespace Voltyks.Application
             }
             throw new Exception("Unsupported provider");
 
-        }
-
-        // Send OTP using Twilio
-        public async Task SendOtpUsingTwilioAsync(PhoneNumberDto phoneNumberDto)
-        {
-            var otpCode = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
-            await redisService.SetAsync($"otp:{phoneNumberDto.PhoneNumber}", otpCode, TimeSpan.FromMinutes(5));
-
-            var settings = twilioSettings.Value;
-            TwilioClient.Init(settings.AccountSid, settings.AuthToken);
-
-            var message = await MessageResource.CreateAsync(
-                to: new PhoneNumber("whatsapp:" + phoneNumberDto.PhoneNumber),
-                from: new PhoneNumber(settings.FromNumber),
-                body: $"رمز التحقق الخاص بك هو: {otpCode}"
-            );
-        }
-
+        }  
         // دالة تسجيل الخروج
         public async Task LogoutAsync(TokenDto dto)
         {
@@ -291,6 +219,41 @@ namespace Voltyks.Application
 
 
 
+
+        private bool IsPhoneNumber(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return false;
+
+            var phonePattern = @"^\+?[0-9\s\-]+$";
+            return Regex.IsMatch(input, phonePattern);
+        }
+
+        private bool IsEmail(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return false;
+
+            try
+            {
+                var addr = new System.Net.Mail.MailAddress(input);
+                return addr.Address == input;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string NormalizePhoneNumber(string phone)
+        {
+            if (phone.StartsWith("+20"))
+                phone = phone.Replace("+20", "0");
+            else if (phone.StartsWith("0020"))
+                phone = phone.Replace("0020", "0");
+
+            return phone;
+        }
 
         private async Task<FacebookUserDto> VerifyExternalToken(ExternalAuthDto dto)
         {
@@ -332,7 +295,6 @@ namespace Voltyks.Application
             return null;
         }
 
-        // دالة  انشاء ال token
         private async Task<string> GenerateJwtTokenAsync(AppUser user)
         {
             var jwtOptions = options.Value;
