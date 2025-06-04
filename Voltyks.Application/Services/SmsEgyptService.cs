@@ -8,10 +8,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Voltyks.Application.Interfaces;
-using Voltyks.Application.ServicesManager;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.DTOs.SmsEgyptDTOs;
+using Voltyks.Core.Exceptions;
+using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 
@@ -44,9 +45,7 @@ namespace Voltyks.Application.Services
 
             if (await IsBlockedAsync(normalizedPhone))
             {
-                return new ApiResponse<string>(
-                    $"لقد تجاوزت الحد الأقصى لمحاولات إرسال OTP. يرجى المحاولة بعد {(int)BlockDuration.TotalSeconds} ثانية.",
-                    false);
+                return new ApiResponse<string>(string.Format(ErrorMessages.otpAttemptLimitExceededTryLater, (int)BlockDuration.TotalSeconds), false);
             }
 
             int attempts = await GetCurrentAttemptsAsync(normalizedPhone);
@@ -55,9 +54,9 @@ namespace Voltyks.Application.Services
             if (attempts > MaxAttempts)
             {
                 await BlockUserAsync(normalizedPhone);
-                return new ApiResponse<string>(
-                    $"لقد تجاوزت الحد الأقصى لمحاولات إرسال OTP. تم حظرك لمدة {(int)BlockDuration.TotalMinutes} دقائق.",
-                    false);
+                return new ApiResponse<string>(string.Format(ErrorMessages.otpAttemptsExceededBlockedForMinutes, (int)BlockDuration.TotalMinutes), false);
+
+               
             }
 
             await SaveAttemptsAsync(normalizedPhone, attempts);
@@ -67,9 +66,9 @@ namespace Voltyks.Application.Services
 
             var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
             if (!isSent)
-                return new ApiResponse<string>("Failed to send OTP", false);
+                return new ApiResponse<string>(ErrorMessages.failedToSendOtp, false);
 
-            return new ApiResponse<string>("OTP sent successfully", true);
+            return new ApiResponse<string>(SuccessfulMessage.otpSentSuccessfully, true);
         }
 
         public async Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto)
@@ -81,17 +80,17 @@ namespace Voltyks.Application.Services
 
             if (string.IsNullOrEmpty(cachedOtp))
             {
-                return new ApiResponse<string>("OTP expired or not found", false);
+                return new ApiResponse<string>(ErrorMessages.otpCodeInvalid, false);
             }
 
             if (cachedOtp != dto.OtpCode)
             {
-                return new ApiResponse<string>("Invalid OTP", false);
+                return new ApiResponse<string>(ErrorMessages.invalidOtp, false);
             }
 
             await _redisService.RemoveAsync($"otp:{normalizedPhone}");
 
-            return new ApiResponse<string>("OTP verified successfully.");
+            return new ApiResponse<string>(SuccessfulMessage.otpVerifiedSuccessfully, status: true, errors: null);
         }
 
 
@@ -100,19 +99,20 @@ namespace Voltyks.Application.Services
         public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
         {
             // توحيد رقم الهاتف
-            var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
+            var normalizedPhone = NormalizePhoneNumber(dto.EmailOrPhone);
 
+            var user = await GetUserByUsernameOrPhoneAsync(dto.EmailOrPhone);
             // التأكد من وجود المستخدم بهذا الرقم
-            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
+            user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
             if (user == null)
             {
-                return new ApiResponse<string>("رقم الهاتف غير موجود", false);
+                return new ApiResponse<string>(ErrorMessages.PhoneNumberNotExist, false);
             }
 
             // تحقق من الحظر بسبب المحاولات السابقة (بنفس فكرة SmsEgyptService)
             if (await _redisService.GetAsync($"otp_block:{normalizedPhone}") != null)
             {
-                return new ApiResponse<string>($"لقد تجاوزت الحد الأقصى لمحاولات إرسال OTP. يرجى المحاولة لاحقًا.", false);
+                return new ApiResponse<string>(ErrorMessages.ExceededMaximumOTPAttempts, false);
             }
 
             // توليد OTP (يمكن تستخدم دالة GenerateOtp() الموجودة في SmsEgyptService)
@@ -125,9 +125,9 @@ namespace Voltyks.Application.Services
             var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
 
             if (!isSent)
-                return new ApiResponse<string>("فشل في إرسال رمز التحقق OTP", false);
+                return new ApiResponse<string>(ErrorMessages.OTPSendingFailed, false);
 
-            return new ApiResponse<string>("تم إرسال رمز التحقق OTP بنجاح", true);
+            return new ApiResponse<string>(ErrorMessages.otpSentSuccessfully, true);
         }
         public async Task<ApiResponse<string>> VerifyForgetPasswordOtpAsync(VerifyForgetPasswordOtpDto dto)
         {
@@ -136,12 +136,12 @@ namespace Voltyks.Application.Services
 
             if (string.IsNullOrEmpty(cachedOtp))
             {
-                return new ApiResponse<string>("رمز التحقق OTP انتهت صلاحيته أو غير موجود", false);
+                return new ApiResponse<string>(ErrorMessages.otpCodeExpiredOrNotFound, false);
             }
 
             if (cachedOtp != dto.OtpCode)
             {
-                return new ApiResponse<string>("رمز التحقق OTP غير صحيح", false);
+                return new ApiResponse<string>(ErrorMessages.otpCodeInvalid, false);
             }
 
             // إزالة OTP من Redis بعد التحقق الناجح
@@ -150,7 +150,7 @@ namespace Voltyks.Application.Services
             // يمكن حفظ علامة لتأكيد التحقق لإعادة تعيين كلمة المرور (مثلاً)
             await _redisService.SetAsync($"forget_password_verified:{normalizedPhone}", "verified", TimeSpan.FromMinutes(10));
 
-            return new ApiResponse<string>("تم التحقق من رمز OTP بنجاح", true);
+            return new ApiResponse<string>(SuccessfulMessage.otpVerifiedSuccessfully, true);
         }
         public async Task<ApiResponse<string>> ResetPasswordAsync(ResetPasswordDto resetPasswordDto)
         {
@@ -160,33 +160,33 @@ namespace Voltyks.Application.Services
             var verified = await _redisService.GetAsync($"forget_password_verified:{normalizedPhone}");
             if (verified != "verified")
             {
-                return new ApiResponse<string>("لم يتم التحقق من رمز OTP أو انتهت صلاحيته", false);
+                return new ApiResponse<string>(ErrorMessages.otpCodeNotVerifiedOrExpired, false);
             }
 
             var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
             if (user == null)
             {
-                return new ApiResponse<string>("المستخدم غير موجود", false);
+                return new ApiResponse<string>(ErrorMessages.userNotFound, false);
             }
 
             // إزالة كلمة المرور الحالية (إذا كان المستخدم مسجل بكلمة مرور)
             var removeResult = await _userManager.RemovePasswordAsync(user);
             if (!removeResult.Succeeded)
             {
-                return new ApiResponse<string>("حدث خطأ أثناء إزالة كلمة المرور القديمة", false);
+                return new ApiResponse<string>(ErrorMessages.errorRemovingOldPassword, false);
             }
 
             // إضافة كلمة مرور جديدة
             var addResult = await _userManager.AddPasswordAsync(user, resetPasswordDto.NewPassword);
             if (!addResult.Succeeded)
             {
-                return new ApiResponse<string>("حدث خطأ أثناء تعيين كلمة المرور الجديدة", false);
+                return new ApiResponse<string>(ErrorMessages.errorSettingNewPassword, false);
             }
 
             // إزالة علامة التحقق بعد النجاح
             await _redisService.RemoveAsync($"forget_password_verified:{normalizedPhone}");
 
-            return new ApiResponse<string>("تم إعادة تعيين كلمة المرور بنجاح", true);
+            return new ApiResponse<string>(SuccessfulMessage.passwordResetSuccessfully, true);
         }
 
 
@@ -194,6 +194,26 @@ namespace Voltyks.Application.Services
 
 
         // ---------- Private Methods ----------
+        private async Task<AppUser?> GetUserByUsernameOrPhoneAsync(string usernameOrPhone)
+        {
+            if (usernameOrPhone.Contains("@"))
+            {
+                var emailUser = await _userManager.FindByEmailAsync(usernameOrPhone);
+                if (emailUser == null)
+                    throw new UnAuthorizedException("Email does not exist");
+
+                if (string.IsNullOrEmpty(emailUser.PhoneNumber))
+                    throw new UnAuthorizedException("There is no phone number associated with this mail");
+
+                return await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == emailUser.PhoneNumber);
+            }
+            else
+            {
+                // توحيد رقم الهاتف
+                var normalizedPhone = NormalizePhoneNumber(usernameOrPhone);
+                return await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
+            }
+        }
         private string NormalizePhoneNumber(string phone)
         {
             if (phone.StartsWith("+20"))

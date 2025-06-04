@@ -9,7 +9,7 @@ namespace Voltyks.Core.DTOs.AuthDTOs
 {
     public class LoginDTO
     {
-        public string UsernameOrPhone { get; set; }
+        public string EmailOrPhone { get; set; }
         public string Password { get; set; }
     }
 }

@@ -13,13 +13,15 @@ namespace Voltyks.Application
 {
     public interface IAuthService
     {
-        Task<UserLoginResultDto> LoginAsync(LoginDTO model);
-        Task<UserRegisterationResultDto> RegisterAsync(RegisterDTO model);
-        Task LogoutAsync(TokenDto tokenDto);
-        Task<string> RefreshJwtTokenAsync(RefreshTokenDto refreshTokenDto);
-        Task CheckEmailExistsAsync(EmailDto emailDto);
-        Task CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto);
-        Task<UserLoginResultDto> ExternalLoginAsync(ExternalAuthDto model);
+
+
+        Task<ApiResponse<UserLoginResultDto>> LoginAsync(LoginDTO model);
+        Task<ApiResponse<UserRegisterationResultDto>> RegisterAsync(RegisterDTO model);
+        Task<ApiResponse<List<string>>> LogoutAsync(TokenDto tokenDto);
+        Task<ApiResponse<string>> RefreshJwtTokenAsync(RefreshTokenDto refreshTokenDto);
+        Task<ApiResponse<List<string>>> CheckEmailExistsAsync(EmailDto emailDto);
+        Task<ApiResponse<List<string>>> CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto);
+
 
       
     }

@@ -10,7 +10,7 @@ namespace Voltyks.Application.Interfaces
 {
     public interface ISmsBeOnService
     {
-        Task<ApiResponse<string>> SendOtpAsync(SendOtpDto dto);
-        Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto);
+        //Task<ApiResponse<string>> SendOtpAsync(SendOtpDto dto);
+        //Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto);
     }
 }

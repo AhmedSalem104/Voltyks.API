@@ -10,22 +10,17 @@ using V_Exception = Voltyks.Core.Exceptions;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Core.Exceptions;
 using Voltyks.Application.Interfaces;
-using System.Security.Cryptography;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Google.Apis.Auth;
 using Newtonsoft.Json;
-using Twilio.Types;
-using Twilio;
-using Twilio.Rest.Api.V2010.Account;
 using Voltyks.Persistence.Entities.Main;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Configuration;
 using System.Text.RegularExpressions;
-using  Voltyks.Core.DTOs.SmsEgyptDTOs;
-using VerifyOtpDto = Voltyks.Core.DTOs.SmsEgyptDTOs.VerifyOtpDto;
-using Voltyks.Application.Services;
+using Voltyks.Persistence.Entities;
+using System.Numerics;
 using Voltyks.Core.DTOs;
-using Voltyks.Application.ServicesManager.ServicesManager;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
 namespace Voltyks.Application
@@ -38,18 +33,31 @@ namespace Voltyks.Application
         , IConfiguration configuration
         ) : IAuthService
     {
-      
+
         // دالة تسجيل الدخول بالايميل او رقم التليفون
-        public async Task<UserLoginResultDto> LoginAsync(LoginDTO model)
+
+        public async Task<ApiResponse<UserLoginResultDto>> LoginAsync(LoginDTO model)
         {
-            var user = await GetUserByUsernameOrPhoneAsync(model.UsernameOrPhone);
+            var user = await GetUserByUsernameOrPhoneAsync(model.EmailOrPhone);
 
             if (user == null)
-                throw new UnAuthorizedException("User does not exist");
+            {
+                return new ApiResponse<UserLoginResultDto>
+                {
+                    Status = false,
+                    Message = ErrorMessages.userNotFound
+                };
+            }
 
             var isPasswordValid = await userManager.CheckPasswordAsync(user, model.Password);
             if (!isPasswordValid)
-                throw new UnAuthorizedException("Invalid password or email address");
+            {
+                return new ApiResponse<UserLoginResultDto>
+                {
+                    Status = false,
+                    Message = ErrorMessages.invalidPasswordOrEmailAddress
+                };
+            }
 
             var accessToken = await GenerateJwtTokenAsync(user);
             var refreshToken = Guid.NewGuid().ToString();
@@ -59,24 +67,59 @@ namespace Voltyks.Application
             SetCookies(accessToken, refreshToken);
 
             var userWithAddress = userManager.Users
-                                .Include(u => u.Address)  // هنا بنعمل Include للـ Address المرتبط
-                                .FirstOrDefault(u => u.Id == user.Id);
+                .Include(u => u.Address)
+                .FirstOrDefault(u => u.Id == user.Id);
 
-            return new UserLoginResultDto()
+            var result = new UserLoginResultDto
             {
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                City = userWithAddress.Address?.City,  
+                City = userWithAddress?.Address?.City,
                 PhoneNumber = user.PhoneNumber,
                 Email = user.Email,
                 Token = accessToken
             };
 
+            return new ApiResponse<UserLoginResultDto>(result, SuccessfulMessage.LoginSuccessful);
         }
+
+        //public async Task<UserLoginResultDto> LoginAsync(LoginDTO model)
+        //{
+        //    var user = await GetUserByUsernameOrPhoneAsync(model.EmailOrPhone);
+
+        //    if (user == null)
+        //    throw new UnAuthorizedException(ErrorMessages.userNotFound);
+
+        //    var isPasswordValid = await userManager.CheckPasswordAsync(user, model.Password);
+        //    if (!isPasswordValid)
+        //        throw new UnAuthorizedException(ErrorMessages.invalidPasswordOrEmailAddress);
+
+        //    var accessToken = await GenerateJwtTokenAsync(user);
+        //    var refreshToken = Guid.NewGuid().ToString();
+
+        //    await redisService.SetAsync($"refresh_token:{user.Id}", refreshToken, TimeSpan.FromDays(7));
+
+        //    SetCookies(accessToken, refreshToken);
+
+        //    var userWithAddress = userManager.Users
+        //                        .Include(u => u.Address)  // هنا بنعمل Include للـ Address المرتبط
+        //                        .FirstOrDefault(u => u.Id == user.Id);
+
+        //    return new UserLoginResultDto()
+        //    {
+        //        FirstName = user.FirstName,
+        //        LastName = user.LastName,
+        //        City = userWithAddress.Address?.City,  
+        //        PhoneNumber = user.PhoneNumber,
+        //        Email = user.Email,
+        //        Token = accessToken
+        //    };
+
+        //}
         // دالة تسجيل مستخدم جديد
-        public async Task<UserRegisterationResultDto> RegisterAsync(RegisterDTO model)
+
+        public async Task<ApiResponse<UserRegisterationResultDto>> RegisterAsync(RegisterDTO model)
         {
-            // تحقق من صحة الـ DataAnnotations
             var validationContext = new ValidationContext(model);
             var validationResults = new List<ValidationResult>();
             bool isValid = Validator.TryValidateObject(model, validationContext, validationResults, true);
@@ -84,127 +127,294 @@ namespace Voltyks.Application
             if (!isValid)
             {
                 var errors = validationResults.Select(r => r.ErrorMessage).ToList();
-                throw new V_Exception.ValidationException(errors);
+                return new ApiResponse<UserRegisterationResultDto>
+                {
+                    Status = false,
+                    Message = "Validation failed",
+                    Data = null,
+                    Errors = errors
+                };
             }
 
-            // ✅ تحقق من تنسيق رقم الهاتف
             if (!Regex.IsMatch(model.PhoneNumber ?? "", @"^\+20\d{10}$"))
             {
-                throw new V_Exception.ValidationException(new[] { "Phone number must start with '+20' followed by 10 digits." });
+                return new ApiResponse<UserRegisterationResultDto>
+                {
+                    Status = false,
+                    Message = "Invalid phone number format",
+                    Data = null,
+                    Errors = new List<string> { ErrorMessages.invalidPhoneNumber }
+                };
             }
 
-
-            // ✅ تحقق من عدم تكرار الإيميل والرقم
             await CheckEmailExistsAsync(new EmailDto { Email = model.Email });
             await CheckPhoneNumberExistsAsync(new PhoneNumberDto { PhoneNumber = model.PhoneNumber });
 
-            // إنشاء المستخدم
             var user = CreateUserFromRegisterModel(model);
             await CreateUserAsync(user, model.Password);
 
-            return MapToUserResultDto(user);
+            return new ApiResponse<UserRegisterationResultDto>(
+                MapToUserResultDto(user),
+                "Registration successful"
+            );
         }
-        public async Task<string> RefreshJwtTokenAsync(RefreshTokenDto dto)
+
+        //public async Task<UserRegisterationResultDto> RegisterAsync(RegisterDTO model)
+        //{
+        //    // تحقق من صحة الـ DataAnnotations
+        //    var validationContext = new ValidationContext(model);
+        //    var validationResults = new List<ValidationResult>();
+        //    bool isValid = Validator.TryValidateObject(model, validationContext, validationResults, true);
+
+        //    if (!isValid)
+        //    {
+        //        var errors = validationResults.Select(r => r.ErrorMessage).ToList();
+        //        throw new V_Exception.ValidationException(errors);
+        //    }
+
+        //    // ✅ تحقق من تنسيق رقم الهاتف
+        //    if (!Regex.IsMatch(model.PhoneNumber ?? "", @"^\+20\d{10}$"))
+        //    {
+        //        throw new V_Exception.ValidationException(new[] {ErrorMessages.invalidPhoneNumber });
+        //    }
+
+
+        //    // ✅ تحقق من عدم تكرار الإيميل والرقم
+        //    await CheckEmailExistsAsync(new EmailDto { Email = model.Email });
+        //    await CheckPhoneNumberExistsAsync(new PhoneNumberDto { PhoneNumber = model.PhoneNumber });
+
+        //    // إنشاء المستخدم
+        //    var user = CreateUserFromRegisterModel(model);
+        //    await CreateUserAsync(user, model.Password);
+
+        //    return MapToUserResultDto(user);
+        //}
+        public async Task<ApiResponse<string>> RefreshJwtTokenAsync(RefreshTokenDto dto)
         {
-            var request = httpContextAccessor.HttpContext.Request;
-            var response = httpContextAccessor.HttpContext.Response;
-
-            var savedRefreshToken = request.Cookies["Refresh_Token"];
-            if (savedRefreshToken != dto.RefreshToken)
-                throw new SecurityTokenExpiredException("Refresh token is invalid or expired");
-
-            var user = await userManager.GetUserAsync(httpContextAccessor.HttpContext.User);
-            if (user == null)
-                throw new SecurityTokenExpiredException();
-
-            var redisStoredToken = await redisService.GetAsync($"refresh_token:{user.Id}");
-            if (redisStoredToken != dto.RefreshToken)
-                throw new UnAuthorizedException("Refresh token mismatch");
-
-            var newAccessToken = await GenerateJwtTokenAsync(user);
-
-            response.Cookies.Append("JWT_Token", newAccessToken, new CookieOptions
+            try
             {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddMinutes(20),
-                MaxAge = TimeSpan.FromMinutes(20)
-            });
+                var request = httpContextAccessor.HttpContext.Request;
+                var response = httpContextAccessor.HttpContext.Response;
 
-            return newAccessToken;
+                var savedRefreshToken = request.Cookies["Refresh_Token"];
+                if (savedRefreshToken != dto.RefreshToken)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = ErrorMessages.invalidOrMismatchedToken
+                    };
+                }
+
+                var user = await userManager.GetUserAsync(httpContextAccessor.HttpContext.User);
+                if (user == null)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = ErrorMessages.UnauthorizedAccess
+                    };
+                }
+
+                var redisStoredToken = await redisService.GetAsync($"refresh_token:{user.Id}");
+                if (redisStoredToken != dto.RefreshToken)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = ErrorMessages.refreshTokenMismatch
+                    };
+                }
+
+                var newAccessToken = await GenerateJwtTokenAsync(user);
+
+                response.Cookies.Append("JWT_Token", newAccessToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTime.UtcNow.AddMinutes(20),
+                    MaxAge = TimeSpan.FromMinutes(20)
+                });
+
+                return new ApiResponse<string>(
+                    data: newAccessToken,
+                    message: SuccessfulMessage.TokenRefreshedSuccessfully,
+                    status: true
+                );
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<string>
+                {
+                    Status = false,
+                    Message = ex.Message
+                };
+            }
         }
-      
-        public async Task CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
+
+
+        //public async Task CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
+        //{
+        //    var errors = new List<string>();
+
+        //    if (string.IsNullOrWhiteSpace(phoneNumberDto.PhoneNumber))
+        //        errors.Add(ErrorMessages.PhoneRequired);
+        //    else if (!IsPhoneNumber(phoneNumberDto.PhoneNumber))
+        //        errors.Add(ErrorMessages.invalidPhoneFormat);
+
+        //    var existingPhoneUser = await userManager.Users
+        //        .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumberDto.PhoneNumber);
+
+        //    if (existingPhoneUser is not null)
+        //        errors.Add(ErrorMessages.phoneAlreadyInUse);
+
+        //    if (errors.Any())
+        //        throw new V_Exception.ValidationException(errors);
+        //}
+
+
+        public async Task<ApiResponse<List<string>>> CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
         {
+            //var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(phoneNumberDto.PhoneNumber))
+                return new ApiResponse<List<string>>( ErrorMessages.PhoneRequired) { Status = false };
+
+            else if (!IsPhoneNumber(phoneNumberDto.PhoneNumber))
+                return new ApiResponse<List<string>>(ErrorMessages.invalidPhoneFormat) { Status = false };
+
             var existingPhoneUser = await userManager.Users
                 .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumberDto.PhoneNumber);
 
             if (existingPhoneUser is not null)
-                throw new V_Exception.ValidationException(new[] { "The phone number is already in use" });
+                return new ApiResponse<List<string>>(ErrorMessages.phoneAlreadyInUse) { Status = false };
+
+
+            return new ApiResponse<List<string>>(SuccessfulMessage.phoneIsAvailable) { Status = true };
         }
-        public async Task CheckEmailExistsAsync(EmailDto emailDto)
+
+
+        //public async Task CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
+        //{
+        //    if (!IsPhoneNumber(phoneNumberDto.PhoneNumber))
+        //        throw new V_Exception.ValidationException(new[] { ErrorMessages.invalidPhoneFormat });
+
+        //    var existingPhoneUser = await userManager.Users
+        //        .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumberDto.PhoneNumber);
+
+        //    if (existingPhoneUser is not null)
+        //        throw new V_Exception.ValidationException(new[] { ErrorMessages.phoneAlreadyInUse });
+        //}
+
+
+        public async Task<ApiResponse<List<string>>> CheckEmailExistsAsync(EmailDto emailDto)
         {
-            var existingEmailUser = await userManager.Users.FirstOrDefaultAsync(e => e.Email == emailDto.Email);
+            //var errors = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(emailDto.Email))
+                return new ApiResponse<List<string>>(ErrorMessages.EmailRequired) { Status = false };
+            else if (!IsEmail(emailDto.Email))
+                return new ApiResponse<List<string>>(ErrorMessages.invalidEmailFormat) { Status = false };
+
+            var existingEmailUser = await userManager.Users
+                .FirstOrDefaultAsync(e => e.Email == emailDto.Email);
 
             if (existingEmailUser is not null)
-                throw new V_Exception.ValidationException(new[] { "The Email is already in use" });
+                return new ApiResponse<List<string>>(ErrorMessages.emailAlreadyInUse) { Status = false };
+
+          
+
+            return new ApiResponse<List<string>>(null, "Success") { Status = true };
         }
+
+        //public async Task CheckEmailExistsAsync(EmailDto emailDto)
+        //{
+        //    var errors = new List<string>();
+
+        //    if (string.IsNullOrWhiteSpace(emailDto.Email))
+        //        errors.Add(ErrorMessages.EmailRequired);
+        //    else if (!IsEmail(emailDto.Email))
+        //        errors.Add(ErrorMessages.invalidEmailFormat);
+
+        //    var existingEmailUser = await userManager.Users
+        //        .FirstOrDefaultAsync(e => e.Email == emailDto.Email);
+
+        //    if (existingEmailUser is not null)
+        //        errors.Add(ErrorMessages.emailAlreadyInUse);
+
+        //    if (errors.Any())
+        //        throw new V_Exception.ValidationException(errors);
+        //}
+
+        //public async Task CheckEmailExistsAsync(EmailDto emailDto)
+        //{
+        //    if (!IsEmail(emailDto.Email))
+        //        throw new V_Exception.ValidationException(new[] {ErrorMessages.invalidEmailFormat});
+
+        //    var existingEmailUser = await userManager.Users
+        //        .FirstOrDefaultAsync(e => e.Email == emailDto.Email);
+
+        //    if (existingEmailUser is not null)
+        //        throw new V_Exception.ValidationException(new[] { ErrorMessages.emailAlreadyInUse });
+        //}
+
         // دالة تسجيل الدخول الخارجي
-        public async Task<UserLoginResultDto> ExternalLoginAsync(ExternalAuthDto model)
-        {
-           
-            if (model.Provider.ToLower() == "google")
-            {
-                var payload = await VerifyExternalToken(model); // تحقق من صحة التوكن (شرحها بعد قليل)
+        //public async Task<UserLoginResultDto> ExternalLoginAsync(ExternalAuthDto model)
+        //{
 
-                if (payload == null)
-                    throw new UnauthorizedAccessException("Invalid external authentication.");
-            }
-            else if (model.Provider.ToLower() == "facebook")
-            {
-                var verifyUrl = $"https://graph.facebook.com/me?access_token={model.IdToken}&fields=id,name,email";
-                using var client = new HttpClient();
+        //    if (model.Provider.ToLower() == "google")
+        //    {
+        //        var payload = await VerifyExternalToken(model); // تحقق من صحة التوكن (شرحها بعد قليل)
 
-
-                var response = await client.GetStringAsync(verifyUrl);
-
-                var userData = JsonConvert.DeserializeObject<FacebookUserDto>(response);
+        //        if (payload == null)
+        //            throw new UnauthorizedAccessException(ErrorMessages.invalidExternalAuthentication);
+        //    }
+        //    else if (model.Provider.ToLower() == "facebook")
+        //    {
+        //        var verifyUrl = $"https://graph.facebook.com/me?access_token={model.IdToken}&fields=id,name,email";
+        //        using var client = new HttpClient();
 
 
-                var user = await userManager.FindByEmailAsync(userData.Email);
-                if (user == null)
-                {
-                    user = new AppUser
-                    {
-                        Email = userData.Email,
-                        UserName = userData.Email,
-                        FullName = userData.Name,
-                        EmailConfirmed = true
-                    };
-                    await userManager.CreateAsync(user);
-                }
+        //        var response = await client.GetStringAsync(verifyUrl);
 
-                var token = await GenerateJwtTokenAsync(user);
+        //        var userData = JsonConvert.DeserializeObject<FacebookUserDto>(response);
 
-                return new UserLoginResultDto
-                {
-                    Email = user.Email,
-                    Token = token
-                };
-            }
-            throw new Exception("Unsupported provider");
 
-        }  
+        //        var user = await userManager.FindByEmailAsync(userData.Email);
+        //        if (user == null)
+        //        {
+        //            user = new AppUser
+        //            {
+        //                Email = userData.Email,
+        //                UserName = userData.Email,
+        //                FullName = userData.Name,
+        //                EmailConfirmed = true
+        //            };
+        //            await userManager.CreateAsync(user);
+        //        }
+
+        //        var token = await GenerateJwtTokenAsync(user);
+
+        //        return new UserLoginResultDto
+        //        {
+        //            Email = user.Email,
+        //            Token = token
+        //        };
+        //    }
+        //    throw new Exception("Unsupported provider");
+
+        //}  
         // دالة تسجيل الخروج
-        public async Task LogoutAsync(TokenDto dto)
+        public async Task<ApiResponse<List<string>>> LogoutAsync(TokenDto dto)
         {
             var tokenFromCookies = httpContextAccessor.HttpContext.Request.Cookies["JWT_Token"];
 
             // التحقق من تطابق الـ token في الكوكيز مع الـ token المرسل
             if (string.IsNullOrEmpty(tokenFromCookies) || tokenFromCookies != dto.Token)
             {
-                throw new UnauthorizedAccessException("Invalid or mismatched token.");
+                return new ApiResponse<List<string>>(ErrorMessages.invalidOrMismatchedToken) { Status = false };
+
             }
 
             // إزالة الجلسة من Redis
@@ -214,6 +424,9 @@ namespace Voltyks.Application
             var response = httpContextAccessor.HttpContext.Response;
             response.Cookies.Delete("JWT_Token");
             response.Cookies.Delete("Refresh_Token");
+
+            return new ApiResponse<List<string>>(SuccessfulMessage.logoutSuccessfully) { Status = true };
+
         }
 
 
@@ -225,7 +438,7 @@ namespace Voltyks.Application
             if (string.IsNullOrEmpty(input))
                 return false;
 
-            var phonePattern = @"^\+?[0-9\s\-]+$";
+            var phonePattern = @"^(?:\+20|0020|0)?1[0125]\d{8}$";
             return Regex.IsMatch(input, phonePattern);
         }
 
@@ -394,12 +607,25 @@ namespace Voltyks.Application
             };
         }
 
-        private async Task CreateUserAsync(AppUser user, string password)
+
+        private async Task<ApiResponse<List<string>>> CreateUserAsync(AppUser user, string password)
         {
             var result = await userManager.CreateAsync(user, password);
             if (!result.Succeeded)
-                throw new V_Exception.ValidationException(result.Errors.Select(e => e.Description));
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<List<string>>(errors, ErrorMessages.UserCreationFaild) { Status = false };
+            }
+
+            return new ApiResponse<List<string>>(null, SuccessfulMessage.UserCreationSuccessfully) { Status = true };
         }
+
+        //private async Task CreateUserAsync(AppUser user, string password)
+        //{
+        //    var result = await userManager.CreateAsync(user, password);
+        //    if (!result.Succeeded)
+        //        throw new V_Exception.ValidationException(result.Errors.Select(e => e.Description));
+        //}
 
         private UserRegisterationResultDto MapToUserResultDto(AppUser user)
         {

@@ -12,6 +12,6 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         [Required(ErrorMessage = "Phone number is required")]
         [StringLength(13, MinimumLength = 10, ErrorMessage = "Phone number must be between 10 and 13 characters")]
         [RegularExpression(@"^(?:\+20|0020|0)?1[0125]\d{8}$", ErrorMessage = "Phone number Invalid Egyptian mobile")]
-        public string PhoneNumber { get; set; }
+        public string EmailOrPhone { get; set; }
     }
 }

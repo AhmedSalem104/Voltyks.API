@@ -29,62 +29,62 @@ namespace Voltyks.Application.Services
             _smsSettings = smsSettings;
         }
 
-        public async Task<ApiResponse<string>> SendOtpAsync(SendOtpDto dto)
-        {
-            var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber); // 👈 Normalize the phone number
+        //public async Task<ApiResponse<string>> SendOtpAsync(SendOtpDto dto)
+        //{
+        //    var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber); // 👈 Normalize the phone number
 
-            if (await IsBlockedAsync(normalizedPhone))
-            {
-                return new ApiResponse<string>(
-                    $"You have exceeded the maximum number of OTP attempts. Please try again after {(int)BlockDuration.TotalSeconds} seconds.",
-                    false);
-            }
+        //    if (await IsBlockedAsync(normalizedPhone))
+        //    {
+        //        return new ApiResponse<string>(
+        //            $"You have exceeded the maximum number of OTP attempts. Please try again after {(int)BlockDuration.TotalSeconds} seconds.",
+        //            false);
+        //    }
 
-            int attempts = await GetCurrentAttemptsAsync(normalizedPhone);
-            attempts++;
+        //    int attempts = await GetCurrentAttemptsAsync(normalizedPhone);
+        //    attempts++;
 
-            if (attempts > MaxAttempts)
-            {
-                await BlockUserAsync(normalizedPhone);
-                return new ApiResponse<string>(
-                    $"You have been blocked for {(int)BlockDuration.TotalMinutes} minutes due to exceeding OTP attempts.",
-                    false);
-            }
+        //    if (attempts > MaxAttempts)
+        //    {
+        //        await BlockUserAsync(normalizedPhone);
+        //        return new ApiResponse<string>(
+        //            $"You have been blocked for {(int)BlockDuration.TotalMinutes} minutes due to exceeding OTP attempts.",
+        //            false);
+        //    }
 
-            await SaveAttemptsAsync(normalizedPhone, attempts);
+        //    await SaveAttemptsAsync(normalizedPhone, attempts);
 
-            var otp = GenerateOtp();
-            await SaveOtpAsync(normalizedPhone, otp);
+        //    var otp = GenerateOtp();
+        //    await SaveOtpAsync(normalizedPhone, otp);
 
-            var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
-            if (!isSent)
-                return new ApiResponse<string>("Failed to send OTP", false);
+        //    var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
+        //    if (!isSent)
+        //        return new ApiResponse<string>("Failed to send OTP", false);
 
-            return new ApiResponse<string>("OTP sent successfully", true);
-        }
+        //    return new ApiResponse<string>("OTP sent successfully", true);
+        //}
 
 
-        public async Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto)
-        {
+        //public async Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto)
+        //{
 
-            var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
+        //    var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
 
-            var cachedOtp = await _redisService.GetAsync($"otp:{normalizedPhone}");
+        //    var cachedOtp = await _redisService.GetAsync($"otp:{normalizedPhone}");
 
-            if (string.IsNullOrEmpty(cachedOtp))
-            {
-                return new ApiResponse<string>("OTP expired or not found", false);
-            }
+        //    if (string.IsNullOrEmpty(cachedOtp))
+        //    {
+        //        return new ApiResponse<string>("OTP expired or not found", false);
+        //    }
 
-            if (cachedOtp != dto.OtpCode)
-            {
-                return new ApiResponse<string>("Invalid OTP", false);
-            }
+        //    if (cachedOtp != dto.OtpCode)
+        //    {
+        //        return new ApiResponse<string>("Invalid OTP", false);
+        //    }
 
-            await _redisService.RemoveAsync($"otp:{normalizedPhone}");
+        //    await _redisService.RemoveAsync($"otp:{normalizedPhone}");
 
-            return new ApiResponse<string>("OTP verified successfully.");
-        }
+        //    return new ApiResponse<string>("OTP verified successfully.");
+        //}
 
         // ----------- Private Methods -----------
 

@@ -14,9 +14,9 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         [RegularExpression(@"^(?:\+20|0020|0)?1[0125]\d{8}$", ErrorMessage = "Phone number Invalid Egyptian mobile")]
         public string PhoneNumber { get; set; }
 
-        [Required(ErrorMessage = "OTP code is required")]
-        [RegularExpression(@"^\d{4}$", ErrorMessage = "OTP code must be exactly 4 digits")]
-        public string OtpCode { get; set; }
+        //[Required(ErrorMessage = "OTP code is required")]
+        //[RegularExpression(@"^\d{4}$", ErrorMessage = "OTP code must be exactly 4 digits")]
+        //public string OtpCode { get; set; }
 
         [Required(ErrorMessage = "New password is required")]
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be between 6 and 100 characters")]
