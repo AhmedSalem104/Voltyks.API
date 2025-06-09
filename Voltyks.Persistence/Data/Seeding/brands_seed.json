@@ -1,0 +1,146 @@
+[
+  {
+    "Id": 1,
+    "Name": "Audi"
+  },
+  {
+    "Id": 2,
+    "Name": "BMW"
+  },
+  {
+    "Id": 3,
+    "Name": "BYD"
+  },
+  {
+    "Id": 4,
+    "Name": "CUPRA"
+  },
+  {
+    "Id": 5,
+    "Name": "Cadillac"
+  },
+  {
+    "Id": 6,
+    "Name": "DS"
+  },
+  {
+    "Id": 7,
+    "Name": "Elaris"
+  },
+  {
+    "Id": 8,
+    "Name": "Ford"
+  },
+  {
+    "Id": 9,
+    "Name": "GWM ORA"
+  },
+  {
+    "Id": 10,
+    "Name": "Genesis"
+  },
+  {
+    "Id": 11,
+    "Name": "Hongqi"
+  },
+  {
+    "Id": 12,
+    "Name": "Hyundai"
+  },
+  {
+    "Id": 13,
+    "Name": "Jaguar"
+  },
+  {
+    "Id": 14,
+    "Name": "Kia"
+  },
+  {
+    "Id": 15,
+    "Name": "Lotus"
+  },
+  {
+    "Id": 16,
+    "Name": "Lucid"
+  },
+  {
+    "Id": 17,
+    "Name": "Maxus"
+  },
+  {
+    "Id": 18,
+    "Name": "Mercedes-Benz"
+  },
+  {
+    "Id": 19,
+    "Name": "NIO"
+  },
+  {
+    "Id": 20,
+    "Name": "Nissan"
+  },
+  {
+    "Id": 21,
+    "Name": "Opel"
+  },
+  {
+    "Id": 22,
+    "Name": "Peugeot"
+  },
+  {
+    "Id": 23,
+    "Name": "Polestar"
+  },
+  {
+    "Id": 24,
+    "Name": "Porsche"
+  },
+  {
+    "Id": 25,
+    "Name": "Renault"
+  },
+  {
+    "Id": 26,
+    "Name": "Rolls-Royce"
+  },
+  {
+    "Id": 27,
+    "Name": "Skoda"
+  },
+  {
+    "Id": 28,
+    "Name": "Skywell"
+  },
+  {
+    "Id": 29,
+    "Name": "Smart"
+  },
+  {
+    "Id": 30,
+    "Name": "Tesla"
+  },
+  {
+    "Id": 31,
+    "Name": "VinFast"
+  },
+  {
+    "Id": 32,
+    "Name": "Volkswagen"
+  },
+  {
+    "Id": 33,
+    "Name": "Volvo"
+  },
+  {
+    "Id": 34,
+    "Name": "Voyah"
+  },
+  {
+    "Id": 35,
+    "Name": "XPENG"
+  },
+  {
+    "Id": 36,
+    "Name": "Zeekr"
+  }
+]

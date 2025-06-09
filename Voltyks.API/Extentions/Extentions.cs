@@ -1,15 +1,19 @@
-﻿using System.Text;
+﻿using System.Data.Entity.Infrastructure;
+using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Voltyks.API.Middelwares;
-using Voltyks.Application;
+using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Services.AllowServices;
+using Voltyks.Application.Services.Auth;
 using Voltyks.Application.ServicesManager;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.ErrorModels;
+using Voltyks.Core.Mapping;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence;
 using Voltyks.Persistence.Data;
@@ -32,6 +36,9 @@ namespace Voltyks.API.Extentions
             services.ConfigreServices();
             services.ConfigureServices();
             services.ConfigureJwtServices(configuration);
+            services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsSettings"));
+            services.AddSingleton<SqlConnectionFactory>();
+            services.AddAutoMapper(typeof(MappingProfile));
 
             services.AddAuthentication()
             .AddGoogle("Google", options =>
@@ -44,15 +51,13 @@ namespace Voltyks.API.Extentions
                 options.AppId = configuration["Authentication:Facebook:client_id"];
                 options.AppSecret = configuration["Authentication:Facebook:client_secret"];
             });
-
-            services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsSettings"));
-
-
-
-
+            services.AddDbContext<VoltyksDbContext>(options =>
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
             return services;
 
         }
+
+
         private static IServiceCollection AddBuildInServices(this IServiceCollection services)
         {
             services.AddControllers();
@@ -109,14 +114,21 @@ namespace Voltyks.API.Extentions
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
-                app.UseSwaggerUI();
+                
+                app.UseSwaggerUI(c =>
+                {
+                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
+                    c.DefaultModelsExpandDepth(-1); // ✅ إخفاء قسم Schemas
+                });
             }
             app.UseStaticFiles();
             app.UseHttpsRedirection();
+            app.UseRouting();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
-            app.UseRouting();
+           
+
 
 
             return app;
@@ -152,30 +164,90 @@ namespace Voltyks.API.Extentions
         }
         private static IServiceCollection ConfigureJwtServices(this IServiceCollection services, IConfiguration configuration)
         {
-
             var jwtOptions = configuration.GetSection("JwtOptions").Get<JwtOptions>();
 
-            services.AddAuthentication(option =>
+            services.AddAuthentication(options =>
             {
-                option.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                option.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-            }).AddJwtBearer(option =>
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
             {
-                option.TokenValidationParameters = new TokenValidationParameters()
+                options.RequireHttpsMetadata = false; // useful in development
+                options.SaveToken = true;
+
+                options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
                     ValidateAudience = true,
-                    ValidateIssuerSigningKey = true,
                     ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
 
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey)),
+                    ClockSkew = TimeSpan.Zero // ⬅️ optional: to reduce token expiry delays
                 };
             });
 
-            return services;
+            // ✅ Add support for JWT in Swagger (inside same method optionally)
+            services.AddSwaggerGen(c =>
+            {
+                c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+                    Scheme = "Bearer",
+                    BearerFormat = "JWT",
+                    In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                    Description = "Enter 'Bearer' followed by space and your JWT token."
+                });
 
+                c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+        {
+            {
+                new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                {
+                    Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                    {
+                        Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
+                },
+                Array.Empty<string>()
+            }
+        });
+            });
+
+            return services;
         }
+
+        //private static IServiceCollection ConfigureJwtServices(this IServiceCollection services, IConfiguration configuration)
+        //{
+
+        //    var jwtOptions = configuration.GetSection("JwtOptions").Get<JwtOptions>();
+
+        //    services.AddAuthentication(option =>
+        //    {
+        //        option.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        //        option.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        //    }).AddJwtBearer(option =>
+        //    {
+        //        option.TokenValidationParameters = new TokenValidationParameters()
+        //        {
+        //            ValidateIssuer = true,
+        //            ValidateAudience = true,
+        //            ValidateIssuerSigningKey = true,
+        //            ValidateLifetime = true,
+
+        //            ValidIssuer = jwtOptions.Issuer,
+        //            ValidAudience = jwtOptions.Audience,
+        //            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey)),
+        //        };
+        //    });
+
+        //    return services;
+
+        //}
     }
 }

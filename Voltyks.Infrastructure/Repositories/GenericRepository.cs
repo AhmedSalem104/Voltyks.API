@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 using Voltyks.Persistence.Data;
@@ -10,74 +11,69 @@ using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Infrastructure
 {
+
     public class GenericRepository<TEntity, TKey> : IGenericRepository<TEntity, TKey>
-        where TEntity : BaseEntity<TKey>
+      where TEntity : BaseEntity<TKey>
     {
         private readonly VoltyksDbContext _context;
 
         public GenericRepository(VoltyksDbContext context)
         {
-            _context=context;
+            _context = context;
         }
 
-        //public async Task<IEnumerable<TEntity>> GetAllAsync(bool trackChanges = false)
-        //{
-        //    if (typeof(TEntity) == typeof(Product))
-        //    {
-        //        return trackChanges ?
-        //             await _context.Products.Include(P => P.ProductBrand).Include(P => P.ProductType).ToListAsync() as IEnumerable<TEntity>
-        //             : await _context.Products.Include(P => P.ProductBrand).Include(P => P.ProductType).AsNoTracking().ToListAsync() as IEnumerable<TEntity>;
-        //    }
+        public async Task<IEnumerable<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>>? filter = null, bool trackChanges = false)
+        {
+            IQueryable<TEntity> query = _context.Set<TEntity>();
 
-        //    return trackChanges ?
-        //         await _context.Set<TEntity>().ToListAsync()
-        //         : await _context.Set<TEntity>().AsNoTracking().ToListAsync();
+            if (!trackChanges)
+                query = query.AsNoTracking();
 
-        //    //if (trackChanges) return await _context.Set<TEntity>().ToListAsync();
-        //    //return await _context.Set<TEntity>().AsNoTracking().ToListAsync();
-        //}
+            if (filter is not null)
+                query = query.Where(filter);
 
-        //public async Task<TEntity?> GetAsync(TKey id)
-        //{
-        //    if (typeof(TEntity) == typeof(Product))
-        //    {
-        //        //return await _context.Products.Include(P => P.ProductBrand).Include(P => P.ProductType).FirstOrDefaultAsync(P => P.Id == id as int?) as TEntity;
-        //        return await _context.Products.Where(P => P.Id == id as int?).Include(P => P.ProductBrand).Include(P => P.ProductType).FirstOrDefaultAsync() as TEntity;
-        //    }
-        //    return await _context.Set<TEntity>().FindAsync(id);
-        //}
+            return await query.ToListAsync();
+        }
 
-        //public async Task AddAsync(TEntity entity)
-        //{
-        //    await _context.AddAsync(entity);
-        //}
+        public async Task<TEntity?> GetAsync(TKey id)
+        {
+            return await _context.Set<TEntity>().FindAsync(id);
+        }
 
-        //public void Update(TEntity entity)
-        //{
-        //    _context.Update(entity);
-        //}
+        public async Task<IEnumerable<TEntity>> GetAllWithIncludeAsync(
+        Expression<Func<TEntity, bool>>? filter = null,
+        bool trackChanges = false,
+        params Expression<Func<TEntity, object>>[] includes)
+        {
+            IQueryable<TEntity> query = _context.Set<TEntity>();
 
-        //public void Delete(TEntity entity)
-        //{
-        //    _context.Remove(entity);
-        //}
+            if (!trackChanges)
+                query = query.AsNoTracking();
 
-        //public async Task<IEnumerable<TEntity>> GetAllAsync(ISpecifications<TEntity, TKey> spec, bool trackChanges = false)
-        //{
-        //    return await ApplySpecifications(spec).ToListAsync();
-        //}
+            if (filter is not null)
+                query = query.Where(filter);
 
-        //public async Task<TEntity?> GetAsync(ISpecifications<TEntity, TKey> spec)
-        //{
-        //    return await ApplySpecifications(spec).FirstOrDefaultAsync();
-        //}
+            foreach (var include in includes)
+                query = query.Include(include);
 
-        //public async Task<int> CountAsync(ISpecifications<TEntity, TKey> spec)
-        //{
-        //   return await  ApplySpecifications(spec).CountAsync();
-        //}
+            return await query.ToListAsync();
+        }
 
-     
-      
+
+        public async Task AddAsync(TEntity entity)
+        {
+            await _context.Set<TEntity>().AddAsync(entity);
+        }
+
+        public void Update(TEntity entity)
+        {
+            _context.Set<TEntity>().Update(entity);
+        }
+
+        public void Delete(TEntity entity)
+        {
+            _context.Set<TEntity>().Remove(entity);
+        }
     }
+
 }

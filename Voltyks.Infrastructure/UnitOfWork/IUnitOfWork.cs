@@ -7,13 +7,20 @@ using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Infrastructure.UnitOfWork
 {
+
+
     public interface IUnitOfWork
     {
         Task<int> SaveChangesAsync();
 
+        // Generic EF Repositories
+        IGenericRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
+            where TEntity : BaseEntity<TKey>;
 
-        // Generate Repository
-        IGenericRepository<TEntity, TKey> GetRepository<TEntity, TKey>() where TEntity : BaseEntity<TKey>;
+        // Dapper Repositories
+        //IUserDapperRepository UserDapper { get; }
+        //Brand brand  { get; }
 
     }
+
 }

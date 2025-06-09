@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Persistence.Data
 {
@@ -17,6 +18,9 @@ namespace Voltyks.Persistence.Data
             base.OnModelCreating(modelBuilder);
         }
 
-        // public DbSet<Product> Products { get; set; }
+        public DbSet<Vehicle> Vehicles { get; set; }
+        public DbSet<Brand> Brands { get; set; }
+        public DbSet<Model> Models { get; set; }
+
     }
 }

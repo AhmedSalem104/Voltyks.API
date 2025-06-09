@@ -33,16 +33,11 @@ namespace Voltyks.Persistence.Entities
         public const string otpAttemptLimitExceededTryLater = "otpAttemptLimitExceededTryLater";
         public const string otpAttemptsExceededBlockedForMinutes = "otpAttemptsExceededBlockedForMinutes";
         public const string failedToSendOtp = "failedToSendOtp";
-
         public const string phoneAlreadyInUse = "phoneAlreadyInUse";
         public const string emailAlreadyInUse = "emailAlreadyInUse";
         public const string invalidPhoneFormat = "invalidPhoneFormat";
         public const string invalidEmailFormat = "invalidEmailFormat";
         public const string UserCreationFaild = "UserCreationFaild";
-
-
-        
-
         public const string invalidPasswordOrEmailAddress = "invalidPasswordOrEmailAddress";
         public const string emailDoesNotExist = "emailDoesNotExist";
         public const string noPhoneAssociated = "noPhoneAssociated";
@@ -54,6 +49,9 @@ namespace Voltyks.Persistence.Entities
         public const string invalidOrMismatchedToken = "invalidOrMismatchedToken";
         public const string invalidPhoneNumber = "invalidPhoneNumber";
 
+        public const string faildGetBrands = "faildGetBrands";
+        public const string noModelsFoundForThisBrand = "noModelsFoundForThisBrand";
+        public const string NoYearsFoundForThisModel = "NoYearsFoundForThisModel";
 
 
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Persistence.Entities
 {
@@ -21,7 +22,9 @@ namespace Voltyks.Persistence.Entities
         public const string phoneIsAvailable = "phoneIsAvailable";
         public const string UserCreationSuccessfully = "UserCreationSuccessfully";
         public const string logoutSuccessfully = "logoutSuccessfully";
-
+        public const string brandsGetSuccessfully = "brandsGetSuccessfully";
+        public const string modelsRetrievedSuccessfully = "modelsRetrievedSuccessfully";
+        public const string yearsRetrievedSuccessfully = "yearsRetrievedSuccessfully";
 
 
 

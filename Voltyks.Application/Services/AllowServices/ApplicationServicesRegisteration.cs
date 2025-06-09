@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Twilio.TwiML.Voice;
-using Voltyks.Application.Interfaces;
+using Voltyks.Application.Interfaces.SMSEgypt;
+using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.ServicesManager;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
@@ -23,13 +24,8 @@ namespace Voltyks.Application.Services.AllowServices
             services.AddAutoMapper(typeof(AssemblyReference).Assembly);
             services.AddScoped<IServiceManager, ServiceManager>();
             services.Configure<JwtOptions>(configuration.GetSection("JwtOptions"));
-            services.Configure<TwilioSettings>(configuration.GetSection("Twilio"));
             services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsEgyptSettings"));
-            services.Configure<SmsBeOnSettings>(configuration.GetSection("SmsBeOnSettings"));
-            services.Configure<ChatApiSettings>(configuration.GetSection("ChatApi"));
-            services.AddScoped<ITwilioService, TwilioService>();
             services.AddScoped<ISmsEgyptService, SmsEgyptService>();
-            services.AddScoped<ISmsBeOnService, SmsBeOnService>();
             services.AddHttpClient();
 
 

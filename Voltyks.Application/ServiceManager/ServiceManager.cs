@@ -1,15 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Voltyks.Application.Interfaces;
+using Voltyks.Application.Interfaces.Auth;
+using Voltyks.Application.Interfaces.Brand;
+using Voltyks.Application.Interfaces.Redis;
+using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Services;
+using Voltyks.Application.Services.Auth;
+using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Infrastructure.UnitOfWork;
@@ -22,16 +24,21 @@ namespace Voltyks.Application.ServicesManager
         IHttpContextAccessor httpContextAccessor
         ,IHttpClientFactory httpClientFactory
         , IOptions<JwtOptions> options
-        , IOptions<TwilioSettings> twilioSettings
         , IOptions<SmsEgyptSettings> SmsSettings
-        , IOptions<SmsBeOnSettings> smsBeOnSettings
         , IRedisService redisService
-        , IConfiguration configuration) : IServiceManager
+        , IConfiguration configuration
+        , IUnitOfWork unitOfWork
+        , IMapper mapper) : IServiceManager
     {
       
-        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, twilioSettings, redisService,configuration);
+        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration);
         public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager);
-        public ISmsBeOnService SmsBeOnService { get; } = new SmsBeOnService(redisService, httpClientFactory, smsBeOnSettings);
+        public IBrandService BrandService { get; } = new BrandService(unitOfWork);
+        public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
+        public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
+
+
+       
 
     }
 }

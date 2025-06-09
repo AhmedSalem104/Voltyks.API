@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Persistence.Entities.Identity
 {
