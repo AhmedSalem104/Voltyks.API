@@ -1,5 +1,6 @@
 ﻿
 using System.Net;
+using Voltyks.Core.DTOs;
 using Voltyks.Core.ErrorModels;
 using Voltyks.Core.Exceptions;
 
@@ -40,36 +41,68 @@ namespace Voltyks.API.Middelwares
                 await HandlingErrorAsync(context, ex);
             }
         }
-
         private static async Task HandlingErrorAsync(HttpContext context, Exception ex)
         {
-            // إعداد نوع المحتوى كـ JSON للرد
             context.Response.ContentType = "application/json";
 
-            // إنشاء كائن الخطأ لتضمين الحالة والرسالة
-            var response = new ErrorDetails
+            int statusCode = ex switch
             {
-                StatusCode = StatusCodes.Status500InternalServerError, // القيمة الافتراضية
-                ErrorMessage = ex.Message // عرض رسالة الخطأ الفعلية
-            };
-
-            // تحديد كود الحالة حسب نوع الاستثناء باستخدام switch expression
-            response.StatusCode = ex switch
-            {
-                NotFoundException => StatusCodes.Status404NotFound, // إذا كان الخطأ من نوع NotFound
-                BadRequestException => StatusCodes.Status400BadRequest, // إذا كان الخطأ من نوع BadRequest
+                NotFoundException => StatusCodes.Status404NotFound,
+                BadRequestException => StatusCodes.Status400BadRequest,
                 UnAuthorizedException => StatusCodes.Status401Unauthorized,
-
-
-                _ => StatusCodes.Status500InternalServerError // لجميع الأخطاء الأخرى
+                _ => StatusCodes.Status500InternalServerError
             };
 
-            // ضبط كود الحالة في الرد حسب النتيجة أعلاه
-            context.Response.StatusCode = response.StatusCode;
+            context.Response.StatusCode = statusCode;
 
-            // إرسال الرد بصيغة JSON
+            // ✅ استخدم ApiResponse بدل ErrorDetails
+            var response = new ApiResponse<string>(
+                  message: ex.Message,
+                  status: false,
+                  errors: ex switch
+                  {
+                      ValidationException ve => ve.Errors?
+                          .Distinct()
+                          .ToList(),
+
+                      _ => null
+                  }
+              );
+
+
+
             await context.Response.WriteAsJsonAsync(response);
         }
+
+        //private static async Task HandlingErrorAsync(HttpContext context, Exception ex)
+        //{
+        //    // إعداد نوع المحتوى كـ JSON للرد
+        //    context.Response.ContentType = "application/json";
+
+        //    // إنشاء كائن الخطأ لتضمين الحالة والرسالة
+        //    var response = new ErrorDetails
+        //    {
+        //        StatusCode = StatusCodes.Status500InternalServerError, // القيمة الافتراضية
+        //        ErrorMessage = ex.Message // عرض رسالة الخطأ الفعلية
+        //    };
+
+        //    // تحديد كود الحالة حسب نوع الاستثناء باستخدام switch expression
+        //    response.StatusCode = ex switch
+        //    {
+        //        NotFoundException => StatusCodes.Status404NotFound, // إذا كان الخطأ من نوع NotFound
+        //        BadRequestException => StatusCodes.Status400BadRequest, // إذا كان الخطأ من نوع BadRequest
+        //        UnAuthorizedException => StatusCodes.Status401Unauthorized,
+        //        _ => StatusCodes.Status500InternalServerError // لجميع الأخطاء الأخرى
+
+
+        //    };
+
+        //    // ضبط كود الحالة في الرد حسب النتيجة أعلاه
+        //    context.Response.StatusCode = response.StatusCode;
+
+        //    // إرسال الرد بصيغة JSON
+        //    await context.Response.WriteAsJsonAsync(response);
+        //}
 
         private static async Task HandlingNotFoundEndpoint(HttpContext context)
         {

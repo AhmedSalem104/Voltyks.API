@@ -1,5 +1,6 @@
 ﻿using System.Data.Entity.Infrastructure;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -11,12 +12,14 @@ using Voltyks.Application.Services.AllowServices;
 using Voltyks.Application.Services.Auth;
 using Voltyks.Application.ServicesManager;
 using Voltyks.Application.ServicesManager.ServicesManager;
+using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.ErrorModels;
 using Voltyks.Core.Mapping;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence;
 using Voltyks.Persistence.Data;
+using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 
@@ -173,6 +176,25 @@ namespace Voltyks.API.Extentions
             })
             .AddJwtBearer(options =>
             {
+                // ✅ تعديل الرسالة هنا
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType = "application/json";
+
+                        var response = new ApiResponse<string>(
+                            message: "Authorization token is missing or invalid.",
+                            status: false
+                        );
+
+                        var result = JsonSerializer.Serialize(response);
+                        return context.Response.WriteAsync(result);
+                    }
+                };
+
                 options.RequireHttpsMetadata = false; // useful in development
                 options.SaveToken = true;
 
