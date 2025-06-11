@@ -11,6 +11,8 @@ namespace Voltyks.Core.DTOs.ModelDTOs
     {
         public int ModelId { get; set; }
         public string ModelName { get; set; }
+        public double Capacity { get; set; }
+
         public BrandDto Brand { get; set; }
     }
 
