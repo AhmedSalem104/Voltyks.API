@@ -12,8 +12,8 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    [Migration("20250609112202_addCoiumnYearInVehicleEntity")]
-    partial class addCoiumnYearInVehicleEntity
+    [Migration("20250611185948_AddVehicleModeule")]
+    partial class AddVehicleModeule
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -308,6 +308,9 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<int>("BrandId")
                         .HasColumnType("int");
 
+                    b.Property<double>("Capacity")
+                        .HasColumnType("float");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -338,6 +341,9 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     b.Property<DateTime>("CreationDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ModelId")
                         .HasColumnType("int");

@@ -305,6 +305,9 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<int>("BrandId")
                         .HasColumnType("int");
 
+                    b.Property<double>("Capacity")
+                        .HasColumnType("float");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)

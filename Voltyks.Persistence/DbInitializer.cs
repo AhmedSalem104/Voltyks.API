@@ -44,7 +44,7 @@ namespace Voltyks.Persistence
                 if (!_context.Brands.Any())
                 {
                     // 1. Read All Data brands From Json File
-                    var brandsData = await File.ReadAllTextAsync(@"..\Persistence\Data\Seeding\brands_seed.json");
+                    var brandsData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\brands_seed.json");
 
                     // 2. Transform The Data To List<Brands>
                     var brands = JsonSerializer.Deserialize<List<Brand>>(brandsData);
@@ -60,8 +60,9 @@ namespace Voltyks.Persistence
                 //// Seeding For Models Form Json File
                 if (!_context.Models.Any())
                 {
-                    // 1. Read All Data types From Json File
-                    var typesData = await File.ReadAllTextAsync(@"..\Persistence\Data\Seeding\models_seed.json");
+                // 1. Read All Data types From Json File
+
+                var typesData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\models_seed.json");
 
                     // 2. Transform The Data To List<Models>
                     var types = JsonSerializer.Deserialize<List<Model>>(typesData);

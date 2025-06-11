@@ -15,6 +15,8 @@ namespace Voltyks.Persistence.Entities.Main
         // Foreign Keys
         public int BrandId { get; set; }
 
+        public double Capacity { get; set; }
+
         // Navigation properties
         public Brand? Brand { get; set; }
 

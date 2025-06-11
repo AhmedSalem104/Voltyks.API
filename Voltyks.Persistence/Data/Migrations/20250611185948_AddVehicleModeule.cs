@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Voltyks.Persistence.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class addVehicleModule : Migration
+    public partial class AddVehicleModeule : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,7 +31,8 @@ namespace Voltyks.Persistence.Data.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    BrandId = table.Column<int>(type: "int", nullable: false)
+                    BrandId = table.Column<int>(type: "int", nullable: false),
+                    Capacity = table.Column<double>(type: "float", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -53,6 +54,8 @@ namespace Voltyks.Persistence.Data.Migrations
                     Color = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Plate = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     CreationDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Year = table.Column<int>(type: "int", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     BrandId = table.Column<int>(type: "int", nullable: false),
                     ModelId = table.Column<int>(type: "int", nullable: false),
                     UserId = table.Column<string>(type: "nvarchar(450)", nullable: false)
