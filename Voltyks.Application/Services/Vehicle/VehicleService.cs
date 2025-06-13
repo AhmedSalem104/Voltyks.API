@@ -12,6 +12,7 @@ using System.Linq.Expressions;
 using Voltyks.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using Voltyks.Persistence.Entities;
 
 namespace Voltyks.Application.Services
 {
@@ -27,41 +28,42 @@ namespace Voltyks.Application.Services
             _mapper = mapper;
             _httpContextAccessor = httpContextAccessor;
         }
-
-        // ✅ استخراج UserId من التوكن
-        private string GetCurrentUserId()
-        {
-            return _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
-                   ?? throw new UnauthorizedAccessException("User not authenticated.");
-        }
-
+      
         public async Task<ApiResponse<VehicleDto>> CreateVehicleAsync(CreateVehicleDto dto)
         {
             var repo = _unitOfWork.GetRepository<Vehicle, int>();
+            var userId = GetCurrentUserId();
+
+            // ✅ التحقق إذا كان المستخدم لديه مركبة بالفعل
+            var existingVehicle = await repo.GetAllAsync(v => v.UserId == userId && !v.IsDeleted);
+
+            if (existingVehicle.Any())
+            {
+                return new ApiResponse<VehicleDto>(ErrorMessages.UserAlreadyHasVehicle, false);
+            }
+
             var vehicle = _mapper.Map<Vehicle>(dto);
-            vehicle.UserId = GetCurrentUserId(); // ربط بالمستخدم الحالي
+            vehicle.UserId = GetCurrentUserId();
 
             await repo.AddAsync(vehicle);
             await _unitOfWork.SaveChangesAsync();
 
-            return await GetVehicleDtoById(vehicle.Id, "Vehicle created successfully");
+            return await GetVehicleDtoById(vehicle.Id, SuccessfulMessage.vehicleCreatedSuccessfully);
         }
-
         public async Task<ApiResponse<VehicleDto>> UpdateVehicleAsync(int id, UpdateVehicleDto dto)
         {
             var repo = _unitOfWork.GetRepository<Vehicle, int>();
             var vehicle = await repo.GetAsync(id);
 
             if (vehicle == null || vehicle.UserId != GetCurrentUserId())
-                return new ApiResponse<VehicleDto>("Vehicle not found or not authorized", false);
+                return new ApiResponse<VehicleDto>(ErrorMessages.VehicleNotFoundOrNotAuthorized, false);
 
             _mapper.Map(dto, vehicle);
             repo.Update(vehicle);
             await _unitOfWork.SaveChangesAsync();
 
-            return await GetVehicleDtoById(vehicle.Id, "Vehicle updated successfully");
+            return await GetVehicleDtoById(vehicle.Id, SuccessfulMessage.VehicleUpdatedSuccessfully);
         }
-
         public async Task<ApiResponse<IEnumerable<VehicleDto>>> GetVehiclesByUserIdAsync()
         {
             var currentUserId = GetCurrentUserId();
@@ -77,25 +79,30 @@ namespace Voltyks.Application.Services
                     });
 
             var dtos = _mapper.Map<IEnumerable<VehicleDto>>(vehicles);
-            return new ApiResponse<IEnumerable<VehicleDto>>(dtos, "Vehicles retrieved", true);
+            return new ApiResponse<IEnumerable<VehicleDto>>(dtos, SuccessfulMessage.VehiclesRetrieved, true);
         }
-
         public async Task<ApiResponse<bool>> DeleteVehicleAsync(int vehicleId)
         {
             var repo = _unitOfWork.GetRepository<Vehicle, int>();
             var vehicle = await repo.GetAsync(vehicleId);
 
             if (vehicle == null || vehicle.UserId != GetCurrentUserId())
-                return new ApiResponse<bool>("Vehicle not found or not authorized", false);
+                return new ApiResponse<bool>(ErrorMessages.VehicleNotFoundOrNotAuthorized, false);
 
             vehicle.IsDeleted = true;
             repo.Update(vehicle);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiResponse<bool>(true, "Vehicle deleted", true);
+            return new ApiResponse<bool>(true, SuccessfulMessage.VehicleDeleted, true);
         }
 
-        // 🔹 Helper method
+
+        // ---------- Private Methods ----------
+        private string GetCurrentUserId()
+        {
+            return _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                   ?? throw new UnauthorizedAccessException(ErrorMessages.UserNotAuthenticated);
+        }
         private async Task<ApiResponse<VehicleDto>> GetVehicleDtoById(int id, string message)
         {
             var repo = _unitOfWork.GetRepository<Vehicle, int>();

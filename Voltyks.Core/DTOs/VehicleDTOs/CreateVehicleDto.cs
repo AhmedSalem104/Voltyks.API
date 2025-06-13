@@ -14,7 +14,6 @@ namespace Voltyks.Core.DTOs.VehicleDTOs
         public int BrandId { get; set; }
         public int ModelId { get; set; }
         public int Year { get; set; }
-        public string UserId { get; set; }
     }
 
 }

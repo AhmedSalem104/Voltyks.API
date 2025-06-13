@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Net.WebRequestMethods;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Voltyks.Persistence.Entities
@@ -52,7 +53,12 @@ namespace Voltyks.Persistence.Entities
         public const string faildGetBrands = "faildGetBrands";
         public const string noModelsFoundForThisBrand = "noModelsFoundForThisBrand";
         public const string NoYearsFoundForThisModel = "NoYearsFoundForThisModel";
+        public const string otpLimitExceededForToday = "otpLimitExceededForToday";
+        public const string UserAlreadyHasVehicle = "UserAlreadyHasVehicle";
+        public const string UserNotAuthenticated = "UserNotAuthenticated";
+        public const string VehicleNotFoundOrNotAuthorized = "VehicleNotFoundOrNotAuthorized";
 
+        
 
 
 

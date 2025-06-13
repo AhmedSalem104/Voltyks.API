@@ -25,7 +25,13 @@ namespace Voltyks.Persistence.Entities
         public const string brandsGetSuccessfully = "brandsGetSuccessfully";
         public const string modelsRetrievedSuccessfully = "modelsRetrievedSuccessfully";
         public const string yearsRetrievedSuccessfully = "yearsRetrievedSuccessfully";
+        public const string registrationSuccessfully = "registrationSuccessfully";
+        public const string vehicleCreatedSuccessfully = "vehicleCreatedSuccessfully";
+        public const string VehicleUpdatedSuccessfully = "VehicleUpdatedSuccessfully";
+        public const string VehiclesRetrieved = "VehiclesRetrieved";
+        public const string VehicleDeleted = "VehicleDeleted";
 
+        
 
 
 

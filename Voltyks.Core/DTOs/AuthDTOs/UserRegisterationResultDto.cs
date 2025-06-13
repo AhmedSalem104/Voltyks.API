@@ -9,11 +9,8 @@ namespace Voltyks.Core.DTOs.AuthDTOs
 {
     public class UserRegisterationResultDto
     {
-        
-        public string Email { get; set; }
-        
-       
-        
-
+        [Required(ErrorMessage = "Email is required")]
+        [EmailAddress(ErrorMessage = "Invalid Email Address")]
+        public string Email { get; set; }               
     }
 }

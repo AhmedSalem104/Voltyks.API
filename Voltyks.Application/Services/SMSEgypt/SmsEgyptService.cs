@@ -25,8 +25,6 @@ namespace Voltyks.Application.Services.SMSEgypt
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<SmsEgyptSettings> _smsSettings;
         private readonly UserManager<AppUser> _userManager;
-        
-
         private const int MaxAttempts = 5;
         private readonly TimeSpan BlockDuration = TimeSpan.FromMinutes(2);
 
@@ -38,30 +36,36 @@ namespace Voltyks.Application.Services.SMSEgypt
             _userManager = userManager;
         }
 
-
-
         public async Task<ApiResponse<string>> SendOtpAsync(SendOtpDto dto)
         {
-            var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber); // ✅ توحيد تنسيق الرقم
+            var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
 
+            /* 1️⃣ تحقق من حد الرسائل اليومية */
+            var dailyLimitResult = await CheckAndIncrementOtpDailyLimitAsync(normalizedPhone);
+            if (!dailyLimitResult.Status)
+                return new ApiResponse<string>(dailyLimitResult.Message, false);
+
+            /* 2️⃣ تحقق من الحظر المؤقت بسبب إدخال OTP خطأ أكثر من المسموح */
             if (await IsBlockedAsync(normalizedPhone))
             {
-                return new ApiResponse<string>(string.Format(ErrorMessages.otpAttemptLimitExceededTryLater, (int)BlockDuration.TotalSeconds), false);
+                return new ApiResponse<string>(
+                    string.Format(ErrorMessages.otpAttemptLimitExceededTryLater, (int)BlockDuration.TotalSeconds),
+                    false);
             }
 
+            /* 3️⃣ عدّ المحاولات الفاشلة لإدخال الـ OTP (حماية من التحايل) */
             int attempts = await GetCurrentAttemptsAsync(normalizedPhone);
             attempts++;
-
             if (attempts > MaxAttempts)
             {
                 await BlockUserAsync(normalizedPhone);
-                return new ApiResponse<string>(string.Format(ErrorMessages.otpAttemptsExceededBlockedForMinutes, (int)BlockDuration.TotalMinutes), false);
-
-               
+                return new ApiResponse<string>(
+                    string.Format(ErrorMessages.otpAttemptsExceededBlockedForMinutes, (int)BlockDuration.TotalMinutes),
+                    false);
             }
-
             await SaveAttemptsAsync(normalizedPhone, attempts);
 
+            /* 4️⃣ توليد وحفظ الـ OTP ثم إرسالها */
             var otp = GenerateOtp();
             await SaveOtpAsync(normalizedPhone, otp);
 
@@ -71,7 +75,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.otpSentSuccessfully, true);
         }
-
         public async Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto)
         {
 
@@ -96,36 +99,32 @@ namespace Voltyks.Application.Services.SMSEgypt
 
         public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
         {
-            // توحيد رقم الهاتف
             var normalizedPhone = NormalizePhoneNumber(dto.EmailOrPhone);
 
+            /* 1️⃣ تحقق من حد الرسائل اليومية قبل أي شيء */
+            var dailyLimitResult = await CheckAndIncrementOtpDailyLimitAsync(normalizedPhone);
+            if (!dailyLimitResult.Status)
+                return new ApiResponse<string>(dailyLimitResult.Message, false);
+
+            /* 2️⃣ تأكد إن المستخدم موجود */
             var user = await GetUserByUsernameOrPhoneAsync(dto.EmailOrPhone);
-            // التأكد من وجود المستخدم بهذا الرقم
-            user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
+            //var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
             if (user == null)
-            {
                 return new ApiResponse<string>(ErrorMessages.PhoneNumberNotExist, false);
-            }
 
-            // تحقق من الحظر بسبب المحاولات السابقة (بنفس فكرة SmsEgyptService)
+            /* 3️⃣ تحقق من الحظر المؤقت (في حالة محاولات كثيرة خاطئة) */
             if (await _redisService.GetAsync($"otp_block:{normalizedPhone}") != null)
-            {
                 return new ApiResponse<string>(ErrorMessages.ExceededMaximumOTPAttempts, false);
-            }
 
-            // توليد OTP (يمكن تستخدم دالة GenerateOtp() الموجودة في SmsEgyptService)
+            /* 4️⃣ توليد وإرسال OTP */
             var otp = GenerateOtp();
-
-            // حفظ OTP في Redis لمدة 5 دقائق (مثلاً)
             await _redisService.SetAsync($"forget_password_otp:{normalizedPhone}", otp, TimeSpan.FromMinutes(5));
 
-            // إرسال رسالة OTP للمستخدم (يمكن إعادة استخدام SendOtpMessageAsync من SmsEgyptService)
             var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
-
             if (!isSent)
                 return new ApiResponse<string>(ErrorMessages.OTPSendingFailed, false);
 
-            return new ApiResponse<string>(ErrorMessages.otpSentSuccessfully, true);
+            return new ApiResponse<string>(SuccessfulMessage.otpSentSuccessfully, true);
         }
         public async Task<ApiResponse<string>> VerifyForgetPasswordOtpAsync(VerifyForgetPasswordOtpDto dto)
         {
@@ -187,11 +186,55 @@ namespace Voltyks.Application.Services.SMSEgypt
             return new ApiResponse<string>(SuccessfulMessage.passwordResetSuccessfully, true);
         }
 
+        public string GenerateOtp()
+        {
+            return new Random().Next(1000, 9999).ToString();
+        }
+        public async Task SaveOtpAsync(string phoneNumber, string otp)
+        {
+            await _redisService.SetAsync($"otp:{phoneNumber}", otp, TimeSpan.FromMinutes(5));
+        }
+        public async Task<bool> SendOtpMessageAsync(string phoneNumber, string otp)
+        {
+            string message = $"Your OTP is {otp}";
+            string fullUrl = $"{_smsSettings.Value.BaseUrl}?username={_smsSettings.Value.Username}&password={_smsSettings.Value.Password}&sendername={_smsSettings.Value.SenderName}&message={Uri.EscapeDataString(message)}&mobiles={phoneNumber}";
 
+            var client = _httpClientFactory.CreateClient();
+            var response = await client.GetAsync(fullUrl);
 
+            return response.IsSuccessStatusCode;
+        }
 
 
         // ---------- Private Methods ----------
+        private async Task<ApiResponse<bool>> CheckAndIncrementOtpDailyLimitAsync(string phoneNumber)
+        {
+            var normalizedPhone = NormalizePhoneNumber(phoneNumber);
+            var otpDailyLimitKey = $"otp_daily_limit:{normalizedPhone}";
+
+            var currentCountStr = await _redisService.GetAsync(otpDailyLimitKey);
+            int currentCount = string.IsNullOrEmpty(currentCountStr) ? 0 : int.Parse(currentCountStr);
+
+            if (currentCount >= 2)
+            {
+                return new ApiResponse<bool>(ErrorMessages.otpLimitExceededForToday, false);
+            }
+
+            currentCount++;
+
+            if (currentCount == 1)
+            {
+                // أول مرة: نحط Expiry لمدة 24 ساعة
+                await _redisService.SetAsync(otpDailyLimitKey, currentCount.ToString(), TimeSpan.FromDays(1));
+            }
+            else
+            {
+                // تحديث العدد بدون تغيير Expiry الحالي
+                await _redisService.SetAsync(otpDailyLimitKey, currentCount.ToString());
+            }
+
+            return new ApiResponse<bool>(true);
+        }
         private async Task<AppUser?> GetUserByUsernameOrPhoneAsync(string usernameOrPhone)
         {
             if (usernameOrPhone.Contains("@"))
@@ -227,7 +270,6 @@ namespace Voltyks.Application.Services.SMSEgypt
             var isBlocked = await _redisService.GetAsync(blockKey);
             return isBlocked != null;
         }
-
         private async Task<int> GetCurrentAttemptsAsync(string phoneNumber)
         {
             string attemptsKey = $"otp_attempts:{phoneNumber}";
@@ -237,7 +279,6 @@ namespace Voltyks.Application.Services.SMSEgypt
                 ? parsedAttempts
                 : 0;
         }
-
         private async Task BlockUserAsync(string phoneNumber)
         {
             string blockKey = $"otp_block:{phoneNumber}";
@@ -246,35 +287,14 @@ namespace Voltyks.Application.Services.SMSEgypt
             await _redisService.SetAsync(blockKey, "blocked", BlockDuration);
             await _redisService.RemoveAsync(attemptsKey);
         }
-
         private async Task SaveAttemptsAsync(string phoneNumber, int attempts)
         {
             string attemptsKey = $"otp_attempts:{phoneNumber}";
             await _redisService.SetAsync(attemptsKey, attempts.ToString(), BlockDuration);
         }
 
-        public string GenerateOtp()
-        {
-            return new Random().Next(1000, 9999).ToString();
-        }
 
-        public async Task SaveOtpAsync(string phoneNumber, string otp)
-        {
-            await _redisService.SetAsync($"otp:{phoneNumber}", otp, TimeSpan.FromMinutes(5));
-        }
 
-        public async Task<bool> SendOtpMessageAsync(string phoneNumber, string otp)
-        {
-            string message = $"Your OTP is {otp}";
-            string fullUrl = $"{_smsSettings.Value.BaseUrl}?username={_smsSettings.Value.Username}&password={_smsSettings.Value.Password}&sendername={_smsSettings.Value.SenderName}&message={Uri.EscapeDataString(message)}&mobiles={phoneNumber}";
-
-            var client = _httpClientFactory.CreateClient();
-            var response = await client.GetAsync(fullUrl);
-
-            return response.IsSuccessStatusCode;
-        }
-
-        
     }
 
 }
