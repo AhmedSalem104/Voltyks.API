@@ -43,7 +43,7 @@ namespace Voltyks.Application.Services.Auth
                 return new ApiResponse<UserLoginResultDto>
                 {
                     Status = false,
-                    Message = ErrorMessages.userNotFound
+                    Message = ErrorMessages.UserNotFound
                 };
             }
 
@@ -53,7 +53,7 @@ namespace Voltyks.Application.Services.Auth
                 return new ApiResponse<UserLoginResultDto>
                 {
                     Status = false,
-                    Message = ErrorMessages.invalidPasswordOrEmailAddress
+                    Message = ErrorMessages.InvalidPasswordOrEmailAddress
                 };
             }
 
@@ -104,7 +104,7 @@ namespace Voltyks.Application.Services.Auth
                     Status = false,
                     Message = "Invalid phone number format",
                     Data = null,
-                    Errors = new List<string> { ErrorMessages.invalidPhoneNumber }
+                    Errors = new List<string> { ErrorMessages.InvalidPhoneNumber }
                 };
             }
 
@@ -114,7 +114,7 @@ namespace Voltyks.Application.Services.Auth
                 return new ApiResponse<UserRegisterationResultDto>
                 {
                     Status = false,
-                    Message = ErrorMessages.emailAlreadyInUse,
+                    Message = ErrorMessages.EmailAlreadyExists,
                     Errors = emailCheck.Errors ?? new List<string> { emailCheck.Message }
                 };
             }
@@ -125,7 +125,7 @@ namespace Voltyks.Application.Services.Auth
                 return new ApiResponse<UserRegisterationResultDto>
                 {
                     Status = false,
-                    Message = ErrorMessages.phoneAlreadyInUse,
+                    Message = ErrorMessages.PhoneAlreadyExists,
                     Errors = phoneCheck.Errors ?? new List<string> { phoneCheck.Message }
                 };
             }
@@ -149,7 +149,7 @@ namespace Voltyks.Application.Services.Auth
             // 3. Only here if creation succeeded
             return new ApiResponse<UserRegisterationResultDto>(
                 MapToUserResultDto(user),
-               SuccessfulMessage.registrationSuccessfully
+               SuccessfulMessage.UserCreatedSuccessfully
             );
 
            
@@ -167,7 +167,7 @@ namespace Voltyks.Application.Services.Auth
                     return new ApiResponse<string>
                     {
                         Status = false,
-                        Message = ErrorMessages.invalidOrMismatchedToken
+                        Message = ErrorMessages.InvalidOrMismatchedToken
                     };
                 }
 
@@ -187,7 +187,7 @@ namespace Voltyks.Application.Services.Auth
                     return new ApiResponse<string>
                     {
                         Status = false,
-                        Message = ErrorMessages.refreshTokenMismatch
+                        Message = ErrorMessages.RefreshTokenMismatch
                     };
                 }
 
@@ -225,16 +225,16 @@ namespace Voltyks.Application.Services.Auth
                 return new ApiResponse<List<string>>( ErrorMessages.PhoneRequired) { Status = false };
 
             else if (!IsPhoneNumber(phoneNumberDto.PhoneNumber))
-                return new ApiResponse<List<string>>(ErrorMessages.invalidPhoneFormat) { Status = false };
+                return new ApiResponse<List<string>>(ErrorMessages.InvalidPhoneFormat) { Status = false };
 
             var existingPhoneUser = await userManager.Users
                 .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumberDto.PhoneNumber);
 
             if (existingPhoneUser is not null)
-                return new ApiResponse<List<string>>(ErrorMessages.phoneAlreadyInUse) { Status = false };
+                return new ApiResponse<List<string>>(ErrorMessages.PhoneAlreadyExists) { Status = false };
 
 
-            return new ApiResponse<List<string>>(SuccessfulMessage.phoneIsAvailable) { Status = true };
+            return new ApiResponse<List<string>>(SuccessfulMessage.PhoneIsAvailable) { Status = true };
         }
         public async Task<ApiResponse<List<string>>> CheckEmailExistsAsync(EmailDto emailDto)
         {
@@ -243,13 +243,13 @@ namespace Voltyks.Application.Services.Auth
             if (string.IsNullOrWhiteSpace(emailDto.Email))
                 return new ApiResponse<List<string>>(ErrorMessages.EmailRequired) { Status = false };
             else if (!IsEmail(emailDto.Email))
-                return new ApiResponse<List<string>>(ErrorMessages.invalidEmailFormat) { Status = false };
+                return new ApiResponse<List<string>>(ErrorMessages.InvalidEmailFormat) { Status = false };
 
             var existingEmailUser = await userManager.Users
                 .FirstOrDefaultAsync(e => e.Email == emailDto.Email);
 
             if (existingEmailUser is not null)
-                return new ApiResponse<List<string>>(ErrorMessages.emailAlreadyInUse) { Status = false };
+                return new ApiResponse<List<string>>(ErrorMessages.EmailAlreadyExists) { Status = false };
 
           
 
@@ -262,7 +262,7 @@ namespace Voltyks.Application.Services.Auth
             // التحقق من تطابق الـ token في الكوكيز مع الـ token المرسل
             if (string.IsNullOrEmpty(tokenFromCookies) || tokenFromCookies != dto.Token)
             {
-                return new ApiResponse<List<string>>(ErrorMessages.invalidOrMismatchedToken) { Status = false };
+                return new ApiResponse<List<string>>(ErrorMessages.InvalidOrMismatchedToken) { Status = false };
 
             }
 
@@ -274,7 +274,7 @@ namespace Voltyks.Application.Services.Auth
             response.Cookies.Delete("JWT_Token");
             response.Cookies.Delete("Refresh_Token");
 
-            return new ApiResponse<List<string>>(SuccessfulMessage.logoutSuccessfully) { Status = true };
+            return new ApiResponse<List<string>>(SuccessfulMessage.LoggedOutSuccessfully) { Status = true };
 
         }
 
@@ -453,10 +453,10 @@ namespace Voltyks.Application.Services.Auth
             if (!result.Succeeded)
             {
                 var errors = result.Errors.Select(e => e.Description).ToList();
-                return new ApiResponse<List<string>>(errors, ErrorMessages.UserCreationFaild) { Status = false };
+                return new ApiResponse<List<string>>(errors, ErrorMessages.UserCreationFailed) { Status = false };
             }
 
-            return new ApiResponse<List<string>>(null, SuccessfulMessage.UserCreationSuccessfully) { Status = true };
+            return new ApiResponse<List<string>>(null, SuccessfulMessage.UserCreatedSuccessfully) { Status = true };
         }
         private UserRegisterationResultDto MapToUserResultDto(AppUser user)
         {

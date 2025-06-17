@@ -13,8 +13,6 @@ namespace Voltyks.Persistence.Entities
         public const string PhoneRequired = "PhoneRequired";
         public const string EmailRequired = "EmailRequired";
         public const string PhoneAlreadyExists = "PhoneAlreadyExists";
-        public const string PhoneIsaVailable = "PhoneIsaVailable";
-        public const string EmailIsaVailable = "EmailIsaVailable";
         public const string EmailAlreadyExists = "EmailAlreadyExists";
         public const string ValidationFailed = "ValidationFailed";
         public const string TokenExpired = "TokenExpired";
@@ -23,45 +21,35 @@ namespace Voltyks.Persistence.Entities
         public const string PhoneNumberNotExist = "PhoneNumberNotExist";
         public const string ExceededMaximumOTPAttempts = "ExceededMaximumOTPAttempts";
         public const string OTPSendingFailed = "OTPSendingFailed";
-        public const string otpSentSuccessfully = "otpSentSuccessfully";
-        public const string otpCodeExpiredOrNotFound = "otpCodeExpiredOrNotFound";
-        public const string otpCodeInvalid = "otpCodeInvalid";
-        public const string otpCodeNotVerifiedOrExpired = "otpCodeNotVerifiedOrExpired";
-        public const string userNotFound = "userNotFound";
-        public const string errorRemovingOldPassword = "errorRemovingOldPassword";
-        public const string errorSettingNewPassword = "errorSettingNewPassword";
-        public const string invalidOtp = "invalidOtp";
-        public const string otpAttemptLimitExceededTryLater = "otpAttemptLimitExceededTryLater";
-        public const string otpAttemptsExceededBlockedForMinutes = "otpAttemptsExceededBlockedForMinutes";
-        public const string failedToSendOtp = "failedToSendOtp";
-        public const string phoneAlreadyInUse = "phoneAlreadyInUse";
-        public const string emailAlreadyInUse = "emailAlreadyInUse";
-        public const string invalidPhoneFormat = "invalidPhoneFormat";
-        public const string invalidEmailFormat = "invalidEmailFormat";
-        public const string UserCreationFaild = "UserCreationFaild";
-        public const string invalidPasswordOrEmailAddress = "invalidPasswordOrEmailAddress";
-        public const string emailDoesNotExist = "emailDoesNotExist";
-        public const string noPhoneAssociated = "noPhoneAssociated";
-        public const string invalidExternalAuthentication = "invalidExternalAuthentication";
-        public const string invalidRefreshToken = "invalidRefreshToken";
-        public const string refreshTokenMismatch = "refreshTokenMismatch";
-        public const string invalidExternalToken = "invalidExternalToken";
-        public const string unsupportedProvider = "unsupportedProvider";
-        public const string invalidOrMismatchedToken = "invalidOrMismatchedToken";
-        public const string invalidPhoneNumber = "invalidPhoneNumber";
-
-        public const string faildGetBrands = "faildGetBrands";
-        public const string noModelsFoundForThisBrand = "noModelsFoundForThisBrand";
+        public const string OtpSentSuccessfully = "OtpSentSuccessfully";
+        public const string OtpCodeExpiredOrNotFound = "OtpCodeExpiredOrNotFound";
+        public const string OtpCodeInvalid = "OtpCodeInvalid";
+        public const string OtpCodeNotVerifiedOrExpired = "OtpCodeNotVerifiedOrExpired";
+        public const string UserNotFound = "UserNotFound";
+        public const string ErrorRemovingOldPassword = "ErrorRemovingOldPassword";
+        public const string ErrorSettingNewPassword = "ErrorSettingNewPassword";
+        public const string OtpAttemptLimitExceededTryLater = "OtpAttemptLimitExceededTryLater";
+        public const string OtpAttemptsExceededBlockedForMinutes = "OtpAttemptsExceededBlockedForMinutes";
+        public const string InvalidPhoneFormat = "InvalidPhoneFormat";
+        public const string InvalidEmailFormat = "InvalidEmailFormat";
+        public const string UserCreationFailed = "UserCreationFailed";
+        public const string InvalidPasswordOrEmailAddress = "InvalidPasswordOrEmailAddress";
+        public const string EmailDoesNotExist = "EmailDoesNotExist";
+        public const string NoPhoneAssociated = "NoPhoneAssociated";
+        public const string InvalidExternalAuthentication = "InvalidExternalAuthentication";
+        public const string InvalidRefreshToken = "InvalidRefreshToken";
+        public const string RefreshTokenMismatch = "RefreshTokenMismatch";
+        public const string InvalidExternalToken = "InvalidExternalToken";
+        public const string UnsupportedProvider = "UnsupportedProvider";
+        public const string InvalidOrMismatchedToken = "InvalidOrMismatchedToken";
+        public const string InvalidPhoneNumber = "InvalidPhoneNumber";
+        public const string FailedGetBrands = "FailedGetBrands";
+        public const string NoModelsFoundForThisBrand = "NoModelsFoundForThisBrand";
         public const string NoYearsFoundForThisModel = "NoYearsFoundForThisModel";
-        public const string otpLimitExceededForToday = "otpLimitExceededForToday";
+        public const string OtpLimitExceededForToday = "OtpLimitExceededForToday";
         public const string UserAlreadyHasVehicle = "UserAlreadyHasVehicle";
         public const string UserNotAuthenticated = "UserNotAuthenticated";
         public const string VehicleNotFoundOrNotAuthorized = "VehicleNotFoundOrNotAuthorized";
-
-        
-
-
-
-
     }
+
 }

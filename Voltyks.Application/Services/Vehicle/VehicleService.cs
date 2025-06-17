@@ -48,7 +48,7 @@ namespace Voltyks.Application.Services
             await repo.AddAsync(vehicle);
             await _unitOfWork.SaveChangesAsync();
 
-            return await GetVehicleDtoById(vehicle.Id, SuccessfulMessage.vehicleCreatedSuccessfully);
+            return await GetVehicleDtoById(vehicle.Id, SuccessfulMessage.VehicleCreatedSuccessfully);
         }
         public async Task<ApiResponse<VehicleDto>> UpdateVehicleAsync(int id, UpdateVehicleDto dto)
         {

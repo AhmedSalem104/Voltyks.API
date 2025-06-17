@@ -31,12 +31,12 @@ namespace Voltyks.Application.Services
 
             if (!models.Any())
             {
-                return new ApiResponse<IEnumerable<ModelDto>>(ErrorMessages.noModelsFoundForThisBrand, false);
+                return new ApiResponse<IEnumerable<ModelDto>>(ErrorMessages.NoModelsFoundForThisBrand, false);
             }
 
             var modelDtos = _mapper.Map<IEnumerable<ModelDto>>(models);
 
-            return new ApiResponse<IEnumerable<ModelDto>>(modelDtos, SuccessfulMessage.modelsRetrievedSuccessfully, true);
+            return new ApiResponse<IEnumerable<ModelDto>>(modelDtos, SuccessfulMessage.ModelsRetrievedSuccessfully, true);
         }
         public async Task<ApiResponse<IEnumerable<int>>> GetYearsByModelIdAsync(int modelId)
         {
@@ -53,7 +53,7 @@ namespace Voltyks.Application.Services
             if (!years.Any())
                 return new ApiResponse<IEnumerable<int>>(ErrorMessages.NoYearsFoundForThisModel, false);
 
-            return new ApiResponse<IEnumerable<int>>(years, SuccessfulMessage.yearsRetrievedSuccessfully, true);
+            return new ApiResponse<IEnumerable<int>>(years, SuccessfulMessage.YearsRetrievedSuccessfully, true);
         }
 
     }

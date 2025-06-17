@@ -34,12 +34,12 @@ namespace Voltyks.Application.Services
                     Name = b.Name
                 });
 
-                return new ApiResponse<IEnumerable<BrandReadDto>>(data, SuccessfulMessage.brandsGetSuccessfully, true);
+                return new ApiResponse<IEnumerable<BrandReadDto>>(data, SuccessfulMessage.BrandsRetrievedSuccessfully, true);
             }
             catch (Exception ex)
             {
                 return new ApiResponse<IEnumerable<BrandReadDto>>(
-                    message: ErrorMessages.faildGetBrands,
+                    message: ErrorMessages.FailedGetBrands,
                     status: false,
                     errors: new List<string> { ex.Message }
                 );
