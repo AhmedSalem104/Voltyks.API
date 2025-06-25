@@ -75,8 +75,43 @@ namespace Voltyks.Persistence
                     }
                 }
 
+                if (!_context.PriceOptions.Any())
+                {
+                    var prices = new List<PriceOption>();
+                    for (decimal i = 5; i <= 100; i += 5)
+                    {
+                        prices.Add(new PriceOption { Value = i });
+                    }
+                    _context.PriceOptions.AddRange(prices);
+                    _context.SaveChanges();
+                }
+                // Seeding Protocols
+                if (!_context.Protocols.Any())
+                {
+                    var protocols = new List<Protocol>
+            {
+                new Protocol { Name = "Chinese" },
+                new Protocol { Name = "European" }
+            };
+                    _context.Protocols.AddRange(protocols);
+                    await _context.SaveChangesAsync();
 
-               
+                }
+
+                // Seeding Capacities
+                if (!_context.Capacities.Any())
+                {
+                    var capacities = new List<Capacity>
+            {
+                new Capacity { KW = 7 },
+                new Capacity { KW = 15 },
+                new Capacity { KW = 22 }
+            };
+                    _context.Capacities.AddRange(capacities);
+                    await _context.SaveChangesAsync();
+
+                }
+
             }
             catch (Exception)
             {

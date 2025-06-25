@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Interfaces.Brand;
+using Voltyks.Application.Interfaces.ChargerStation;
 using Voltyks.Application.Interfaces.SMSEgypt;
 
 namespace Voltyks.Application.ServicesManager.ServicesManager
@@ -17,6 +18,8 @@ namespace Voltyks.Application.ServicesManager.ServicesManager
         IBrandService BrandService { get; }
         IModelService ModelService { get; }
         IVehicleService VehicleService  { get; }
+        IChargerService ChargerService { get; }
+
 
 
     }

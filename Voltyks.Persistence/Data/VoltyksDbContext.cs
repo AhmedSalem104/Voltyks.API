@@ -16,11 +16,18 @@ namespace Voltyks.Persistence.Data
         {
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
             base.OnModelCreating(modelBuilder);
+
         }
 
         public DbSet<Vehicle> Vehicles { get; set; }
         public DbSet<Brand> Brands { get; set; }
         public DbSet<Model> Models { get; set; }
+        public DbSet<Capacity> Capacities { get; set; }
+        public DbSet<Protocol> Protocols { get; set; }
+        public DbSet<PriceOption> PriceOptions { get; set; }
+        public DbSet<Charger> Chargers { get; set; }
+
+        
 
     }
 }

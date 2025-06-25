@@ -1,4 +1,5 @@
 ﻿
+using System.Net.Http;
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Interfaces.Brand;
+using Voltyks.Application.Interfaces.ChargerStation;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Services;
@@ -36,9 +38,10 @@ namespace Voltyks.Application.ServicesManager
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
+        public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
 
 
-       
+
 
     }
 }

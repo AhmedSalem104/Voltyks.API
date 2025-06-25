@@ -19,7 +19,6 @@ using System.Text.RegularExpressions;
 using Voltyks.Persistence.Entities;
 using System.Numerics;
 using Voltyks.Core.DTOs;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Interfaces.Redis;
 
@@ -437,7 +436,7 @@ namespace Voltyks.Application.Services.Auth
                 PhoneNumber = model.PhoneNumber,
                 FirstName = model.FirstName,
                 LastName = model.LastName,
-                Address = new Address
+                Address = new Persistence.Entities.Identity.Address
                 {
 
                     City = model.City,        // ديناميكي من DTO

@@ -7,6 +7,7 @@ using Voltyks.Core.DTOs.BrandsDTOs;
 using Voltyks.Persistence.Entities.Main;
 using Model = Voltyks.Persistence.Entities.Main.Model;
 using Voltyks.Core.DTOs.VehicleDTOs;
+using Voltyks.Core.DTOs.Charger;
 
 
 namespace Voltyks.Core.Mapping
@@ -30,7 +31,29 @@ namespace Voltyks.Core.Mapping
             CreateMap<CreateVehicleDto, Vehicle>().ReverseMap();           
             CreateMap<UpdateVehicleDto, Vehicle>().ReverseMap();
 
-   
+            CreateMap<Capacity, CapacityDto>();
+            CreateMap<Protocol, ProtocolDto>();
+            CreateMap<PriceOption, PriceByCapacityDto>();
+
+
+            CreateMap<AddChargerDto, Charger>()
+                .ForMember(dest => dest.UserId, opt => opt.Ignore())
+                .ForMember(dest => dest.AddressId, opt => opt.Ignore())
+                .ForMember(dest => dest.DateAdded, opt => opt.Ignore())
+                .ForMember(dest => dest.IsDeleted, opt => opt.Ignore());
+
+
+            CreateMap<Charger, ChargerDto>()
+                .ForMember(dest => dest.Protocol, opt => opt.MapFrom(src => src.Protocol.Name))
+                .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => src.Capacity.KW))
+                .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption.Value))
+                .ForMember(dest => dest.Area, opt => opt.MapFrom(src => src.Address.Area))
+                .ForMember(dest => dest.Street, opt => opt.MapFrom(src => src.Address.Street))
+                .ForMember(dest => dest.BuildingNumber, opt => opt.MapFrom(src => src.Address.BuildingNumber))
+                .ForMember(dest => dest.Latitude, opt => opt.MapFrom(src => src.Address.Latitude))
+                .ForMember(dest => dest.Longitude, opt => opt.MapFrom(src => src.Address.Longitude));
+
+
         }
     }
 
