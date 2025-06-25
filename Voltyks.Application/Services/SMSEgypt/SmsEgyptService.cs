@@ -97,29 +97,7 @@ namespace Voltyks.Application.Services.SMSEgypt
             return new ApiResponse<string>(SuccessfulMessage.OtpVerifiedSuccessfully, true);
         }
 
-        //public async Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto)
-        //{
-
-        //    var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
-
-        //    var cachedOtp = await _redisService.GetAsync($"otp:{normalizedPhone}");
-
-        //    if (string.IsNullOrEmpty(cachedOtp))
-        //    {
-        //        return new ApiResponse<string>(ErrorMessages.otpCodeInvalid, false);
-        //    }
-
-        //    if (cachedOtp != dto.OtpCode)
-        //    {
-        //        return new ApiResponse<string>(ErrorMessages.invalidOtp, false);
-        //    }
-
-        //    await _redisService.RemoveAsync($"otp:{normalizedPhone}");
-
-        //    return new ApiResponse<string>(SuccessfulMessage.otpVerifiedSuccessfully, status: true, errors: null);
-        //}
-
-
+    
         public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
         {
             var normalizedPhone = NormalizePhoneNumber(dto.EmailOrPhone);
@@ -148,36 +126,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.OtpSentSuccessfully, true);
         }
-
-        //public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
-        //{
-        //    var normalizedPhone = NormalizePhoneNumber(dto.EmailOrPhone);
-
-        //    /* 1️⃣ تحقق من حد الرسائل اليومية قبل أي شيء */
-        //    var dailyLimitResult = await CheckAndIncrementOtpDailyLimitAsync(normalizedPhone);
-        //    if (!dailyLimitResult.Status)
-        //        return new ApiResponse<string>(dailyLimitResult.Message, false);
-
-        //    /* 2️⃣ تأكد إن المستخدم موجود */
-        //    var user = await GetUserByUsernameOrPhoneAsync(dto.EmailOrPhone);
-        //    //var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
-        //    if (user == null)
-        //        return new ApiResponse<string>(ErrorMessages.PhoneNumberNotExist, false);
-
-        //    /* 3️⃣ تحقق من الحظر المؤقت (في حالة محاولات كثيرة خاطئة) */
-        //    if (await _redisService.GetAsync($"otp_block:{normalizedPhone}") != null)
-        //        return new ApiResponse<string>(ErrorMessages.ExceededMaximumOTPAttempts, false);
-
-        //    /* 4️⃣ توليد وإرسال OTP */
-        //    var otp = GenerateOtp();
-        //    await _redisService.SetAsync($"forget_password_otp:{normalizedPhone}", otp, TimeSpan.FromMinutes(5));
-
-        //    var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
-        //    if (!isSent)
-        //        return new ApiResponse<string>(ErrorMessages.OTPSendingFailed, false);
-
-        //    return new ApiResponse<string>(SuccessfulMessage.otpSentSuccessfully, true);
-        //}
         public async Task<ApiResponse<string>> VerifyForgetPasswordOtpAsync(VerifyForgetPasswordOtpDto dto)
         {
             var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
@@ -276,36 +224,7 @@ namespace Voltyks.Application.Services.SMSEgypt
                 return new ApiResponse<bool>(ErrorMessages.OtpLimitExceededForToday, false);
 
             return new ApiResponse<bool>(true);   // still under the cap
-        }
-
-        //private async Task<ApiResponse<bool>> CheckAndIncrementOtpDailyLimitAsync(string phoneNumber)
-        //{
-        //    var normalizedPhone = NormalizePhoneNumber(phoneNumber);
-        //    var otpDailyLimitKey = $"otp_daily_limit:{normalizedPhone}";
-
-        //    var currentCountStr = await _redisService.GetAsync(otpDailyLimitKey);
-        //    int currentCount = string.IsNullOrEmpty(currentCountStr) ? 0 : int.Parse(currentCountStr);
-
-        //    if (currentCount >= 2)
-        //    {
-        //        return new ApiResponse<bool>(ErrorMessages.otpLimitExceededForToday, false);
-        //    }
-
-        //    currentCount++;
-
-        //    if (currentCount == 1)
-        //    {
-        //        // أول مرة: نحط Expiry لمدة 24 ساعة
-        //        await _redisService.SetAsync(otpDailyLimitKey, currentCount.ToString(), TimeSpan.FromDays(1));
-        //    }
-        //    else
-        //    {
-        //        // تحديث العدد بدون تغيير Expiry الحالي
-        //        await _redisService.SetAsync(otpDailyLimitKey, currentCount.ToString());
-        //    }
-
-        //    return new ApiResponse<bool>(true);
-        //}
+        }    
         private async Task<AppUser?> GetUserByUsernameOrPhoneAsync(string usernameOrPhone)
         {
             if (usernameOrPhone.Contains("@"))
