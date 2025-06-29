@@ -96,16 +96,23 @@ namespace Voltyks.Application.Services.Auth
                     Errors = errors
                 };
             }
-            if (!Regex.IsMatch(model.PhoneNumber ?? "", @"^\+20\d{10}$"))
+            string normalizedPhone;
+            try
+            {
+                normalizedPhone = NormalizePhoneToInternational(model.PhoneNumber);
+            }
+            catch (Exception ex)
             {
                 return new ApiResponse<UserRegisterationResultDto>
                 {
                     Status = false,
-                    Message = "Invalid phone number format",
-                    Data = null,
-                    Errors = new List<string> { ErrorMessages.InvalidPhoneNumber }
+                    Message = ex.Message,
+                    Errors = new List<string> { ex.Message }
                 };
             }
+            model.PhoneNumber = normalizedPhone;
+
+
 
             var emailCheck = await CheckEmailExistsAsync(new EmailDto { Email = model.Email });
             if (!emailCheck.Status)
@@ -225,9 +232,18 @@ namespace Voltyks.Application.Services.Auth
 
             else if (!IsPhoneNumber(phoneNumberDto.PhoneNumber))
                 return new ApiResponse<List<string>>(ErrorMessages.InvalidPhoneFormat) { Status = false };
+            string normalizedPhone;
+            try
+            {
+                normalizedPhone = NormalizePhoneToInternational(phoneNumberDto.PhoneNumber);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<List<string>>(ex.Message) { Status = false };
+            }
 
             var existingPhoneUser = await userManager.Users
-                .FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumberDto.PhoneNumber);
+                .FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
 
             if (existingPhoneUser is not null)
                 return new ApiResponse<List<string>>(ErrorMessages.PhoneAlreadyExists) { Status = false };
@@ -252,7 +268,7 @@ namespace Voltyks.Application.Services.Auth
 
           
 
-            return new ApiResponse<List<string>>(null, "Success") { Status = true };
+            return new ApiResponse<List<string>>(null, SuccessfulMessage.EmailIsAvailable) { Status = true };
         }
         public async Task<ApiResponse<List<string>>> LogoutAsync(TokenDto dto)
         {
@@ -404,7 +420,8 @@ namespace Voltyks.Application.Services.Auth
             }
             else
             {
-                return await userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == usernameOrPhone);
+                var normalizedPhone = NormalizePhoneToInternational(usernameOrPhone);
+                return await userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
             }
         }
         private void SetCookies(string accessToken, string refreshToken)
@@ -465,6 +482,20 @@ namespace Voltyks.Application.Services.Auth
             };
         }
 
-      
+        private string NormalizePhoneToInternational(string phone)
+        {
+            if (string.IsNullOrWhiteSpace(phone))
+                throw new ArgumentException("Phone number is required.");
+
+            // يسمح فقط بـ 010xxxxxxx أو +2010xxxxxxx
+            if (Regex.IsMatch(phone, @"^(01[0-2,5]\d{8})$"))
+                return "+2" + phone;  // 010 → +2010
+
+            else if (Regex.IsMatch(phone, @"^\+201[0-2,5]\d{8}$"))
+                return phone;
+
+            throw new ArgumentException("Invalid phone number format. Use 010xxxxxxxx or +2010xxxxxxxx.");
+        }
+
     }
 }

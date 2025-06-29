@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -212,19 +213,40 @@ namespace Voltyks.Application.Services.SMSEgypt
             var normalizedPhone = NormalizePhoneNumber(phoneNumber);
             var key = $"otp_daily_limit:{normalizedPhone}";
 
-            // ➡️ 1.   Atomic increment – returns the NEW value
             long newCount = await _redisService.IncrementAsync(key);
 
-            // ➡️ 2.   First hit? attach 24 h TTL so the window resets automatically
+            // نخلي المفتاح ينتهي بعد 24 ساعة من أول محاولة
             if (newCount == 1)
-                await _redisService.ExpireAsync(key, TimeSpan.FromDays(1));
+                await _redisService.ExpireAsync(key, TimeSpan.FromHours(24));
 
-            // ➡️ 3.   Enforce the 2‑per‑day ceiling
-            if (newCount > 2)
+            //  نخليه 20
+            if (newCount > 20)
+            {
+                // ممكن كمان نحط Log أو Alert لو محتاج تتابع حالات التعدي
                 return new ApiResponse<bool>(ErrorMessages.OtpLimitExceededForToday, false);
+            }
 
-            return new ApiResponse<bool>(true);   // still under the cap
-        }    
+            return new ApiResponse<bool>(true);
+        }
+
+        //private async Task<ApiResponse<bool>> CheckAndIncrementOtpDailyLimitAsync(string phoneNumber)
+        //{
+        //    var normalizedPhone = NormalizePhoneNumber(phoneNumber);
+        //    var key = $"otp_daily_limit:{normalizedPhone}";
+
+        //    // ➡️ 1.   Atomic increment – returns the NEW value
+        //    long newCount = await _redisService.IncrementAsync(key);
+
+        //    // ➡️ 2.   First hit? attach 24 h TTL so the window resets automatically
+        //    if (newCount == 1)
+        //        await _redisService.ExpireAsync(key, TimeSpan.FromDays(1));
+
+        //    // ➡️ 3.   Enforce the 2‑per‑day ceiling
+        //    if (newCount > 2)
+        //        return new ApiResponse<bool>(ErrorMessages.OtpLimitExceededForToday, false);
+
+        //    return new ApiResponse<bool>(true);   // still under the cap
+        //}    
         private async Task<AppUser?> GetUserByUsernameOrPhoneAsync(string usernameOrPhone)
         {
             if (usernameOrPhone.Contains("@"))
@@ -247,13 +269,22 @@ namespace Voltyks.Application.Services.SMSEgypt
         }
         private string NormalizePhoneNumber(string phone)
         {
-            if (phone.StartsWith("+20"))
-                phone = phone.Replace("+20", "0");
-            else if (phone.StartsWith("0020"))
-                phone = phone.Replace("0020", "0");
+            // الشكل المحلي 010xxxxxxxx
+            if (Regex.IsMatch(phone, @"^01[0-9]{9}$"))
+            {
+                return $"+2{phone}";  // نحوله إلى الصيغة الدولية
+            }
 
-            return phone;
+            // الشكل الدولي +2010xxxxxxxx
+            if (Regex.IsMatch(phone, @"^\+201[0-9]{9}$"))
+            {
+                return phone; // مقبول بالفعل
+            }
+
+            throw new ArgumentException("Invalid phone format. Accepted formats: 010xxxxxxxx or +2010xxxxxxxx.");
         }
+
+
         private async Task<bool> IsBlockedAsync(string phoneNumber)
         {
             string blockKey = $"otp_block:{phoneNumber}";
@@ -281,6 +312,12 @@ namespace Voltyks.Application.Services.SMSEgypt
         {
             string attemptsKey = $"otp_attempts:{phoneNumber}";
             await _redisService.SetAsync(attemptsKey, attempts.ToString(), BlockDuration);
+        }
+        public async Task<ApiResponse<string>> ClearOtpDailyLimitAsync(string phoneNumber)
+        {
+            var normalizedPhone = NormalizePhoneNumber(phoneNumber);
+            await _redisService.RemoveAsync($"otp_daily_limit:{normalizedPhone}");
+            return new ApiResponse<string>("تم مسح الحد اليومي بنجاح", true);
         }
 
 
