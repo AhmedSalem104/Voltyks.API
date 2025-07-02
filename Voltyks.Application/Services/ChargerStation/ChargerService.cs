@@ -12,6 +12,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Voltyks.Persistence.Entities;
 using System.Threading.Channels;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Voltyks.Application.Interfaces.ChargerStation
 {
@@ -85,13 +86,13 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             await _unitOfWork.GetRepository<Charger, int>().AddAsync(charger);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiResponse<string>(message: "Charger added successfully");
+            return new ApiResponse<string>(message: SuccessfulMessage.ChargerAddedSuccessfully);
         }
         public async Task<ApiResponse<IEnumerable<ChargerDto>>> GetChargersForCurrentUserAsync()
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
-                return new ApiResponse<IEnumerable<ChargerDto>>("Unauthorized", false);
+                return new ApiResponse<IEnumerable<ChargerDto>>(ErrorMessages.UnauthorizedAccess, false);
 
             var userId = userIdClaim.Value;
 
@@ -110,22 +111,21 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<IEnumerable<ChargerDto>>(result);
         }
-
         public async Task<ApiResponse<string>> ToggleChargerStatusAsync(int chargerId)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
-                return new ApiResponse<string>("Unauthorized", false);
+                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
 
             var userId = userIdClaim.Value;
 
             var charger = await _unitOfWork.GetRepository<Charger, int>().GetAsync(chargerId);
 
             if (charger == null || charger.IsDeleted)
-                return new ApiResponse<string>("Charger not found", false);
+                return new ApiResponse<string>(ErrorMessages.ChargerNotFound, false);
 
             if (charger.UserId != userId)
-                return new ApiResponse<string>("You are not authorized to modify this charger", true);
+                return new ApiResponse<string>(ErrorMessages.YouAreNotAuthorizedToModifyThisCharger, true);
 
             // عكس الحالة
             charger.IsActive = !charger.IsActive;
@@ -142,16 +142,11 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 status: true
             );
         }
-
-
-
-
-
         public async Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
-                return new ApiResponse<string>("Unauthorized", false);
+                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
 
             var userId = userIdClaim.Value;
 
@@ -164,10 +159,10 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             var chargerEntity = charger.FirstOrDefault();
 
             if (chargerEntity == null)
-                return new ApiResponse<string>("Charger not found", false);
+                return new ApiResponse<string>(ErrorMessages.ChargerNotFound, false);
 
             if (chargerEntity.UserId != userId)
-                return new ApiResponse<string>("Unauthorized access to charger", false);
+                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccessToCharger, false);
 
             // تحديث البيانات
             chargerEntity.ProtocolId = dto.ProtocolId;
@@ -185,35 +180,31 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             _unitOfWork.GetRepository<Charger, int>().Update(chargerEntity);
             _unitOfWork.GetRepository<ChargerAddress, int>().Update(chargerEntity.Address);
             await _unitOfWork.SaveChangesAsync();
-            return new ApiResponse<string>(message: "Charger updated successfully");
+            return new ApiResponse<string>(message: SuccessfulMessage.ChargerUpdatedSuccessfully);
 
         }
-
         public async Task<ApiResponse<string>> DeleteChargerAsync(int chargerId)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
-                return new ApiResponse<string>("Unauthorized", false);
+                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
 
             var userId = userIdClaim.Value;
 
             var charger = await _unitOfWork.GetRepository<Charger, int>().GetAsync(chargerId);
 
             if (charger == null || charger.IsDeleted)
-                return new ApiResponse<string>("Charger not found or already deleted", false);
+                return new ApiResponse<string>(ErrorMessages.ChargerNotFoundOrAlreadyDeleted, false);
 
             if (charger.UserId != userId)
-                return new ApiResponse<string>("You are not authorized to delete this charger", false);
+                return new ApiResponse<string>(ErrorMessages.YouAreNotAuthorizedToDeleteThisCharger, false);
 
             charger.IsDeleted = true;
             _unitOfWork.GetRepository<Charger, int>().Update(charger);
             await _unitOfWork.SaveChangesAsync();
-            return new ApiResponse<string>(message: "Charger deleted successfully");
+            return new ApiResponse<string>(message: SuccessfulMessage.ChargerDeletedSuccessfully);
 
         }
-
-
-
 
     }
 

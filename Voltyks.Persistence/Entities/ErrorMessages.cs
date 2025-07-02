@@ -50,6 +50,14 @@ namespace Voltyks.Persistence.Entities
         public const string UserAlreadyHasVehicle = "UserAlreadyHasVehicle";
         public const string UserNotAuthenticated = "UserNotAuthenticated";
         public const string VehicleNotFoundOrNotAuthorized = "VehicleNotFoundOrNotAuthorized";
+        public const string ChargerNotFound = "ChargerNotFound";
+        public const string YouAreNotAuthorizedToModifyThisCharger = "YouAreNotAuthorizedToModifyThisCharger";
+        public const string UnauthorizedAccessToCharger = "UnauthorizedAccessToCharger";
+        public const string ChargerNotFoundOrAlreadyDeleted = "ChargerNotFoundOrAlreadyDeleted";
+        public const string YouAreNotAuthorizedToDeleteThisCharger = "YouAreNotAuthorizedToDeleteThisCharger";
+
+        
+
     }
 
 }

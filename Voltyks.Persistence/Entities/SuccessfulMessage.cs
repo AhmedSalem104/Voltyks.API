@@ -26,6 +26,13 @@ namespace Voltyks.Persistence.Entities
         public const string VehiclesRetrieved = "VehiclesRetrieved";
         public const string VehicleDeleted = "VehicleDeleted";
         public const string EmailIsAvailable = "EmailIsAvailable";
+        public const string ChargerAddedSuccessfully = "ChargerAddedSuccessfully";
+        public const string ChargerUpdatedSuccessfully = "ChargerUpdatedSuccessfully";
+        public const string ChargerDeletedSuccessfully = "ChargerDeletedSuccessfully";
+
+        
+
+
 
     }
 
