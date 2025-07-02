@@ -21,8 +21,8 @@ namespace Voltyks.Core.DTOs
             // تحقق من الإيميل
             var isEmail = new EmailAddressAttribute().IsValid(input);
 
-            // تحقق من رقم الهاتف المصري
-            var isEgyptianPhone = Regex.IsMatch(input, @"^(?:\+20|0020|0)?1[0125]\d{8}$");
+
+            var isEgyptianPhone = Regex.IsMatch(input, @"^(\+2(010\d{8}|011\d{8}|012\d{8}|015\d{8})|010\d{8}|011\d{8}|012\d{8}|015\d{8})$");
 
             if (!isEmail && !isEgyptianPhone)
             {

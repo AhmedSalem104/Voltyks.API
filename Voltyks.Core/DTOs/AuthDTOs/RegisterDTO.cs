@@ -26,7 +26,8 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         public string Password { get; set; }
 
         [Required(ErrorMessage = "Phone number is required")]
-        [RegularExpression(@"^\+\d{10,15}$", ErrorMessage = "Phone number must start with '+' and contain only digits")]
+        [RegularExpression(@"^(\+2(010\d{8}|011\d{8}|012\d{8}|015\d{8})|010\d{8}|011\d{8}|012\d{8}|015\d{8})$", ErrorMessage = "Phone number must be in the format '010XXXXXXXX', '011XXXXXXXX', '012XXXXXXXX', '015XXXXXXXX' or '+2010XXXXXXXX', '+2011XXXXXXXX', '+2012XXXXXXXX', '+2015XXXXXXXX'")]
+
         public string PhoneNumber { get; set; }
 
         [Required(ErrorMessage = "City is required")]

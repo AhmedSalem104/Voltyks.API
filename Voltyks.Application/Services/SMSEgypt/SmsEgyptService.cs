@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -98,26 +99,29 @@ namespace Voltyks.Application.Services.SMSEgypt
             return new ApiResponse<string>(SuccessfulMessage.OtpVerifiedSuccessfully, true);
         }
 
-    
+
         public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
         {
-            var normalizedPhone = NormalizePhoneNumber(dto.EmailOrPhone);
-
-            // 1️⃣ تحقق من حد الرسائل اليومية
-            var dailyLimitResult = await CheckAndIncrementOtpDailyLimitAsync(normalizedPhone);
-            if (!dailyLimitResult.Status)
-                return new ApiResponse<string>(dailyLimitResult.Message, false);
-
-            // 2️⃣ تأكد إن المستخدم موجود
+            // 1️⃣ جيب المستخدم سواء أدخل رقم أو إيميل
             var user = await GetUserByUsernameOrPhoneAsync(dto.EmailOrPhone);
             if (user == null)
                 return new ApiResponse<string>(ErrorMessages.PhoneNumberNotExist, false);
 
-            // 3️⃣ تحقق من الحظر المؤقت
+            // 2️⃣ استخرج رقم الموبايل من المستخدم
+            var normalizedPhone = NormalizePhoneNumber(user.PhoneNumber);
+            if (string.IsNullOrWhiteSpace(normalizedPhone))
+                return new ApiResponse<string>("User phone number is missing or invalid", false);
+
+            // 3️⃣ تحقق من حد الرسائل اليومية
+            var dailyLimitResult = await CheckAndIncrementOtpDailyLimitAsync(normalizedPhone);
+            if (!dailyLimitResult.Status)
+                return new ApiResponse<string>(dailyLimitResult.Message, false);
+
+            // 4️⃣ تحقق من الحظر المؤقت
             if (await _redisService.GetAsync($"otp_block:{normalizedPhone}") != null)
                 return new ApiResponse<string>(ErrorMessages.ExceededMaximumOTPAttempts, false);
 
-            // 4️⃣ توليد وإرسال OTP
+            // 5️⃣ توليد وإرسال OTP
             var otp = GenerateOtp();
             await _redisService.SetAsync($"forget_password_otp:{normalizedPhone}", otp, TimeSpan.FromMinutes(5));
 
@@ -127,6 +131,35 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.OtpSentSuccessfully, true);
         }
+
+        //public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
+        //{
+        //    var normalizedPhone = NormalizePhoneNumber(dto.EmailOrPhone);
+
+        //    // 1️⃣ تحقق من حد الرسائل اليومية
+        //    var dailyLimitResult = await CheckAndIncrementOtpDailyLimitAsync(normalizedPhone);
+        //    if (!dailyLimitResult.Status)
+        //        return new ApiResponse<string>(dailyLimitResult.Message, false);
+
+        //    // 2️⃣ تأكد إن المستخدم موجود
+        //    var user = await GetUserByUsernameOrPhoneAsync(dto.EmailOrPhone);
+        //    if (user == null)
+        //        return new ApiResponse<string>(ErrorMessages.PhoneNumberNotExist, false);
+
+        //    // 3️⃣ تحقق من الحظر المؤقت
+        //    if (await _redisService.GetAsync($"otp_block:{normalizedPhone}") != null)
+        //        return new ApiResponse<string>(ErrorMessages.ExceededMaximumOTPAttempts, false);
+
+        //    // 4️⃣ توليد وإرسال OTP
+        //    var otp = GenerateOtp();
+        //    await _redisService.SetAsync($"forget_password_otp:{normalizedPhone}", otp, TimeSpan.FromMinutes(5));
+
+        //    var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
+        //    if (!isSent)
+        //        return new ApiResponse<string>(ErrorMessages.OTPSendingFailed, false);
+
+        //    return new ApiResponse<string>(SuccessfulMessage.OtpSentSuccessfully, true);
+        //}
         public async Task<ApiResponse<string>> VerifyForgetPasswordOtpAsync(VerifyForgetPasswordOtpDto dto)
         {
             var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
@@ -176,10 +209,18 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             // إضافة كلمة مرور جديدة
             var addResult = await _userManager.AddPasswordAsync(user, resetPasswordDto.NewPassword);
-            if (!addResult.Succeeded)
+           
+           if (!addResult.Succeeded)
             {
-                return new ApiResponse<string>(ErrorMessages.ErrorSettingNewPassword, false);
+                var identityErrors = addResult.Errors.Select(e => e.Description).ToList();
+
+                return new ApiResponse<string>(
+                    message: ErrorMessages.ErrorSettingNewPassword,  
+                    status: false,
+                    errors: identityErrors                 
+                );
             }
+
 
             // إزالة علامة التحقق بعد النجاح
             await _redisService.RemoveAsync($"forget_password_verified:{normalizedPhone}");
@@ -267,22 +308,29 @@ namespace Voltyks.Application.Services.SMSEgypt
                 return await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
             }
         }
-        private string NormalizePhoneNumber(string phone)
+        private string NormalizePhoneNumber(string input)
         {
-            // الشكل المحلي 010xxxxxxxx
-            if (Regex.IsMatch(phone, @"^01[0-9]{9}$"))
+            // لو الشكل المحلي زي 010xxxxxxxx
+            if (Regex.IsMatch(input, @"^01[0-9]{9}$"))
             {
-                return $"+2{phone}";  // نحوله إلى الصيغة الدولية
+                return $"+2{input}";
             }
 
-            // الشكل الدولي +2010xxxxxxxx
-            if (Regex.IsMatch(phone, @"^\+201[0-9]{9}$"))
+            // لو الشكل الدولي زي +2010xxxxxxxx
+            if (Regex.IsMatch(input, @"^\+201[0-9]{9}$"))
             {
-                return phone; // مقبول بالفعل
+                return input;
             }
 
-            throw new ArgumentException("Invalid phone format. Accepted formats: 010xxxxxxxx or +2010xxxxxxxx.");
+            // لو إيميل، نرجعه زي ما هو
+            if (new EmailAddressAttribute().IsValid(input))
+            {
+                return input;
+            }
+
+            throw new ArgumentException("Invalid input. Accepted formats: 010xxxxxxxx, +2010xxxxxxxx, or valid email address.");
         }
+
 
 
         private async Task<bool> IsBlockedAsync(string phoneNumber)

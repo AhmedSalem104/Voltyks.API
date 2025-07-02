@@ -10,13 +10,10 @@ namespace Voltyks.Core.DTOs.AuthDTOs
     public class ResetPasswordDto
     {
         [Required(ErrorMessage = "Phone number is required")]
-        [StringLength(13, MinimumLength = 10, ErrorMessage = "Phone number must be between 10 and 13 characters")]
-        [RegularExpression(@"^(?:\+20|0020|0)?1[0125]\d{8}$", ErrorMessage = "Phone number Invalid Egyptian mobile")]
-        public string PhoneNumber { get; set; }
+        [StringLength(13, MinimumLength = 11, ErrorMessage = "Phone number must be 11 or 13 characters")]
+        [RegularExpression(@"^(\+2(010\d{8}|011\d{8}|012\d{8}|015\d{8})|010\d{8}|011\d{8}|012\d{8}|015\d{8})$", ErrorMessage = "Phone number must be in the format '010XXXXXXXX', '011XXXXXXXX', '012XXXXXXXX', '015XXXXXXXX' or '+2010XXXXXXXX', '+2011XXXXXXXX', '+2012XXXXXXXX', '+2015XXXXXXXX'")]
 
-        //[Required(ErrorMessage = "OTP code is required")]
-        //[RegularExpression(@"^\d{4}$", ErrorMessage = "OTP code must be exactly 4 digits")]
-        //public string OtpCode { get; set; }
+        public string PhoneNumber { get; set; }
 
         [Required(ErrorMessage = "New password is required")]
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be between 6 and 100 characters")]

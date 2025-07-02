@@ -448,7 +448,8 @@ namespace Voltyks.Application.Services.Auth
         {
             return new AppUser
             {
-                UserName = model.FirstName + model.LastName + Guid.NewGuid().ToString("N").Substring(0, 8),
+                UserName = model.FirstName.Replace(" ", "") + model.LastName.Replace(" ", "") + Guid.NewGuid().ToString("N").Substring(0, 8),
+                //UserName = model.FirstName + model.LastName + Guid.NewGuid().ToString("N").Substring(0, 8),
                 Email = model.Email,
                 PhoneNumber = model.PhoneNumber,
                 FirstName = model.FirstName,
@@ -484,17 +485,28 @@ namespace Voltyks.Application.Services.Auth
 
         private string NormalizePhoneToInternational(string phone)
         {
+
+
             if (string.IsNullOrWhiteSpace(phone))
                 throw new ArgumentException("Phone number is required.");
 
-            // يسمح فقط بـ 010xxxxxxx أو +2010xxxxxxx
-            if (Regex.IsMatch(phone, @"^(01[0-2,5]\d{8})$"))
-                return "+2" + phone;  // 010 → +2010
 
-            else if (Regex.IsMatch(phone, @"^\+201[0-2,5]\d{8}$"))
-                return phone;
 
-            throw new ArgumentException("Invalid phone number format. Use 010xxxxxxxx or +2010xxxxxxxx.");
+            // الشكل المحلي 010xxxxxxxx
+            if (Regex.IsMatch(phone, @"^01[0-9]{9}$"))
+            {
+                return $"+2{phone}";  // نحوله إلى الصيغة الدولية
+            }
+
+            // الشكل الدولي +2010xxxxxxxx
+            if (Regex.IsMatch(phone, @"^\+201[0-9]{9}$"))
+            {
+                return phone; // مقبول بالفعل
+            }
+
+            throw new ArgumentException("Invalid phone format. Accepted formats: 010xxxxxxxx or +2010xxxxxxxx.");
+
+
         }
 
     }

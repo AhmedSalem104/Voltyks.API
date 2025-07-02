@@ -110,6 +110,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<IEnumerable<ChargerDto>>(result);
         }
+
         public async Task<ApiResponse<string>> ToggleChargerStatusAsync(int chargerId)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
@@ -124,7 +125,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 return new ApiResponse<string>("Charger not found", false);
 
             if (charger.UserId != userId)
-                return new ApiResponse<string>("You are not authorized to modify this charger", false);
+                return new ApiResponse<string>("You are not authorized to modify this charger", true);
 
             // عكس الحالة
             charger.IsActive = !charger.IsActive;
@@ -133,10 +134,18 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             await _unitOfWork.SaveChangesAsync();
 
             string newStatus = charger.IsActive ? "Active" : "Not Active";
+            string dataValue = charger.IsActive ? "true" : "false"; 
 
-            return new ApiResponse<string>(message: $"Charger status changed to: { newStatus }");
-
+            return new ApiResponse<string>(
+                data: dataValue,
+                message: $"Charger status changed to: {newStatus}",
+                status: true
+            );
         }
+
+
+
+
 
         public async Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto)
         {
