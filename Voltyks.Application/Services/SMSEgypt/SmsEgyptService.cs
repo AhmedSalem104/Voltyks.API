@@ -27,8 +27,8 @@ namespace Voltyks.Application.Services.SMSEgypt
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<SmsEgyptSettings> _smsSettings;
         private readonly UserManager<AppUser> _userManager;
-        private const int MaxAttempts = 5;
-        private readonly TimeSpan BlockDuration = TimeSpan.FromMinutes(2);
+        private const int MaxAttempts = 10;
+        private readonly TimeSpan BlockDuration = TimeSpan.FromMinutes(10);
 
         public SmsEgyptService(IRedisService redisService, IHttpClientFactory httpClientFactory, IOptions<SmsEgyptSettings> smsSettings , UserManager<AppUser> userManager)
         {
@@ -131,35 +131,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.OtpSentSuccessfully, true);
         }
-
-        //public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
-        //{
-        //    var normalizedPhone = NormalizePhoneNumber(dto.EmailOrPhone);
-
-        //    // 1️⃣ تحقق من حد الرسائل اليومية
-        //    var dailyLimitResult = await CheckAndIncrementOtpDailyLimitAsync(normalizedPhone);
-        //    if (!dailyLimitResult.Status)
-        //        return new ApiResponse<string>(dailyLimitResult.Message, false);
-
-        //    // 2️⃣ تأكد إن المستخدم موجود
-        //    var user = await GetUserByUsernameOrPhoneAsync(dto.EmailOrPhone);
-        //    if (user == null)
-        //        return new ApiResponse<string>(ErrorMessages.PhoneNumberNotExist, false);
-
-        //    // 3️⃣ تحقق من الحظر المؤقت
-        //    if (await _redisService.GetAsync($"otp_block:{normalizedPhone}") != null)
-        //        return new ApiResponse<string>(ErrorMessages.ExceededMaximumOTPAttempts, false);
-
-        //    // 4️⃣ توليد وإرسال OTP
-        //    var otp = GenerateOtp();
-        //    await _redisService.SetAsync($"forget_password_otp:{normalizedPhone}", otp, TimeSpan.FromMinutes(5));
-
-        //    var isSent = await SendOtpMessageAsync(normalizedPhone, otp);
-        //    if (!isSent)
-        //        return new ApiResponse<string>(ErrorMessages.OTPSendingFailed, false);
-
-        //    return new ApiResponse<string>(SuccessfulMessage.OtpSentSuccessfully, true);
-        //}
         public async Task<ApiResponse<string>> VerifyForgetPasswordOtpAsync(VerifyForgetPasswordOtpDto dto)
         {
             var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
