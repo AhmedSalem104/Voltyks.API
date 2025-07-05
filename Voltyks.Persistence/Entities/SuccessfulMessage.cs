@@ -29,6 +29,7 @@ namespace Voltyks.Persistence.Entities
         public const string ChargerAddedSuccessfully = "ChargerAddedSuccessfully";
         public const string ChargerUpdatedSuccessfully = "ChargerUpdatedSuccessfully";
         public const string ChargerDeletedSuccessfully = "ChargerDeletedSuccessfully";
+        public const string UserDataRetrievedSuccessfully = "UserDataRetrievedSuccessfully";
 
         
 

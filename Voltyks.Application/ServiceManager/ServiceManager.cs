@@ -33,7 +33,7 @@ namespace Voltyks.Application.ServicesManager
         , IMapper mapper) : IServiceManager
     {
       
-        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration);
+        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork);
         public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager);
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);

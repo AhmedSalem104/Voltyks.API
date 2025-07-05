@@ -21,9 +21,11 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<string>> RefreshJwtTokenAsync(RefreshTokenDto refreshTokenDto);
         Task<ApiResponse<List<string>>> CheckEmailExistsAsync(EmailDto emailDto);
         Task<ApiResponse<List<string>>> CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto);
+        Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId);
 
 
-      
+
+
     }
 
 

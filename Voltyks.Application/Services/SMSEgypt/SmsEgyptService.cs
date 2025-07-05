@@ -99,7 +99,6 @@ namespace Voltyks.Application.Services.SMSEgypt
             return new ApiResponse<string>(SuccessfulMessage.OtpVerifiedSuccessfully, true);
         }
 
-
         public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
         {
             // 1️⃣ جيب المستخدم سواء أدخل رقم أو إيميل
@@ -198,7 +197,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.PasswordResetSuccessfully, true);
         }
-
         public string GenerateOtp()
         {
             return new Random().Next(1000, 9999).ToString();
@@ -217,7 +215,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return response.IsSuccessStatusCode;
         }
-
 
         // ---------- Private Methods ----------
         private async Task<ApiResponse<bool>> CheckAndIncrementOtpDailyLimitAsync(string phoneNumber)
@@ -240,25 +237,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<bool>(true);
         }
-
-        //private async Task<ApiResponse<bool>> CheckAndIncrementOtpDailyLimitAsync(string phoneNumber)
-        //{
-        //    var normalizedPhone = NormalizePhoneNumber(phoneNumber);
-        //    var key = $"otp_daily_limit:{normalizedPhone}";
-
-        //    // ➡️ 1.   Atomic increment – returns the NEW value
-        //    long newCount = await _redisService.IncrementAsync(key);
-
-        //    // ➡️ 2.   First hit? attach 24 h TTL so the window resets automatically
-        //    if (newCount == 1)
-        //        await _redisService.ExpireAsync(key, TimeSpan.FromDays(1));
-
-        //    // ➡️ 3.   Enforce the 2‑per‑day ceiling
-        //    if (newCount > 2)
-        //        return new ApiResponse<bool>(ErrorMessages.OtpLimitExceededForToday, false);
-
-        //    return new ApiResponse<bool>(true);   // still under the cap
-        //}    
         private async Task<AppUser?> GetUserByUsernameOrPhoneAsync(string usernameOrPhone)
         {
             if (usernameOrPhone.Contains("@"))
@@ -302,8 +280,6 @@ namespace Voltyks.Application.Services.SMSEgypt
             throw new ArgumentException("Invalid input. Accepted formats: 010xxxxxxxx, +2010xxxxxxxx, or valid email address.");
         }
 
-
-
         private async Task<bool> IsBlockedAsync(string phoneNumber)
         {
             string blockKey = $"otp_block:{phoneNumber}";
@@ -338,8 +314,6 @@ namespace Voltyks.Application.Services.SMSEgypt
             await _redisService.RemoveAsync($"otp_daily_limit:{normalizedPhone}");
             return new ApiResponse<string>("تم مسح الحد اليومي بنجاح", true);
         }
-
-
 
     }
 

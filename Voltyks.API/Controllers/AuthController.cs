@@ -11,6 +11,7 @@ using Voltyks.Core.DTOs;
 using Microsoft.IdentityModel.Tokens;
 using Voltyks.Application;
 using Voltyks.Persistence.Entities;
+using System.Security.Claims;
 
 
 
@@ -177,6 +178,17 @@ namespace Voltyks.Presentation
 
         #endregion
 
+        [HttpGet("GetProfileDetails")]
+        public async Task<IActionResult> GetMyDetails()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); // من الـ JWT
+            var result = await serviceManager.AuthService.GetUserDetailsAsync(userId);
+            if (result == null) return NotFound();
 
-    }     
+            return Ok(result);
+        }
+
+
+
     }
+}

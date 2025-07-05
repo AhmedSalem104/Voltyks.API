@@ -6,13 +6,11 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
-using V_Exception = Voltyks.Core.Exceptions;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Core.Exceptions;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Google.Apis.Auth;
 using Newtonsoft.Json;
-using Voltyks.Persistence.Entities.Main;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Configuration;
 using System.Text.RegularExpressions;
@@ -21,6 +19,12 @@ using System.Numerics;
 using Voltyks.Core.DTOs;
 using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Interfaces.Redis;
+using AutoMapper;
+
+using Voltyks.Infrastructure.UnitOfWork;
+using Voltyks.Persistence.Entities.Main;
+using Voltyks.Core.DTOs.VehicleDTOs;
+using Voltyks.Core.DTOs.Charger;
 
 
 namespace Voltyks.Application.Services.Auth
@@ -30,9 +34,26 @@ namespace Voltyks.Application.Services.Auth
         , IOptions<JwtOptions> options
         , IRedisService redisService
         , IConfiguration configuration
+        , IMapper _mapper
+        , IUnitOfWork _unitOfWork
         ) : IAuthService
     {
 
+        public async Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId)
+        {
+            if (!IsAuthorized(userId))
+                return UnauthorizedResponse();
+
+            var user = await GetUserWithAddressAsync(userId);
+            if (user == null)
+                return UserNotFoundResponse();
+
+            var vehicles = await GetUserVehiclesAsync(userId);
+            var chargers = await GetUserChargersAsync(userId);
+
+            var result = BuildUserDetailsDto(user, vehicles, chargers);
+            return new ApiResponse<UserDetailsDto>(result, SuccessfulMessage.UserDataRetrievedSuccessfully, true);
+        }
         public async Task<ApiResponse<UserLoginResultDto>> LoginAsync(LoginDTO model)
         {
             var user = await GetUserByUsernameOrPhoneAsync(model.EmailOrPhone);
@@ -293,7 +314,12 @@ namespace Voltyks.Application.Services.Auth
 
         }
 
-
+        // ---------- Private Methods ----------
+        private string GetCurrentUserId()
+        {
+            return httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                   ?? throw new UnauthorizedAccessException(ErrorMessages.UserNotAuthenticated);
+        }
         private bool IsPhoneNumber(string input)
         {
             if (string.IsNullOrEmpty(input))
@@ -482,7 +508,6 @@ namespace Voltyks.Application.Services.Auth
                 Email = user.Email
             };
         }
-
         private string NormalizePhoneToInternational(string phone)
         {
 
@@ -508,6 +533,59 @@ namespace Voltyks.Application.Services.Auth
 
 
         }
+
+
+        private bool IsAuthorized(string requestedUserId)
+        {
+            var currentUserId = GetCurrentUserId();
+            return currentUserId == requestedUserId;
+        }
+        private ApiResponse<UserDetailsDto> UnauthorizedResponse()
+        {
+            return new ApiResponse<UserDetailsDto>("Unauthorized access", false, new List<string> { "You are not allowed to view this data." });
+        }
+        private async Task<AppUser?> GetUserWithAddressAsync(string userId)
+        {
+            return await userManager.Users
+                .Include(u => u.Address)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+        }
+        private ApiResponse<UserDetailsDto> UserNotFoundResponse()
+        {
+            return new ApiResponse<UserDetailsDto>("User not found", false);
+        }
+        private async Task<List<Vehicle>> GetUserVehiclesAsync(string userId)
+        {
+            var vehicleRepo = _unitOfWork.GetRepository<Vehicle, int>();
+            return (await vehicleRepo.GetAllWithIncludeAsync(
+             v => v.UserId == userId && !v.IsDeleted,
+             false,
+             v => v.Brand,
+             v => v.Model
+          )).ToList();
+
+        }
+        private async Task<List<Charger>> GetUserChargersAsync(string userId)
+        {
+            var chargerRepo = _unitOfWork.GetRepository<Charger, int>();
+            return (await chargerRepo.GetAllWithIncludeAsync(
+                 c => c.UserId == userId && !c.IsDeleted,
+                 false,
+                 c => c.Capacity,
+                 c => c.Protocol,
+                 c => c.Address,
+                 c => c.PriceOption
+             )).ToList();
+
+        }
+        private UserDetailsDto BuildUserDetailsDto(AppUser user, List<Vehicle> vehicles, List<Charger> chargers)
+        {
+            var result = _mapper.Map<UserDetailsDto>(user);
+            result.Vehicles = _mapper.Map<List<VehicleDto>>(vehicles);
+            result.Chargers = _mapper.Map<List<ChargerDto>>(chargers);
+            return result;
+        }
+
 
     }
 }

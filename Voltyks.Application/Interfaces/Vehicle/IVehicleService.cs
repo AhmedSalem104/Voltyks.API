@@ -13,10 +13,7 @@ namespace Voltyks.Application.Interfaces
     {
         Task<ApiResponse<VehicleDto>> CreateVehicleAsync(CreateVehicleDto dto);
         Task<ApiResponse<VehicleDto>> UpdateVehicleAsync(int id, UpdateVehicleDto dto);
-
-        // تم حذف userId لأننا بنستخدم التوكن
         Task<ApiResponse<IEnumerable<VehicleDto>>> GetVehiclesByUserIdAsync();
-
         Task<ApiResponse<bool>> DeleteVehicleAsync(int vehicleId);
     }
 }
