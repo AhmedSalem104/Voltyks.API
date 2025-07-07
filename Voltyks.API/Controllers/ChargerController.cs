@@ -63,9 +63,9 @@ namespace Voltyks.API.Controllers
 
         [Authorize]
         [HttpPut("UpdateCharger")]
-        public async Task<IActionResult> UpdateCharger([FromBody] UpdateChargerDto dto)
+        public async Task<IActionResult> UpdateCharger([FromBody] UpdateChargerDto dto , int chargerId)
         {
-            var result = await _serviceManager.ChargerService.UpdateChargerAsync(dto);
+            var result = await _serviceManager.ChargerService.UpdateChargerAsync(dto , chargerId);
             return Ok(result);
         }
 

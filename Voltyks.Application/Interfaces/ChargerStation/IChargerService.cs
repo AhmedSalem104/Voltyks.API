@@ -15,8 +15,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         Task<ApiResponse<IEnumerable<PriceByCapacityDto>>> GetPriceListBasedOnCapacityAsync();
         Task<ApiResponse<string>> AddChargerAsync(AddChargerDto dto);
         Task<ApiResponse<IEnumerable<ChargerDto>>> GetChargersForCurrentUserAsync();
-        Task<ApiResponse<string>> ToggleChargerStatusAsync(int chargerId);
-        Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto);
+        Task<ApiResponse<bool>> ToggleChargerStatusAsync(int chargerId);
+        Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto , int chargerId);
         Task<ApiResponse<string>> DeleteChargerAsync(int chargerId);
 
     }

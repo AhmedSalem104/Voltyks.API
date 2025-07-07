@@ -86,7 +86,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             await _unitOfWork.GetRepository<Charger, int>().AddAsync(charger);
             await _unitOfWork.SaveChangesAsync();
 
-            return new ApiResponse<string>(message: SuccessfulMessage.ChargerAddedSuccessfully);
+            return new ApiResponse<string>(message: SuccessfulMessage.ChargerAddedSuccessfully ,true);
         }
         public async Task<ApiResponse<IEnumerable<ChargerDto>>> GetChargersForCurrentUserAsync()
         {
@@ -111,21 +111,21 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<IEnumerable<ChargerDto>>(result);
         }
-        public async Task<ApiResponse<string>> ToggleChargerStatusAsync(int chargerId)
+        public async Task<ApiResponse<bool>> ToggleChargerStatusAsync(int chargerId)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
-                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
+                return new ApiResponse<bool>(ErrorMessages.UnauthorizedAccess, false);
 
             var userId = userIdClaim.Value;
 
             var charger = await _unitOfWork.GetRepository<Charger, int>().GetAsync(chargerId);
 
             if (charger == null || charger.IsDeleted)
-                return new ApiResponse<string>(ErrorMessages.ChargerNotFound, false);
+                return new ApiResponse<bool>(ErrorMessages.ChargerNotFound, false);
 
             if (charger.UserId != userId)
-                return new ApiResponse<string>(ErrorMessages.YouAreNotAuthorizedToModifyThisCharger, true);
+                return new ApiResponse<bool>(ErrorMessages.YouAreNotAuthorizedToModifyThisCharger, true);
 
             // عكس الحالة
             charger.IsActive = !charger.IsActive;
@@ -134,15 +134,15 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             await _unitOfWork.SaveChangesAsync();
 
             string newStatus = charger.IsActive ? "Active" : "Not Active";
-            string dataValue = charger.IsActive ? "true" : "false"; 
+            bool dataValue = charger.IsActive ? true : false; 
 
-            return new ApiResponse<string>(
+            return new ApiResponse<bool>(
                 data: dataValue,
                 message: $"Charger status changed to: {newStatus}",
                 status: true
             );
         }
-        public async Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto)
+        public async Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto, int chargerId)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
@@ -151,7 +151,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             var userId = userIdClaim.Value;
 
             var charger = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
-                c => c.Id == dto.ChargerId && !c.IsDeleted,
+                c => c.Id == chargerId && !c.IsDeleted,
                 false,
                 c => c.Address
             );
@@ -180,7 +180,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             _unitOfWork.GetRepository<Charger, int>().Update(chargerEntity);
             _unitOfWork.GetRepository<ChargerAddress, int>().Update(chargerEntity.Address);
             await _unitOfWork.SaveChangesAsync();
-            return new ApiResponse<string>(message: SuccessfulMessage.ChargerUpdatedSuccessfully);
+            return new ApiResponse<string>(message: SuccessfulMessage.ChargerUpdatedSuccessfully,true);
 
         }
         public async Task<ApiResponse<string>> DeleteChargerAsync(int chargerId)
@@ -202,7 +202,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             charger.IsDeleted = true;
             _unitOfWork.GetRepository<Charger, int>().Update(charger);
             await _unitOfWork.SaveChangesAsync();
-            return new ApiResponse<string>(message: SuccessfulMessage.ChargerDeletedSuccessfully);
+            return new ApiResponse<string>(message: SuccessfulMessage.ChargerDeletedSuccessfully,true);
 
         }
 

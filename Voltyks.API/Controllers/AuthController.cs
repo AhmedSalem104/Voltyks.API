@@ -155,7 +155,6 @@ namespace Voltyks.Presentation
         }
 
         #region SmsEgypt
-
         [HttpPost("SendSmsEgyptOtp")]
         public async Task<IActionResult> SendOtp([FromBody] SendSmsEgyptOtpDto dto)
         {

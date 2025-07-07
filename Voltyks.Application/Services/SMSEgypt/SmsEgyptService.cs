@@ -99,6 +99,7 @@ namespace Voltyks.Application.Services.SMSEgypt
             return new ApiResponse<string>(SuccessfulMessage.OtpVerifiedSuccessfully, true);
         }
 
+
         public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
         {
             // 1️⃣ جيب المستخدم سواء أدخل رقم أو إيميل
@@ -197,6 +198,7 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.PasswordResetSuccessfully, true);
         }
+
         public string GenerateOtp()
         {
             return new Random().Next(1000, 9999).ToString();
