@@ -41,19 +41,15 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             var data = _mapper.Map<IEnumerable<ProtocolDto>>(protocols);
             return new ApiResponse<IEnumerable<ProtocolDto>>(data);
         }
-        public async Task<ApiResponse<IEnumerable<PriceByCapacityDto>>> GetPriceListBasedOnCapacityAsync()
+
+        public async Task<ApiResponse<IEnumerable<PriceByCapacityDto>>> GetPriceListAsync()
         {
-            var capacities = await _unitOfWork.GetRepository<Capacity, int>().GetAllAsync();
-            var prices = await _unitOfWork.GetRepository<PriceOption, int>().GetAllAsync();
-
-            var result = capacities.Select(c => new PriceByCapacityDto
-            {
-                Capacity = c.KW,
-                AvailablePrices = prices.Select(p => p.Value).ToList()
-            });
-
-            return new ApiResponse<IEnumerable<PriceByCapacityDto>>(result);
+            var Prices = await _unitOfWork.GetRepository<PriceOption, int>().GetAllAsync();
+            var data = _mapper.Map<IEnumerable<PriceByCapacityDto>>(Prices);
+            return new ApiResponse<IEnumerable<PriceByCapacityDto>>(data);
         }
+
+    
         public async Task<ApiResponse<string>> AddChargerAsync(AddChargerDto dto)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
@@ -62,54 +58,72 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             var userId = userIdClaim.Value;
 
-            // إنشاء العنوان
-            var address = new ChargerAddress
-            {
-                Area = dto.Area,
-                Street = dto.Street,
-                BuildingNumber = dto.BuildingNumber,
-                Latitude = dto.Latitude,
-                Longitude = dto.Longitude
-            };
-            await _unitOfWork.GetRepository<ChargerAddress, int>().AddAsync(address);
-            await _unitOfWork.SaveChangesAsync();
+            if (!await ProtocolExistsAsync(dto.ProtocolId))
+                return new ApiResponse<string>($"ProtocolId {dto.ProtocolId} does not exist.", false);
 
-            // استخدام AutoMapper لبناء الكائن
-            var charger = _mapper.Map<Charger>(dto);
+            if (!await CapacityExistsAsync(dto.CapacityId))
+                return new ApiResponse<string>($"CapacityId {dto.CapacityId} does not exist.", false);
 
-            // نضيف القيم غير الموجودة في DTO
-            charger.UserId = userId;
-            charger.AddressId = address.Id;
-            charger.DateAdded = DateTime.UtcNow;
-            charger.IsDeleted = false;
+            if (!await PriceOptionExistsAsync(dto.PriceOptionId))
+                return new ApiResponse<string>($"PriceOptionId {dto.PriceOptionId} does not exist.", false);
 
-            await _unitOfWork.GetRepository<Charger, int>().AddAsync(charger);
-            await _unitOfWork.SaveChangesAsync();
+            var address = await CreateAddressAsync(dto);
 
-            return new ApiResponse<string>(message: SuccessfulMessage.ChargerAddedSuccessfully ,true);
+            await AddChargerRecordAsync(dto, userId, address.Id);
+
+            return new ApiResponse<string>(SuccessfulMessage.ChargerAddedSuccessfully, true);
         }
-        public async Task<ApiResponse<IEnumerable<ChargerDto>>> GetChargersForCurrentUserAsync()
+        public async Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto, int chargerId)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
-                return new ApiResponse<IEnumerable<ChargerDto>>(ErrorMessages.UnauthorizedAccess, false);
+                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
 
             var userId = userIdClaim.Value;
 
-            var chargers = await _unitOfWork.GetRepository<Charger, int>()
-                                 .GetAllWithIncludeAsync(
-                                     c => c.UserId == userId && !c.IsDeleted,
-                                     false,
-                                     c => c.Protocol,
-                                     c => c.Capacity,
-                                     c => c.PriceOption,
-                                     c => c.Address
-                                 );
+            // التحقق من وجود القيم المرجعية
+            if (!await ProtocolExistsAsync(dto.ProtocolId))
+                return new ApiResponse<string>($"ProtocolId {dto.ProtocolId} does not exist.", false);
 
+            if (!await CapacityExistsAsync(dto.CapacityId))
+                return new ApiResponse<string>($"CapacityId {dto.CapacityId} does not exist.", false);
 
-            var result = _mapper.Map<IEnumerable<ChargerDto>>(chargers);
+            if (!await PriceOptionExistsAsync(dto.PriceOptionId))
+                return new ApiResponse<string>($"PriceOptionId {dto.PriceOptionId} does not exist.", false);
 
-            return new ApiResponse<IEnumerable<ChargerDto>>(result);
+            // جلب الشاحن مع العنوان
+            var charger = await GetChargerWithAddressAsync(chargerId, userId);
+            if (charger == null)
+                return new ApiResponse<string>(ErrorMessages.ChargerNotFound, false);
+
+            // تحديث البيانات
+            UpdateChargerAndAddress(charger, dto);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            return new ApiResponse<string>(SuccessfulMessage.ChargerUpdatedSuccessfully, true);
+        }     
+        public async Task<ApiResponse<string>> DeleteChargerAsync(int chargerId)
+        {
+            var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
+
+            var userId = userIdClaim.Value;
+
+            var charger = await _unitOfWork.GetRepository<Charger, int>().GetAsync(chargerId);
+
+            if (charger == null || charger.IsDeleted)
+                return new ApiResponse<string>(ErrorMessages.ChargerNotFoundOrAlreadyDeleted, false);
+
+            if (charger.UserId != userId)
+                return new ApiResponse<string>(ErrorMessages.YouAreNotAuthorizedToDeleteThisCharger, false);
+
+            charger.IsDeleted = true;
+            _unitOfWork.GetRepository<Charger, int>().Update(charger);
+            await _unitOfWork.SaveChangesAsync();
+            return new ApiResponse<string>(message: SuccessfulMessage.ChargerDeletedSuccessfully,true);
+
         }
         public async Task<ApiResponse<bool>> ToggleChargerStatusAsync(int chargerId)
         {
@@ -134,7 +148,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             await _unitOfWork.SaveChangesAsync();
 
             string newStatus = charger.IsActive ? "Active" : "Not Active";
-            bool dataValue = charger.IsActive ? true : false; 
+            bool dataValue = charger.IsActive ? true : false;
 
             return new ApiResponse<bool>(
                 data: dataValue,
@@ -142,69 +156,100 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 status: true
             );
         }
-        public async Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto, int chargerId)
+        public async Task<ApiResponse<IEnumerable<ChargerDto>>> GetChargersForCurrentUserAsync()
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
-                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
+                return new ApiResponse<IEnumerable<ChargerDto>>(ErrorMessages.UnauthorizedAccess, false);
 
             var userId = userIdClaim.Value;
 
-            var charger = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
-                c => c.Id == chargerId && !c.IsDeleted,
+            var chargers = await _unitOfWork.GetRepository<Charger, int>()
+                                 .GetAllWithIncludeAsync(
+                                     c => c.UserId == userId && !c.IsDeleted,
+                                     false,
+                                     c => c.Protocol,
+                                     c => c.Capacity,
+                                     c => c.PriceOption,
+                                     c => c.Address
+                                 );
+
+
+            var result = _mapper.Map<IEnumerable<ChargerDto>>(chargers);
+
+            return new ApiResponse<IEnumerable<ChargerDto>>(result);
+        }
+
+
+
+
+        // Add Charger
+        private async Task AddChargerRecordAsync(AddChargerDto dto, string userId, int addressId)
+        {
+            var charger = _mapper.Map<Charger>(dto);
+            charger.UserId = userId;
+            charger.AddressId = addressId;
+            charger.Adeptor = dto.Adeptor;
+
+            await _unitOfWork.GetRepository<Charger, int>().AddAsync(charger);
+            await _unitOfWork.SaveChangesAsync();
+        }
+        private async Task<ChargerAddress> CreateAddressAsync(AddChargerDto dto)
+        {
+            var address = new ChargerAddress
+            {
+                Area = dto.Area,
+                Street = dto.Street,
+                BuildingNumber = dto.BuildingNumber,
+                Latitude = dto.Latitude,
+                Longitude = dto.Longitude
+            };
+
+            await _unitOfWork.GetRepository<ChargerAddress, int>().AddAsync(address);
+            await _unitOfWork.SaveChangesAsync();
+
+            return address;
+        }
+        private async Task<bool> PriceOptionExistsAsync(int priceOptionId)
+        {
+            return await _unitOfWork.GetRepository<PriceOption, int>().AnyAsync(po => po.Id == priceOptionId);
+        }
+        private async Task<bool> CapacityExistsAsync(int capacityId)
+        {
+            return await _unitOfWork.GetRepository<Capacity, int>().AnyAsync(c => c.Id == capacityId);
+        }
+        private async Task<bool> ProtocolExistsAsync(int protocolId)
+        {
+            return await _unitOfWork.GetRepository<Protocol, int>().AnyAsync(p => p.Id == protocolId);
+        }
+
+        // Update Charger
+        private async Task<Charger?> GetChargerWithAddressAsync(int chargerId, string userId)
+        {
+            var chargers = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+                c => c.Id == chargerId && !c.IsDeleted && c.UserId == userId,
                 false,
-                c => c.Address
-            );
+                c => c.Address);
 
-            var chargerEntity = charger.FirstOrDefault();
-
-            if (chargerEntity == null)
-                return new ApiResponse<string>(ErrorMessages.ChargerNotFound, false);
-
-            if (chargerEntity.UserId != userId)
-                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccessToCharger, false);
-
-            // تحديث البيانات
-            chargerEntity.ProtocolId = dto.ProtocolId;
-            chargerEntity.CapacityId = dto.CapacityId;
-            chargerEntity.PriceOptionId = dto.PriceOptionId;
-            chargerEntity.IsActive = dto.IsActive;
-
-            // تحديث العنوان المرتبط
-            chargerEntity.Address.Area = dto.Area;
-            chargerEntity.Address.Street = dto.Street;
-            chargerEntity.Address.BuildingNumber = dto.BuildingNumber;
-            chargerEntity.Address.Latitude = dto.Latitude;
-            chargerEntity.Address.Longitude = dto.Longitude;
-
-            _unitOfWork.GetRepository<Charger, int>().Update(chargerEntity);
-            _unitOfWork.GetRepository<ChargerAddress, int>().Update(chargerEntity.Address);
-            await _unitOfWork.SaveChangesAsync();
-            return new ApiResponse<string>(message: SuccessfulMessage.ChargerUpdatedSuccessfully,true);
-
+            return chargers.FirstOrDefault();
         }
-        public async Task<ApiResponse<string>> DeleteChargerAsync(int chargerId)
+        private void UpdateChargerAndAddress(Charger charger, UpdateChargerDto dto)
         {
-            var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-                return new ApiResponse<string>(ErrorMessages.UnauthorizedAccess, false);
+            charger.ProtocolId = dto.ProtocolId;
+            charger.CapacityId = dto.CapacityId;
+            charger.PriceOptionId = dto.PriceOptionId;
+            charger.IsActive = dto.IsActive;
 
-            var userId = userIdClaim.Value;
+            charger.Address.Area = dto.Area;
+            charger.Address.Street = dto.Street;
+            charger.Address.BuildingNumber = dto.BuildingNumber;
+            charger.Address.Latitude = dto.Latitude;
+            charger.Address.Longitude = dto.Longitude;
 
-            var charger = await _unitOfWork.GetRepository<Charger, int>().GetAsync(chargerId);
-
-            if (charger == null || charger.IsDeleted)
-                return new ApiResponse<string>(ErrorMessages.ChargerNotFoundOrAlreadyDeleted, false);
-
-            if (charger.UserId != userId)
-                return new ApiResponse<string>(ErrorMessages.YouAreNotAuthorizedToDeleteThisCharger, false);
-
-            charger.IsDeleted = true;
             _unitOfWork.GetRepository<Charger, int>().Update(charger);
-            await _unitOfWork.SaveChangesAsync();
-            return new ApiResponse<string>(message: SuccessfulMessage.ChargerDeletedSuccessfully,true);
-
+            _unitOfWork.GetRepository<ChargerAddress, int>().Update(charger.Address);
         }
+
 
     }
 

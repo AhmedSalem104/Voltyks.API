@@ -73,43 +73,57 @@ namespace Voltyks.Persistence
                         await _context.Models.AddRangeAsync(types);
                         await _context.SaveChangesAsync();
                     }
-                }
+                }                    
 
-                if (!_context.PriceOptions.Any())
-                {
-                    var prices = new List<PriceOption>();
-                    for (decimal i = 5; i <= 100; i += 5)
-                    {
-                        prices.Add(new PriceOption { Value = i });
-                    }
-                    _context.PriceOptions.AddRange(prices);
-                    _context.SaveChanges();
-                }
-                // Seeding Protocols
+                //// Seeding For Protocols Form Json File
                 if (!_context.Protocols.Any())
                 {
-                    var protocols = new List<Protocol>
-            {
-                new Protocol { Name = "Chinese" },
-                new Protocol { Name = "European" }
-            };
-                    _context.Protocols.AddRange(protocols);
-                    await _context.SaveChangesAsync();
+                    // 1. Read All Data Protocols From Json File
+                    var ProtocolsData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\protocal_seed.json");
 
+                    // 2. Transform The Data To List<Protocols>
+                    var Protocols = JsonSerializer.Deserialize<List<Protocol>>(ProtocolsData);
+
+                    // 3. Add List<Protocols> To Database
+                    if (Protocols is not null && Protocols.Any())
+                    {
+                        await _context.Protocols.AddRangeAsync(Protocols);
+                        await _context.SaveChangesAsync();
+                    }
                 }
 
-                // Seeding Capacities
+                //// Seeding For priceOption Form Json File
+                if (!_context.PriceOptions.Any())
+                {
+                    // 1. Read All Data PriceOptions From Json File
+                    var PriceOptionsData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\priceOption_seed.json");
+
+                    // 2. Transform The Data To List<PriceOptions>
+                    var PriceOptions = JsonSerializer.Deserialize<List<PriceOption>>(PriceOptionsData);
+
+                    // 3. Add List<PriceOptions> To Database
+                    if (PriceOptions is not null && PriceOptions.Any())
+                    {
+                        await _context.PriceOptions.AddRangeAsync(PriceOptions);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                //// Seeding For Capacities Form Json File
                 if (!_context.Capacities.Any())
                 {
-                    var capacities = new List<Capacity>
-            {
-                new Capacity { KW = 7 },
-                new Capacity { KW = 15 },
-                new Capacity { KW = 22 }
-            };
-                    _context.Capacities.AddRange(capacities);
-                    await _context.SaveChangesAsync();
+                    // 1. Read All Data Capacities From Json File
+                    var CapacitiesData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\capacity_seed.json");
 
+                    // 2. Transform The Data To List<Capacities>
+                    var Capacities = JsonSerializer.Deserialize<List<Capacity>>(CapacitiesData);
+
+                    // 3. Add List<PriceOptions> To Database
+                    if (Capacities is not null && Capacities.Any())
+                    {
+                        await _context.Capacities.AddRangeAsync(Capacities);
+                        await _context.SaveChangesAsync();
+                    }
                 }
 
             }

@@ -22,6 +22,7 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<List<string>>> CheckEmailExistsAsync(EmailDto emailDto);
         Task<ApiResponse<List<string>>> CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto);
         Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId);
+        Task<ApiResponse<bool>> ToggleUserAvailabilityAsync();
 
 
 

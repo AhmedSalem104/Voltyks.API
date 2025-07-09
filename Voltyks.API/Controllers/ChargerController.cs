@@ -30,10 +30,10 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
 
-        [HttpGet("GetPriceByCapacity")]
+        [HttpGet("GetPrices")]
         public async Task<IActionResult> GetPriceBasedOnCapacity()
         {
-            var result = await _serviceManager.ChargerService.GetPriceListBasedOnCapacityAsync();
+            var result = await _serviceManager.ChargerService.GetPriceListAsync();
             return Ok(result);
         }
 

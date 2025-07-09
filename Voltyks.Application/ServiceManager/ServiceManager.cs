@@ -17,6 +17,7 @@ using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Infrastructure.UnitOfWork;
+using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 
@@ -30,10 +31,11 @@ namespace Voltyks.Application.ServicesManager
         , IRedisService redisService
         , IConfiguration configuration
         , IUnitOfWork unitOfWork
+        , VoltyksDbContext context
         , IMapper mapper) : IServiceManager
     {
       
-        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork);
+        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context);
         public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager);
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);

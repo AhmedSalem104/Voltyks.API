@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Voltyks.Persistence.Data;
 
@@ -11,9 +12,11 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    partial class VoltyksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250709181547_AddColumnIsAvailableInAppuserEntity")]
+    partial class AddColumnIsAvailableInAppuserEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -308,7 +311,12 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<int>("KW")
                         .HasColumnType("int");
 
+                    b.Property<int?>("PriceOptionId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("PriceOptionId");
 
                     b.ToTable("Capacities");
                 });
@@ -567,6 +575,13 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Navigation("AppUser");
                 });
 
+            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Capacity", b =>
+                {
+                    b.HasOne("Voltyks.Persistence.Entities.Main.PriceOption", null)
+                        .WithMany("Capacities")
+                        .HasForeignKey("PriceOptionId");
+                });
+
             modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Charger", b =>
                 {
                     b.HasOne("Voltyks.Persistence.Entities.Main.ChargerAddress", "Address")
@@ -652,6 +667,11 @@ namespace Voltyks.Persistence.Data.Migrations
                 {
                     b.Navigation("Address")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.PriceOption", b =>
+                {
+                    b.Navigation("Capacities");
                 });
 #pragma warning restore 612, 618
         }

@@ -9,7 +9,6 @@ namespace Voltyks.Persistence.Entities.Main
     public class PriceOption : BaseEntity<int>
     {
         public decimal Value { get; set; }
-        public ICollection<Capacity>? Capacities { get; set; }
     }
 
 }

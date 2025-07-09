@@ -8,7 +8,7 @@ using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Persistence.Entities.Identity
 {
-    public class AppUser : IdentityUser
+    public class AppUser : IdentityUser 
     {
         public string? FullName { get; set; }
         public string FirstName { get; set; }
@@ -20,6 +20,9 @@ namespace Voltyks.Persistence.Entities.Identity
         public DateTime? VcodeExpirationDate { get; set; }
 
         public Address Address { get; set; } = new Address();  // تهيئة افتراضية
+
+        public bool IsAvailable { get; set; } = true; 
+
 
     }
 }

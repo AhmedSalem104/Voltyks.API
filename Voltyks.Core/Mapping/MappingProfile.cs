@@ -39,7 +39,6 @@ namespace Voltyks.Core.Mapping
 
             CreateMap<Charger, ChargerDto>()
                 .ForMember(dest => dest.Protocol, opt => opt.MapFrom(src => src.Protocol.Name))
-                .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => src.Capacity.KW))
                 .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption.Value))
                 .ForMember(dest => dest.Area, opt => opt.MapFrom(src => src.Address.Area))
                 .ForMember(dest => dest.Street, opt => opt.MapFrom(src => src.Address.Street))

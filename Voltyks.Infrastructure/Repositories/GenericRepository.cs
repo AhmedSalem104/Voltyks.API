@@ -74,6 +74,12 @@ namespace Voltyks.Infrastructure
         {
             _context.Set<TEntity>().Remove(entity);
         }
+
+        public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate)
+        {
+            return await _context.Set<TEntity>().AnyAsync(predicate);
+        }
+
     }
 
 }

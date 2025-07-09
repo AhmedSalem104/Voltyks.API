@@ -17,9 +17,7 @@ namespace Voltyks.Infrastructure.UnitOfWork
         IGenericRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
             where TEntity : BaseEntity<TKey>;
 
-        // Dapper Repositories
-        //IUserDapperRepository UserDapper { get; }
-        //Brand brand  { get; }
+       
 
     }
 

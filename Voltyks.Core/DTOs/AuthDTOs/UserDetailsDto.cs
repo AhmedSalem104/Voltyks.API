@@ -10,6 +10,8 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         public string UserName { get; set; }
         public string Email { get; set; }
         public string PhoneNumber { get; set; }
+        public bool IsAvailable { get; set; } 
+
         public List<VehicleDto> Vehicles { get; set; }
         public List<ChargerDto> Chargers { get; set; }
     }

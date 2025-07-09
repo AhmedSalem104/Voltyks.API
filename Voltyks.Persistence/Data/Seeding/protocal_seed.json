@@ -1,0 +1,17 @@
+[
+    //{ "name": "CCS Type 1" },
+    //{ "name": "CCS Type 2" },
+    //{ "name": "CHAdeMO" },
+    //{ "name": "Tesla Supercharger" },
+    //{ "name": "GB/T (AC)" },
+    //{ "name": "GB/T (DC)" },
+    //{ "name": "Type 1" },
+    //{ "name": "Type 2" },
+    //{ "name": "Mennekes" },
+    //{ "name": "SAE J1772" },
+    { "name": "Chinese" },
+    { "name": "European" },
+    //{ "name": "North American Standard" },
+    //{ "name": "IEC 62196-2" },
+    //{ "name": "IEC 62196-3" }
+]

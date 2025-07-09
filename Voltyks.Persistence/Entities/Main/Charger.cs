@@ -28,6 +28,8 @@ namespace Voltyks.Persistence.Entities.Main
 
         public DateTime DateAdded { get; set; } = DateTime.UtcNow;
         public bool IsDeleted { get; set; } = false;
+        public bool? Adeptor { get; set; } 
+
     }
 
 }

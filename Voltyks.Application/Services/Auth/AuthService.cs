@@ -25,6 +25,8 @@ using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Entities.Main;
 using Voltyks.Core.DTOs.VehicleDTOs;
 using Voltyks.Core.DTOs.Charger;
+using System.Net.Http;
+using Voltyks.Persistence.Data;
 
 
 namespace Voltyks.Application.Services.Auth
@@ -36,6 +38,7 @@ namespace Voltyks.Application.Services.Auth
         , IConfiguration configuration
         , IMapper _mapper
         , IUnitOfWork _unitOfWork
+        , VoltyksDbContext context
         ) : IAuthService
     {
 
@@ -54,6 +57,34 @@ namespace Voltyks.Application.Services.Auth
             var result = BuildUserDetailsDto(user, vehicles, chargers);
             return new ApiResponse<UserDetailsDto>(result, SuccessfulMessage.UserDataRetrievedSuccessfully, true);
         }
+        public async Task<ApiResponse<bool>> ToggleUserAvailabilityAsync()
+        {
+            var userIdClaim = httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                return new ApiResponse<bool>(ErrorMessages.UnauthorizedAccess, false);
+
+            var userId = userIdClaim.Value;
+
+            var user = context.Users.Find(userId);
+            
+
+            if (user == null)
+                return new ApiResponse<bool>("User not found", false);
+
+
+            user.IsAvailable = !user.IsAvailable;
+            await _unitOfWork.SaveChangesAsync();
+
+            var newStatus = user.IsAvailable ? "Available" : "Unavailable";
+
+            return new ApiResponse<bool>(
+                data: user.IsAvailable,
+                message: $"User availability changed to: {newStatus}",
+                status: true
+            );
+        }
+
+
         public async Task<ApiResponse<UserLoginResultDto>> LoginAsync(LoginDTO model)
         {
             var user = await GetUserByUsernameOrPhoneAsync(model.EmailOrPhone);

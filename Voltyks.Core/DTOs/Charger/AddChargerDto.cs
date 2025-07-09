@@ -18,8 +18,9 @@ namespace Voltyks.Core.DTOs.Charger
         public string BuildingNumber { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
-
         public bool IsActive { get; set; }
+        public bool? Adeptor { get; set; }
+
     }
 
 }

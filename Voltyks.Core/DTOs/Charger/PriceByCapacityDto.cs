@@ -8,8 +8,8 @@ namespace Voltyks.Core.DTOs.Charger
 {
     public class PriceByCapacityDto
     {
-        public int Capacity { get; set; }
-        public List<decimal> AvailablePrices { get; set; }
+        public int Id { get; set; }
+        public int value { get; set; }
     }
 
 }

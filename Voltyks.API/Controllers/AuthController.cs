@@ -187,6 +187,14 @@ namespace Voltyks.Presentation
             return Ok(result);
         }
 
+        [HttpPut("toggle-availability")]
+        [Authorize]
+        public async Task<IActionResult> ToggleAvailability()
+        {
+            var result = await serviceManager.AuthService.ToggleUserAvailabilityAsync();
+            return Ok(result);
+        }
+
 
 
     }
