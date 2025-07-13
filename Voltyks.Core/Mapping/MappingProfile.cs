@@ -37,17 +37,6 @@ namespace Voltyks.Core.Mapping
                 .ForMember(dest => dest.DateAdded, opt => opt.Ignore())
                 .ForMember(dest => dest.IsDeleted, opt => opt.Ignore());
 
-            CreateMap<Charger, ChargerDto>()
-                .ForMember(dest => dest.Protocol, opt => opt.MapFrom(src => src.Protocol.Name))
-                .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption.Value))
-                .ForMember(dest => dest.Area, opt => opt.MapFrom(src => src.Address.Area))
-                .ForMember(dest => dest.Street, opt => opt.MapFrom(src => src.Address.Street))
-                .ForMember(dest => dest.BuildingNumber, opt => opt.MapFrom(src => src.Address.BuildingNumber))
-                .ForMember(dest => dest.Latitude, opt => opt.MapFrom(src => src.Address.Latitude))
-                .ForMember(dest => dest.Longitude, opt => opt.MapFrom(src => src.Address.Longitude));
-
-    
-
             CreateMap<Capacity, CapacityDto>();
             CreateMap<Protocol, ProtocolDto>();
             CreateMap<PriceOption, PriceByCapacityDto>();
@@ -55,6 +44,20 @@ namespace Voltyks.Core.Mapping
 
             // User
             CreateMap<AppUser, UserDetailsDto>();
+            CreateMap<Charger, ChargerDto>()
+            .ForMember(dest => dest.Protocol, opt => opt.MapFrom(src => src.Protocol != null ? src.Protocol.Name : null))
+            .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => src.Capacity != null ? src.Capacity.kw : 0))  // لو خاصية kw في Capacity
+            .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption != null ? src.PriceOption.Value : 0))
+            .ForMember(dest => dest.Area, opt => opt.MapFrom(src => src.Address != null ? src.Address.Area : null))
+            .ForMember(dest => dest.Street, opt => opt.MapFrom(src => src.Address != null ? src.Address.Street : null))
+            .ForMember(dest => dest.BuildingNumber, opt => opt.MapFrom(src => src.Address != null ? src.Address.BuildingNumber : null))
+            .ForMember(dest => dest.Latitude, opt => opt.MapFrom(src => src.Address != null ? src.Address.Latitude : 0))
+            .ForMember(dest => dest.Longitude, opt => opt.MapFrom(src => src.Address != null ? src.Address.Longitude : 0))
+            .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
+            .ForMember(dest => dest.DateAdded, opt => opt.MapFrom(src => src.DateAdded))
+            .ForSourceMember(src => src.IsDeleted, opt => opt.DoNotValidate());  // تجاهل IsDeleted
         }
+
     }
+    
 }

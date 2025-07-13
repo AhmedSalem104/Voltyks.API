@@ -19,6 +19,9 @@ namespace Voltyks.Core.DTOs.Charger
         public double Longitude { get; set; }
         public bool IsActive { get; set; }
         public DateTime DateAdded { get; set; }
+        public bool? Adeptor { get; set; }
+
+
     }
 
 }

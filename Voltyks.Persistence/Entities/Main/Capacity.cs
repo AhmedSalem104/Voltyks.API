@@ -9,7 +9,7 @@ namespace Voltyks.Persistence.Entities.Main
 {
     public class Capacity : BaseEntity<int>
     {
-        public int value { get; set; }
+        public int kw { get; set; }
     }
 
 }

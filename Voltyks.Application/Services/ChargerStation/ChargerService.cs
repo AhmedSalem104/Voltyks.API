@@ -172,8 +172,10 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                                      c => c.Capacity,
                                      c => c.PriceOption,
                                      c => c.Address
+                                     
                                  );
 
+          
 
             var result = _mapper.Map<IEnumerable<ChargerDto>>(chargers);
 

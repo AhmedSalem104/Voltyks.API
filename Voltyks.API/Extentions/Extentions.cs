@@ -41,7 +41,7 @@ namespace Voltyks.API.Extentions
             services.ConfigureJwtServices(configuration);
             services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsSettings"));
             services.AddSingleton<SqlConnectionFactory>();
-            services.AddAutoMapper(typeof(MappingProfile));
+            services.AddAutoMapper(typeof(MappingProfile).Assembly);
 
             services.AddAuthentication()
             .AddGoogle("Google", options =>
