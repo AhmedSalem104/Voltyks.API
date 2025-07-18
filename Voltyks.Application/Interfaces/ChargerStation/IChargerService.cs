@@ -16,9 +16,10 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         Task<ApiResponse<string>> AddChargerAsync(AddChargerDto dto);
         Task<ApiResponse<IEnumerable<ChargerDto>>> GetChargersForCurrentUserAsync();
         Task<ApiResponse<bool>> ToggleChargerStatusAsync(int chargerId);
-        Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto , int chargerId);
+        Task<ApiResponse<string>> UpdateChargerAsync(UpdateChargerDto dto, int chargerId);
         Task<ApiResponse<string>> DeleteChargerAsync(int chargerId);
+        Task<ApiResponse<List<NearChargerDto>>> GetNearChargersAsync(NearChargerSearchDto searchDto);
 
+        Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(int chargerId, double userLat, double userLon);
     }
-
 }

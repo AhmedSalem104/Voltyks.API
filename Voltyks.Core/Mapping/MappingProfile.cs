@@ -56,7 +56,47 @@ namespace Voltyks.Core.Mapping
             .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
             .ForMember(dest => dest.DateAdded, opt => opt.MapFrom(src => src.DateAdded))
             .ForSourceMember(src => src.IsDeleted, opt => opt.DoNotValidate());  // تجاهل IsDeleted
+
+
+            CreateMap<Charger, ChargerDetailsDto>()
+             .ForMember(dest => dest.FullName,
+                   opt => opt.MapFrom(src => $"{src.User.FirstName} {src.User.LastName}"))
+
+               .ForMember(dest => dest.Rating,
+                   opt => opt.MapFrom(src => src.AverageRating))
+
+               .ForMember(dest => dest.RatingCount,
+                   opt => opt.MapFrom(src => src.RatingCount))
+
+               .ForMember(dest => dest.Area,
+                   opt => opt.MapFrom(src => src.Address.Area))
+
+               .ForMember(dest => dest.Street,
+                   opt => opt.MapFrom(src => src.Address.Street))
+
+               .ForMember(dest => dest.Protocol,
+                   opt => opt.MapFrom(src => src.Protocol.Name))
+
+               .ForMember(dest => dest.Capacity,
+                   opt => opt.MapFrom(src => $"{src.Capacity.kw} KW/h"))
+
+               .ForMember(dest => dest.PricePerHour,
+                   opt => opt.MapFrom(src => $"{src.PriceOption.Value}/1Hr"))
+
+               .ForMember(dest => dest.AdapterAvailability,
+                   opt => opt.MapFrom(src => src.Adaptor == true ? "Available" : "Not Available"))
+
+               .ForMember(dest => dest.PriceEstimated,
+                   opt => opt.Ignore()) // هنحسبه يدوي بعد الماب
+
+               .ForMember(dest => dest.DistanceInKm,
+                   opt => opt.Ignore()) // نفس الشيء
+
+               .ForMember(dest => dest.EstimatedArrival,
+                   opt => opt.Ignore()); // نفس الشيء
         }
+
+
 
     }
     

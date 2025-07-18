@@ -12,8 +12,8 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    [Migration("20250709181547_AddColumnIsAvailableInAppuserEntity")]
-    partial class AddColumnIsAvailableInAppuserEntity
+    [Migration("20250715080950_ChangeAdeptorToAdaptorInChargerEntity")]
+    partial class ChangeAdeptorToAdaptorInChargerEntity
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -308,15 +308,10 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("KW")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("PriceOptionId")
+                    b.Property<int>("kw")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("PriceOptionId");
 
                     b.ToTable("Capacities");
                 });
@@ -329,11 +324,11 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool?>("Adaptor")
+                        .HasColumnType("bit");
+
                     b.Property<int>("AddressId")
                         .HasColumnType("int");
-
-                    b.Property<bool?>("adeptor")
-                        .HasColumnType("bit");
 
                     b.Property<int>("CapacityId")
                         .HasColumnType("int");
@@ -575,13 +570,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Navigation("AppUser");
                 });
 
-            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Capacity", b =>
-                {
-                    b.HasOne("Voltyks.Persistence.Entities.Main.PriceOption", null)
-                        .WithMany("Capacities")
-                        .HasForeignKey("PriceOptionId");
-                });
-
             modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Charger", b =>
                 {
                     b.HasOne("Voltyks.Persistence.Entities.Main.ChargerAddress", "Address")
@@ -667,11 +655,6 @@ namespace Voltyks.Persistence.Data.Migrations
                 {
                     b.Navigation("Address")
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.PriceOption", b =>
-                {
-                    b.Navigation("Capacities");
                 });
 #pragma warning restore 612, 618
         }

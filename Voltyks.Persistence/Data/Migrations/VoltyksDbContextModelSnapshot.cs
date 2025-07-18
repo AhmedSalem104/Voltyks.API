@@ -305,7 +305,7 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("KW")
+                    b.Property<int>("kw")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -321,11 +321,14 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool?>("Adaptor")
+                        .HasColumnType("bit");
+
                     b.Property<int>("AddressId")
                         .HasColumnType("int");
 
-                    b.Property<bool?>("Adeptor")
-                        .HasColumnType("bit");
+                    b.Property<double>("AverageRating")
+                        .HasColumnType("float");
 
                     b.Property<int>("CapacityId")
                         .HasColumnType("int");
@@ -343,6 +346,9 @@ namespace Voltyks.Persistence.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("ProtocolId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RatingCount")
                         .HasColumnType("int");
 
                     b.Property<string>("UserId")

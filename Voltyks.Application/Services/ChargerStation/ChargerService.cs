@@ -41,7 +41,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             var data = _mapper.Map<IEnumerable<ProtocolDto>>(protocols);
             return new ApiResponse<IEnumerable<ProtocolDto>>(data);
         }
-
         public async Task<ApiResponse<IEnumerable<PriceByCapacityDto>>> GetPriceListAsync()
         {
             var Prices = await _unitOfWork.GetRepository<PriceOption, int>().GetAllAsync();
@@ -184,6 +183,105 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
 
 
+        public async Task<ApiResponse<List<NearChargerDto>>> GetNearChargersAsync(NearChargerSearchDto searchDto)
+        {
+            var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                return new ApiResponse<List<NearChargerDto>>(ErrorMessages.UnauthorizedAccess, false);
+
+            var userId = userIdClaim.Value;
+            var chargers = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+                c => !c.IsDeleted && c.IsActive && c.ProtocolId == searchDto.ProtocolId,
+                false,
+                c => c.Capacity,
+                c => c.PriceOption,
+                c => c.Address
+            );
+
+            var filtered = new List<NearChargerDto>();
+
+            foreach (var charger in chargers)
+            {
+                var distance = CalculateDistanceInKm(
+                    searchDto.Latitude,
+                    searchDto.Longitude,
+                    charger.Address.Latitude,
+                    charger.Address.Longitude);
+
+                if (distance <= searchDto.SearchRangeInKm)
+                {
+                    filtered.Add(new NearChargerDto
+                    {
+                        ChargerId = charger.Id,
+                        Capacity = charger.Capacity.kw,
+                        Price = charger.PriceOption.Value,
+                        DistanceInKm = Math.Round(distance, 2)
+                    });
+                }
+            }
+
+            return new ApiResponse<List<NearChargerDto>>(filtered, "Success", true);
+        }
+        public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(int chargerId, double userLat, double userLon)
+        {
+            var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.UnauthorizedAccess, false);
+
+            var charger = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+                c => c.Id == chargerId && !c.IsDeleted && c.IsActive,
+                false,
+                c => c.Address,
+                c => c.Capacity,
+                c => c.PriceOption,
+                c => c.Protocol,
+                c => c.User
+            );
+
+            var target = charger.FirstOrDefault();
+            if (target == null)
+                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
+
+            var dto = _mapper.Map<ChargerDetailsDto>(target);
+
+            // حساب القيم الغير موجودة في الـ AutoMapper Profile
+            var distance = CalculateDistanceInKm(userLat, userLon, target.Address.Latitude, target.Address.Longitude);
+            var estimatedTime = EstimateTime(distance);
+            dto.DistanceInKm = Math.Round(distance, 2);
+            dto.EstimatedArrival = estimatedTime;
+            dto.PriceEstimated = $"{EstimatePrice(distance, target.PriceOption.Value)} EGP";
+
+            return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
+        }
+
+        private double CalculateDistanceInKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            double R = 6371; // نصف قطر الأرض بالكيلومتر
+            double dLat = ToRadians(lat2 - lat1);
+            double dLon = ToRadians(lon2 - lon1);
+            double a =
+                Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c;
+        }
+        private double ToRadians(double deg)
+        {
+            return deg * (Math.PI / 180);
+        }
+        private string EstimateTime(double distanceKm)
+        {
+            double averageSpeedKmPerMin = 0.1; // 6 كم/ساعة = مشي تقريبًا
+            int minutes = (int)Math.Ceiling(distanceKm / averageSpeedKmPerMin);
+            return $"{minutes} Mins";
+        }
+        private double EstimatePrice(double distanceKm, decimal pricePerHour)
+        {
+            double sessionDurationHr = 1.0; // تقدر تحددها لاحقًا بناءً على البطارية
+            return Math.Round((double)pricePerHour * sessionDurationHr, 2);
+        }
+
 
         // Add Charger
         private async Task AddChargerRecordAsync(AddChargerDto dto, string userId, int addressId)
@@ -191,7 +289,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             var charger = _mapper.Map<Charger>(dto);
             charger.UserId = userId;
             charger.AddressId = addressId;
-            charger.Adeptor = dto.Adeptor;
+            charger.Adaptor = dto.Adaptor;
 
             await _unitOfWork.GetRepository<Charger, int>().AddAsync(charger);
             await _unitOfWork.SaveChangesAsync();
