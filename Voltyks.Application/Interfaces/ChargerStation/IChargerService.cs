@@ -20,6 +20,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         Task<ApiResponse<string>> DeleteChargerAsync(int chargerId);
         Task<ApiResponse<List<NearChargerDto>>> GetNearChargersAsync(NearChargerSearchDto searchDto);
 
-        Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(int chargerId, double userLat, double userLon);
+        Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(ChargerDetailsRequestDto request);
     }
 }

@@ -222,13 +222,75 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<List<NearChargerDto>>(filtered, "Success", true);
         }
-        public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(int chargerId, double userLat, double userLon)
+        //public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(int chargerId, double userLat, double userLon, double kwNeed)
+        //{
+        //    var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
+        //    if (userIdClaim == null)
+        //        return new ApiResponse<ChargerDetailsDto>(ErrorMessages.UnauthorizedAccess, false);
+
+        //    var charger = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+        //        c => c.Id == chargerId && !c.IsDeleted && c.IsActive,
+        //        false,
+        //        c => c.Address,
+        //        c => c.Capacity,
+        //        c => c.PriceOption,
+        //        c => c.Protocol,
+        //        c => c.User
+        //    );
+
+        //    var target = charger.FirstOrDefault();
+        //    if (target == null)
+        //        return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
+
+        //    var dto = _mapper.Map<ChargerDetailsDto>(target);
+
+        //    // حساب القيم الغير موجودة في الـ AutoMapper Profile
+        //    var distance = CalculateDistanceInKm(userLat, userLon, target.Address.Latitude, target.Address.Longitude);
+        //    var estimatedTime = EstimateTime(distance);
+        //    dto.DistanceInKm = Math.Round(distance, 2);
+        //    dto.EstimatedArrival = estimatedTime;
+
+        //    // 1. القدرة بتاعت الشاحن (مثلاً 15 KW/h)
+        //    double chargerCapacity = target.Capacity.kw;
+
+        //    // 2. مدة الشحن المطلوبة = كمية الكهرباء المطلوبة ÷ قدرة الشاحن
+        //    double sessionDurationHr = kwNeed / chargerCapacity;
+
+        //    // 3. السعر التقديري
+        //    double estimatedCost = EstimatePrice(sessionDurationHr, target.PriceOption.Value);
+
+        //    // 4. تخزينه في الـ DTO
+        //    dto.PriceEstimated = $"{estimatedCost} EGP";
+
+
+        //    return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
+        //}
+        public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(ChargerDetailsRequestDto request)
         {
-            var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
+            var userId = GetCurrentUserId();
+            if (userId == null)
                 return new ApiResponse<ChargerDetailsDto>(ErrorMessages.UnauthorizedAccess, false);
 
-            var charger = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+            var charger = await GetChargerById(request.ChargerId);
+            if (charger == null)
+                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
+
+            var dto = _mapper.Map<ChargerDetailsDto>(charger);
+
+            CalculateDistanceAndArrival(request.UserLat, request.UserLon, charger, dto);
+            SetEstimatedPrice(request.KwNeed, charger, dto);
+
+            return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
+        }
+
+
+        private string? GetCurrentUserId()
+        {
+            return _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+        private async Task<Charger?> GetChargerById(int chargerId)
+        {
+            var result = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
                 c => c.Id == chargerId && !c.IsDeleted && c.IsActive,
                 false,
                 c => c.Address,
@@ -237,21 +299,20 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 c => c.Protocol,
                 c => c.User
             );
-
-            var target = charger.FirstOrDefault();
-            if (target == null)
-                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
-
-            var dto = _mapper.Map<ChargerDetailsDto>(target);
-
-            // حساب القيم الغير موجودة في الـ AutoMapper Profile
-            var distance = CalculateDistanceInKm(userLat, userLon, target.Address.Latitude, target.Address.Longitude);
-            var estimatedTime = EstimateTime(distance);
+            return result.FirstOrDefault();
+        }
+        private void CalculateDistanceAndArrival(double userLat, double userLon, Charger charger, ChargerDetailsDto dto)
+        {
+            var distance = CalculateDistanceInKm(userLat, userLon, charger.Address.Latitude, charger.Address.Longitude);
             dto.DistanceInKm = Math.Round(distance, 2);
-            dto.EstimatedArrival = estimatedTime;
-            dto.PriceEstimated = $"{EstimatePrice(distance, target.PriceOption.Value)} EGP";
-
-            return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
+            dto.EstimatedArrival = EstimateTime(distance);
+        }
+        private void SetEstimatedPrice(double kwNeed, Charger charger, ChargerDetailsDto dto)
+        {
+            double chargerCapacity = charger.Capacity.kw;
+            double sessionDurationHr = kwNeed / chargerCapacity;
+            double estimatedCost = EstimatePrice(sessionDurationHr, charger.PriceOption.Value);
+            dto.PriceEstimated = $"{estimatedCost} EGP";
         }
 
         private double CalculateDistanceInKm(double lat1, double lon1, double lat2, double lon2)
@@ -276,9 +337,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             int minutes = (int)Math.Ceiling(distanceKm / averageSpeedKmPerMin);
             return $"{minutes} Mins";
         }
-        private double EstimatePrice(double distanceKm, decimal pricePerHour)
+        private double EstimatePrice(double sessionDurationHr, decimal pricePerHour)
         {
-            double sessionDurationHr = 1.0; // تقدر تحددها لاحقًا بناءً على البطارية
             return Math.Round((double)pricePerHour * sessionDurationHr, 2);
         }
 

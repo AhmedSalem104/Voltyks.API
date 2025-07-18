@@ -87,9 +87,9 @@ namespace Voltyks.API.Controllers
 
 
         [HttpGet("GetChargerDetailsById")]
-        public async Task<IActionResult> GetChargerById([FromQuery]  int id, [FromQuery] double lat, [FromQuery] double lon)
+        public async Task<IActionResult> GetChargerById([FromBody] ChargerDetailsRequestDto request)
         {
-            var result = await _serviceManager.ChargerService.GetChargerByIdAsync(id, lat, lon);
+            var result = await _serviceManager.ChargerService.GetChargerByIdAsync(request);
             if (!result.Status)
                 return Unauthorized(result); // أو BadRequest/NotFound حسب الرسالة
 
