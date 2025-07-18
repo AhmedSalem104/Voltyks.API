@@ -222,49 +222,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<List<NearChargerDto>>(filtered, "Success", true);
         }
-        //public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(int chargerId, double userLat, double userLon, double kwNeed)
-        //{
-        //    var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
-        //    if (userIdClaim == null)
-        //        return new ApiResponse<ChargerDetailsDto>(ErrorMessages.UnauthorizedAccess, false);
-
-        //    var charger = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
-        //        c => c.Id == chargerId && !c.IsDeleted && c.IsActive,
-        //        false,
-        //        c => c.Address,
-        //        c => c.Capacity,
-        //        c => c.PriceOption,
-        //        c => c.Protocol,
-        //        c => c.User
-        //    );
-
-        //    var target = charger.FirstOrDefault();
-        //    if (target == null)
-        //        return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
-
-        //    var dto = _mapper.Map<ChargerDetailsDto>(target);
-
-        //    // حساب القيم الغير موجودة في الـ AutoMapper Profile
-        //    var distance = CalculateDistanceInKm(userLat, userLon, target.Address.Latitude, target.Address.Longitude);
-        //    var estimatedTime = EstimateTime(distance);
-        //    dto.DistanceInKm = Math.Round(distance, 2);
-        //    dto.EstimatedArrival = estimatedTime;
-
-        //    // 1. القدرة بتاعت الشاحن (مثلاً 15 KW/h)
-        //    double chargerCapacity = target.Capacity.kw;
-
-        //    // 2. مدة الشحن المطلوبة = كمية الكهرباء المطلوبة ÷ قدرة الشاحن
-        //    double sessionDurationHr = kwNeed / chargerCapacity;
-
-        //    // 3. السعر التقديري
-        //    double estimatedCost = EstimatePrice(sessionDurationHr, target.PriceOption.Value);
-
-        //    // 4. تخزينه في الـ DTO
-        //    dto.PriceEstimated = $"{estimatedCost} EGP";
-
-
-        //    return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
-        //}
+      
         public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(ChargerDetailsRequestDto request)
         {
             var userId = GetCurrentUserId();
