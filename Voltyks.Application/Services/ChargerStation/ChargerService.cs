@@ -215,7 +215,9 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                         ChargerId = charger.Id,
                         Capacity = charger.Capacity.kw,
                         Price = charger.PriceOption.Value,
-                        DistanceInKm = Math.Round(distance, 2)
+                        DistanceInKm = Math.Round(distance, 2),
+                        Latitude = charger.Address.Latitude,     
+                        Longitude = charger.Address.Longitude    
                     });
                 }
             }
@@ -240,6 +242,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
         }
+
+     
 
 
         private string? GetCurrentUserId()

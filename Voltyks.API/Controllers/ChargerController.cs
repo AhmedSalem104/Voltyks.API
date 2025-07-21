@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.Charger;
+using Voltyks.Persistence.Entities;
 
 namespace Voltyks.API.Controllers
 {
@@ -86,15 +87,25 @@ namespace Voltyks.API.Controllers
         }
 
 
-        [HttpGet("GetChargerDetailsById")]
+        [HttpPost("GetChargerDetailsById")]
         public async Task<IActionResult> GetChargerById([FromBody] ChargerDetailsRequestDto request)
         {
             var result = await _serviceManager.ChargerService.GetChargerByIdAsync(request);
-            if (!result.Status)
-                return Unauthorized(result); // أو BadRequest/NotFound حسب الرسالة
 
-            return Ok(result);
+            if (!result.Status)
+            {
+                if (result.Message == ErrorMessages.UnauthorizedAccess)
+                    return Unauthorized(result); // => 401
+
+                if (result.Message == ErrorMessages.ChargerNotFound)
+                    return NotFound(result); // => 404
+
+                return BadRequest(result); // => 400 لأي خطأ تاني
+            }
+
+            return Ok(result); // => 200
         }
+
 
     }
 
