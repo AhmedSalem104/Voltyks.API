@@ -182,49 +182,120 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         }
 
 
-
         public async Task<ApiResponse<List<NearChargerDto>>> GetNearChargersAsync(NearChargerSearchDto searchDto)
         {
-            var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId == null)
                 return new ApiResponse<List<NearChargerDto>>(ErrorMessages.UnauthorizedAccess, false);
 
-            var userId = userIdClaim.Value;
-            var chargers = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
-                c => !c.IsDeleted && c.IsActive && c.ProtocolId == searchDto.ProtocolId,
-                false,
-                c => c.Capacity,
-                c => c.PriceOption,
-                c => c.Address
-            );
+            var chargers = await GetChargersFromDbAsync(searchDto, currentUserId);
+            var filteredChargers = FilterChargersByDistance(chargers, searchDto);
+            var paginatedChargers = ApplyPagination(filteredChargers, searchDto);
+            var result = MapToDto(paginatedChargers);
 
-            var filtered = new List<NearChargerDto>();
+            return new ApiResponse<List<NearChargerDto>>(result, "Success", true);
+        }
+        private async Task<List<Charger>> GetChargersFromDbAsync(NearChargerSearchDto searchDto, string currentUserId)
+        {
+          return (await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+             c => !c.IsDeleted && c.IsActive &&
+                  (c.ProtocolId == searchDto.ProtocolId ||
+                   (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
+                  c.User.IsAvailable == true,
+                  
+                 // && c.User.Id != currentUserId,
+             false,
+             c => c.Capacity,
+             c => c.PriceOption,
+             c => c.Address,
+             c => c.User
+         )).ToList();
 
-            foreach (var charger in chargers)
+        }
+        private List<(Charger Charger, double Distance)> FilterChargersByDistance(List<Charger> chargers, NearChargerSearchDto searchDto)
+        {
+            return chargers
+                .Select(charger => (
+                    Charger: charger,
+                    Distance: CalculateDistanceInKm(
+                        searchDto.Latitude,
+                        searchDto.Longitude,
+                        charger.Address.Latitude,
+                        charger.Address.Longitude)))
+                .Where(x => x.Distance <= searchDto.SearchRangeInKm)
+                .OrderBy(x => x.Distance)
+                .ToList();
+        }
+        private List<(Charger Charger, double Distance)> ApplyPagination(List<(Charger Charger, double Distance)> filteredChargers, NearChargerSearchDto searchDto)
+        {
+            return filteredChargers
+                .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+                .Take(searchDto.PageSize)
+                .ToList();
+        }
+        private List<NearChargerDto> MapToDto(List<(Charger Charger, double Distance)> paginatedChargers)
+        {
+            var result = _mapper.Map<List<NearChargerDto>>(paginatedChargers.Select(x => x.Charger).ToList());
+
+            for (int i = 0; i < result.Count; i++)
             {
-                var distance = CalculateDistanceInKm(
-                    searchDto.Latitude,
-                    searchDto.Longitude,
-                    charger.Address.Latitude,
-                    charger.Address.Longitude);
-
-                if (distance <= searchDto.SearchRangeInKm)
-                {
-                    filtered.Add(new NearChargerDto
-                    {
-                        ChargerId = charger.Id,
-                        Capacity = charger.Capacity.kw,
-                        Price = charger.PriceOption.Value,
-                        DistanceInKm = Math.Round(distance, 2),
-                        Latitude = charger.Address.Latitude,     
-                        Longitude = charger.Address.Longitude    
-                    });
-                }
+                result[i].DistanceInKm = Math.Round(paginatedChargers[i].Distance, 2);
             }
 
-            return new ApiResponse<List<NearChargerDto>>(filtered, "Success", true);
+            return result;
         }
-      
+
+
+        //public async Task<ApiResponse<List<NearChargerDto>>> GetNearChargersAsync(NearChargerSearchDto searchDto)
+        //{
+        //    var currentUserId = GetCurrentUserId();
+        //    if (currentUserId == null)
+        //        return new ApiResponse<List<NearChargerDto>>(ErrorMessages.UnauthorizedAccess, false);
+
+        //    var chargers = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+        //        c => !c.IsDeleted && c.IsActive &&
+        //             (c.ProtocolId == searchDto.ProtocolId ||
+        //              (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
+        //             c.User.IsAvailable == true &&
+        //             c.User.Id != currentUserId,
+        //        false,
+        //        c => c.Capacity,
+        //        c => c.PriceOption,
+        //        c => c.Address,
+        //        c => c.User
+        //    );
+
+        //    // احسب المسافة وفلتر حسب النطاق
+        //    var filtered = chargers
+        //        .Select(charger => new
+        //        {
+        //            Charger = charger,
+        //            Distance = CalculateDistanceInKm(
+        //                searchDto.Latitude,
+        //                searchDto.Longitude,
+        //                charger.Address.Latitude,
+        //                charger.Address.Longitude)
+        //        })
+        //        .Where(x => x.Distance <= searchDto.SearchRangeInKm)
+        //        .OrderBy(x => x.Distance)
+        //        .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+        //        .Take(searchDto.PageSize)
+        //        .ToList();
+
+        //    // بناء قائمة DTO من النتائج بعد Pagination
+        //    var result = filtered.Select(x => new NearChargerDto
+        //    {
+        //        ChargerId = x.Charger.Id,
+        //        Capacity = x.Charger.Capacity.kw,
+        //        Price = x.Charger.PriceOption.Value,
+        //        DistanceInKm = Math.Round(x.Distance, 2),
+        //        Latitude = x.Charger.Address.Latitude,
+        //        Longitude = x.Charger.Address.Longitude
+        //    }).ToList();
+
+        //    return new ApiResponse<List<NearChargerDto>>(result, "Success", true);
+        //}
+
         public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(ChargerDetailsRequestDto request)
         {
             var userId = GetCurrentUserId();
