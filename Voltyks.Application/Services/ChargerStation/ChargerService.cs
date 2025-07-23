@@ -190,8 +190,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             var chargers = await GetChargersFromDbAsync(searchDto, currentUserId);
             var filteredChargers = FilterChargersByDistance(chargers, searchDto);
-            var paginatedChargers = ApplyPagination(filteredChargers, searchDto);
-            var result = MapToDto(paginatedChargers);
+            //var paginatedChargers = ApplyPagination(filteredChargers, searchDto);
+            var result = MapToDto(filteredChargers);
 
             return new ApiResponse<List<NearChargerDto>>(result, "Success", true);
         }
@@ -201,9 +201,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
              c => !c.IsDeleted && c.IsActive &&
                   (c.ProtocolId == searchDto.ProtocolId ||
                    (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
-                  c.User.IsAvailable == true,
-                  
-                 // && c.User.Id != currentUserId,
+                   c.User.IsAvailable == true &&             
+                   c.User.Id != currentUserId,
              false,
              c => c.Capacity,
              c => c.PriceOption,
@@ -226,13 +225,13 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 .OrderBy(x => x.Distance)
                 .ToList();
         }
-        private List<(Charger Charger, double Distance)> ApplyPagination(List<(Charger Charger, double Distance)> filteredChargers, NearChargerSearchDto searchDto)
-        {
-            return filteredChargers
-                .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-                .Take(searchDto.PageSize)
-                .ToList();
-        }
+        //private List<(Charger Charger, double Distance)> ApplyPagination(List<(Charger Charger, double Distance)> filteredChargers, NearChargerSearchDto searchDto)
+        //{
+        //    return filteredChargers
+        //        .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
+        //        .Take(searchDto.PageSize)
+        //        .ToList();
+        //}
         private List<NearChargerDto> MapToDto(List<(Charger Charger, double Distance)> paginatedChargers)
         {
             var result = _mapper.Map<List<NearChargerDto>>(paginatedChargers.Select(x => x.Charger).ToList());
