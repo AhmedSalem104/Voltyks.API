@@ -56,7 +56,18 @@ namespace Voltyks.Persistence.Entities
         public const string ChargerNotFoundOrAlreadyDeleted = "ChargerNotFoundOrAlreadyDeleted";
         public const string YouAreNotAuthorizedToDeleteThisCharger = "YouAreNotAuthorizedToDeleteThisCharger";
 
-        
+
+
+        public const string PlateAlreadyExists = "Plate number already registered to another vehicle.";
+        public const string InvalidPlate = "Invalid plate format. Expected: 3 letters followed by 3 or 4 digits (e.g., ABC 1234).";
+        public const string InvalidColor = "Invalid color or too long (max 20 characters).";
+        public const string InvalidYear = "Year must be between 2000 and next year.";
+        public const string InvalidBrand = "Brand does not exist.";
+        public const string InvalidModel = "Model does not exist.";
+        public const string ModelBrandMismatch = "Model does not belong to the specified brand.";
+        public const string VehicleNotFound = "Vehicle not found.";
+  
+
 
     }
 

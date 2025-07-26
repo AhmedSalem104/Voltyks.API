@@ -38,7 +38,7 @@ namespace Voltyks.Core.Mapping
                 .ForMember(dest => dest.ModelName, opt => opt.MapFrom(src => src.Model.Name));
 
             CreateMap<VehicleDto, Vehicle>().ReverseMap();
-            CreateMap<CreateVehicleDto, Vehicle>().ReverseMap();
+            CreateMap<CreateAndUpdateVehicleDto, Vehicle>().ReverseMap();
             CreateMap<UpdateVehicleDto, Vehicle>().ReverseMap();
 
             // ===== Charger Add =====

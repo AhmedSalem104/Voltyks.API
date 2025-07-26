@@ -15,6 +15,8 @@ namespace Voltyks.Infrastructure
               Expression<Func<TEntity, bool>>? filter = null,
               bool trackChanges = false,
               params Expression<Func<TEntity, object>>[] includes);
+        Task<TEntity?> GetFirstOrDefaultAsync(Expression<Func<TEntity, bool>> predicate, bool trackChanges = false);
+
         Task<TEntity?> GetAsync(TKey id);
         Task AddAsync(TEntity entity);
         void Update(TEntity entity);

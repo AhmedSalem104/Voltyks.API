@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.VehicleDTOs
 {
-    public class CreateVehicleDto
+    public class CreateAndUpdateVehicleDto
     {
         public string Color { get; set; }
         public string Plate { get; set; }

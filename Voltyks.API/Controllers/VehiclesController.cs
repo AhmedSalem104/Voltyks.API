@@ -15,14 +15,14 @@ namespace Voltyks.API.Controllers
       
 
         [HttpPost("CreateVehicle")]
-        public async Task<IActionResult> CreateVehicle([FromBody] CreateVehicleDto dto)
+        public async Task<IActionResult> CreateVehicle([FromBody] CreateAndUpdateVehicleDto dto)
         {
             var result = await _serviceManager.VehicleService.CreateVehicleAsync(dto);
             return Ok(result);
         }
 
         [HttpPut("UpdateVehicle")]
-        public async Task<IActionResult> UpdateVehicle(int id, [FromBody] UpdateVehicleDto dto)
+        public async Task<IActionResult> UpdateVehicle(int id, [FromBody] CreateAndUpdateVehicleDto dto)
         {
             var result = await _serviceManager.VehicleService.UpdateVehicleAsync(id, dto);
             return Ok(result);

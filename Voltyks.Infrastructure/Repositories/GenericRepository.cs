@@ -58,6 +58,15 @@ namespace Voltyks.Infrastructure
 
             return await query.ToListAsync();
         }
+        public async Task<TEntity?> GetFirstOrDefaultAsync(Expression<Func<TEntity, bool>> predicate, bool trackChanges = false)
+        {
+            IQueryable<TEntity> query = _context.Set<TEntity>();
+
+            if (!trackChanges)
+                query = query.AsNoTracking();
+
+            return await query.FirstOrDefaultAsync(predicate);
+        }
 
 
         public async Task AddAsync(TEntity entity)

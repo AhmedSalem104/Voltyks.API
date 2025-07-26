@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.Charger
 {
-    public class ChargerDto
+    public class  ChargerDto
     {
         public int Id { get; set; }
         public string Protocol { get; set; }

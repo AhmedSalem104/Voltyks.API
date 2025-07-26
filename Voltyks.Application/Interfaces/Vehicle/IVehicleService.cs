@@ -11,8 +11,8 @@ namespace Voltyks.Application.Interfaces
 {
     public interface IVehicleService
     {
-        Task<ApiResponse<VehicleDto>> CreateVehicleAsync(CreateVehicleDto dto);
-        Task<ApiResponse<VehicleDto>> UpdateVehicleAsync(int id, UpdateVehicleDto dto);
+        Task<ApiResponse<VehicleDto>> CreateVehicleAsync(CreateAndUpdateVehicleDto dto);
+        Task<ApiResponse<VehicleDto>> UpdateVehicleAsync(int id, CreateAndUpdateVehicleDto dto);
         Task<ApiResponse<IEnumerable<VehicleDto>>> GetVehiclesByUserIdAsync();
         Task<ApiResponse<bool>> DeleteVehicleAsync(int vehicleId);
     }
