@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Twilio.TwiML.Voice;
+using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.SMSEgypt;
+using Voltyks.Application.Services.Firebase;
 using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.ServicesManager;
 using Voltyks.Application.ServicesManager.ServicesManager;
@@ -26,6 +28,8 @@ namespace Voltyks.Application.Services.AllowServices
             services.Configure<JwtOptions>(configuration.GetSection("JwtOptions"));
             services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsEgyptSettings"));
             services.AddScoped<ISmsEgyptService, SmsEgyptService>();
+            services.AddScoped<IFirebaseService, FirebaseService>();
+
             services.AddHttpClient();
 
 

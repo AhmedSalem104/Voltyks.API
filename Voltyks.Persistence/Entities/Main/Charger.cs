@@ -11,27 +11,24 @@ namespace Voltyks.Persistence.Entities.Main
     {
         public string UserId { get; set; }
         public AppUser User { get; set; }
-
         public int ProtocolId { get; set; }
         public Protocol Protocol { get; set; }
-
         public int CapacityId { get; set; }
         public Capacity Capacity { get; set; }
-
         public int PriceOptionId { get; set; }
         public PriceOption PriceOption { get; set; }
-
         public int AddressId { get; set; }
         public ChargerAddress Address { get; set; }
 
         public bool IsActive { get; set; }
-
-        public DateTime DateAdded { get; set; } = DateTime.UtcNow;
         public bool IsDeleted { get; set; } = false;
         public bool? Adaptor { get; set; }
         public double AverageRating { get; set; }
         public int RatingCount { get; set; }
+        public DateTime DateAdded { get; set; } = DateTime.UtcNow;
 
+
+        public ICollection<ChargingRequest> ChargingRequests { get; set; }
 
 
 

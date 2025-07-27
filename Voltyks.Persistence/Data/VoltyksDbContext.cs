@@ -26,8 +26,11 @@ namespace Voltyks.Persistence.Data
         public DbSet<Protocol> Protocols { get; set; }
         public DbSet<PriceOption> PriceOptions { get; set; }
         public DbSet<Charger> Chargers { get; set; }
+        public DbSet<ChargingRequest> ChargingRequests { get; set; }
+        public DbSet<DeviceToken> DeviceTokens { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
-        
+
 
     }
 }

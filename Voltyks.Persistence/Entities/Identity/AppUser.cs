@@ -21,8 +21,14 @@ namespace Voltyks.Persistence.Entities.Identity
 
         public Address Address { get; set; } = new Address();  // تهيئة افتراضية
 
-        public bool IsAvailable { get; set; } = true; 
+        public bool IsAvailable { get; set; } = true;
 
+
+        // Relations
+        public ICollection<Charger> Chargers { get; set; } = new List<Charger>();
+        public ICollection<DeviceToken> DeviceTokens { get; set; } = new List<DeviceToken>();
+        public ICollection<ChargingRequest> ChargingRequests { get; set; } = new List<ChargingRequest>();
+        public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
     }
 }
