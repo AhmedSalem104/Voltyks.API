@@ -15,7 +15,7 @@ namespace Voltyks.Persistence.Data.Configurations
         {
             builder.HasOne(r => r.CarOwner)
                    .WithMany(u => u.ChargingRequests)
-                   .HasForeignKey(r => r.CarOwnerId)
+                   .HasForeignKey(r => r.UserId)
                    .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(r => r.Charger)

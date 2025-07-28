@@ -21,7 +21,7 @@ namespace Voltyks.Persistence.Data.Configurations
             builder.HasOne(n => n.RelatedRequest)
                    .WithMany()
                    .HasForeignKey(n => n.RelatedRequestId)
-                   .OnDelete(DeleteBehavior.SetNull);
+                   .OnDelete(DeleteBehavior.Restrict);
         }
     }
 

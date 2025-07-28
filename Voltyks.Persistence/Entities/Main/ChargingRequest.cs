@@ -10,7 +10,7 @@ namespace Voltyks.Persistence.Entities.Main
     public class ChargingRequest:BaseEntity<int>
     {
 
-        public string CarOwnerId { get; set; }
+        public string UserId { get; set; }
         public AppUser CarOwner { get; set; }
 
         public int ChargerId { get; set; }
