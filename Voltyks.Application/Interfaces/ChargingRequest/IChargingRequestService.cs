@@ -11,25 +11,17 @@ namespace Voltyks.Application.Interfaces.ChargingRequest
 {
     public interface IChargingRequestService
     {
+        Task<ApiResponse<ChargerDetailsDto>> SendChargingRequestAsync(SendChargingRequestDto dto);
 
-        /// Create a new charging request and notify the charger owner.     
-        Task<ApiResponse<ChargerDetailsDto>> SendChargingRequestAsync(SendChargingRequestDto dto );
         Task<ApiResponse<bool>> RegisterDeviceTokenAsync(DeviceTokenDto token);
 
+        Task<ApiResponse<bool>> AcceptRequestAsync(int requestId);
 
-        ///// Handle when the charger owner accepts the request.   
-        //Task AcceptRequestAsync(int requestId, string ownerId);
+        Task<ApiResponse<bool>> RejectRequestAsync(int requestId);
 
+        Task<ApiResponse<bool>> ConfirmRequestAsync(int requestId);
 
-        ///// Handle when the charger owner rejects the request.
-        //Task RejectRequestAsync(int requestId, string ownerId);
-
-
-        ///// Confirm the request after the charger owner accepts and the car owner confirms.      
-        //Task ConfirmRequestAsync(int requestId, string carOwnerId);
-
-
-        ///// Get full request details (if needed for UI or audit).  
-        //Task<ChargingRequestDetailsDto> GetRequestDetailsAsync(int requestId);
+        Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(int requestId);
     }
+
 }

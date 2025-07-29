@@ -11,8 +11,9 @@ namespace Voltyks.Core.DTOs.ChargerRequest
     public class DeviceTokenDto
     {
         [Required]
-        //[JsonPropertyName("deviceToken")] // إذا تستخدم System.Text.Json
-        public string? DeviceToken { get; set; } 
+        public string? DeviceToken { get; set; }
+        //public string? RoleContext { get; set; }  // "VehicleOwner" or "ChargerOwner"
+
 
     }
 }

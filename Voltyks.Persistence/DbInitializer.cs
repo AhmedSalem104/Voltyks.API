@@ -126,6 +126,23 @@ namespace Voltyks.Persistence
                     }
                 }
 
+                //// Seeding For UserTypes Form Json File
+                if (!_context.UserTypes.Any())
+                {
+                    // 1. Read All Data Capacities From Json File
+                    var UserTypesData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\UserTypes_seed.json");
+
+                    // 2. Transform The Data To List<UserTypes>
+                    var UserTypes = JsonSerializer.Deserialize<List<UserType>>(UserTypesData);
+
+                    // 3. Add List<UserTypes> To Database
+                    if (UserTypes is not null && UserTypes.Any())
+                    {
+                        await _context.UserTypes.AddRangeAsync(UserTypes);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
             }
             catch (Exception)
             {

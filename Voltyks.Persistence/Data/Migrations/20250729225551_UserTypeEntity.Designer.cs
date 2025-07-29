@@ -12,8 +12,8 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    [Migration("20250728213325_AddModuleSendChargerRequest")]
-    partial class AddModuleSendChargerRequest
+    [Migration("20250729225551_UserTypeEntity")]
+    partial class UserTypeEntity
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -460,6 +460,10 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("RoleContext")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -530,11 +534,16 @@ namespace Voltyks.Persistence.Data.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<int>("UserTypeId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("RelatedRequestId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserTypeId");
 
                     b.ToTable("Notifications");
                 });
@@ -570,6 +579,22 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Protocols");
+                });
+
+            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.UserType", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UserTypes");
                 });
 
             modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Vehicle", b =>
@@ -783,9 +808,17 @@ namespace Voltyks.Persistence.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Voltyks.Persistence.Entities.Main.UserType", "UserType")
+                        .WithMany()
+                        .HasForeignKey("UserTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("RelatedRequest");
 
                     b.Navigation("User");
+
+                    b.Navigation("UserType");
                 });
 
             modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Vehicle", b =>

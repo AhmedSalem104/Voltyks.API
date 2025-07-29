@@ -12,7 +12,7 @@ namespace Voltyks.Persistence.Entities.Main
 
         public string UserId { get; set; }
         public AppUser User { get; set; }
-
+        public string RoleContext { get; set; } = null!; // <-- New Field
         public string Token { get; set; }
         public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
     }

@@ -23,6 +23,9 @@ namespace Voltyks.Persistence.Entities.Identity
 
         public bool IsAvailable { get; set; } = true;
 
+   
+
+
 
         // Relations
         public ICollection<Charger> Chargers { get; set; } = new List<Charger>();

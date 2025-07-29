@@ -22,6 +22,9 @@ using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
+
 
 namespace Voltyks.API.Extentions
 {
@@ -56,6 +59,15 @@ namespace Voltyks.API.Extentions
             });
             services.AddDbContext<VoltyksDbContext>(options =>
             options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
+
+            // ✅ Firebase Admin Initialization
+            if (FirebaseApp.DefaultInstance == null)
+            {
+                FirebaseApp.Create(new AppOptions()
+                {
+                    Credential = GoogleCredential.FromFile("Firebase/evchargingsystem-c253f-4d17ff84cba0.json")
+                });
+            }
             return services;
 
         }

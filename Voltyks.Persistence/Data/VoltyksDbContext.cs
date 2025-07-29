@@ -29,7 +29,7 @@ namespace Voltyks.Persistence.Data
         public DbSet<ChargingRequest> ChargingRequests { get; set; }
         public DbSet<DeviceToken> DeviceTokens { get; set; }
         public DbSet<Notification> Notifications { get; set; }
-
+        public DbSet<UserType> UserTypes { get; set; }
 
 
     }

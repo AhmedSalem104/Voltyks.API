@@ -21,7 +21,6 @@ namespace Voltyks.Application.Services.Firebase
         {
             _config = config;
             _projectId = _config["Firebase:ProjectId"];
-
             _httpClient = new HttpClient();
         }
 
