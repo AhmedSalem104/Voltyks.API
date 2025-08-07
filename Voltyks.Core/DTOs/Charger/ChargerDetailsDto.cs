@@ -19,7 +19,8 @@ namespace Voltyks.Core.DTOs.Charger
         public string EstimatedArrival { get; set; }
 
         public string Protocol { get; set; }
-        public int Capacity { get; set; }
+        public CapacityDto Capacity { get; set; }
+
 
         public string PricePerHour { get; set; }
         public string AdapterAvailability { get; set; }

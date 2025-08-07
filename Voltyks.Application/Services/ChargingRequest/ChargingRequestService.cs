@@ -36,84 +36,27 @@ namespace Voltyks.Application.Services.ChargingRequest
         {
             try
             {
-                var charger = (await _unitOfWork.GetRepository<Charger, int>()
-                    .GetAllWithIncludeAsync(
-                        c => c.Id == dto.ChargerId,
-                        false,
-                        c => c.Address, c => c.Protocol, c => c.Capacity, c => c.PriceOption, c => c.User
-                    )).FirstOrDefault();
-
+                var charger = await GetChargerWithIncludes(dto.ChargerId);
                 if (charger == null)
                     return new ApiResponse<ChargerDetailsDto>(null, "Charger not found", false);
 
                 var userId = GetCurrentUserId();
-
                 if (userId == null)
                     return new ApiResponse<ChargerDetailsDto>(null, "Car owner not found", false);
 
-                var chargingRequest = new ChargingRequestEntity
-                {
-                    UserId = userId,
-                    ChargerId = dto.ChargerId,
-                    RequestedAt = DateTime.UtcNow,
-                    Status = "pending"
-                };
+                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId);
 
-                await _unitOfWork.GetRepository<ChargingRequestEntity, int>().AddAsync(chargingRequest);
-                await _unitOfWork.SaveChangesAsync();
+                var userOwnerChargerId = charger.UserId;
+                var tokenList = await GetDeviceTokens(userOwnerChargerId);
 
-                var userOwnerCharger = await _unitOfWork.GetRepository<Charger, int>().GetAsync(charger.Id);
-                var userOwnerChargerId = userOwnerCharger.UserId;
-
-                var tokens = charger.User.DeviceTokens?
-                         .Where(t => t.UserId == userOwnerChargerId)
-                         .Select(t => t.Token)
-                         .ToList();
-
-                if (tokens != null && tokens.Any())
+                if (tokenList.Any())
                 {
                     string title = "New Charging Request 🚗";
                     string body = $"Driver {userId} requested to charge at your station.";
-
-                    foreach (var token in tokens)
-                    {
-                        await _firebaseService.SendNotificationAsync(token, title, body);
-                    }
+                    await SendFcmNotifications(tokenList, title, body , chargingRequest.Id);
                 }
 
-                var notifi = new Notification()
-                {
-                    Title = "New Charging Request 🚗",
-                    Body = $"Driver {userId} requested to charge at your station.",
-                    IsRead = false,
-                    SentAt = DateTime.UtcNow,
-                    UserId = userOwnerChargerId,
-                    RelatedRequestId = chargingRequest.Id,
-                    UserTypeId = 1 // "ChargerOwner"
-
-                    //  add new property UserSenderId
-                };
-
-                await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
-
-           
-
-
-                //var chargerDetails = new ChargerDetailsDto
-                //{
-                //    FullName = charger.User.FullName,
-                //    Rating = charger.AverageRating,
-                //    RatingCount = charger.RatingCount,
-                //    Area = charger.Address.Area,
-                //    Street = charger.Address.Street,
-                //    DistanceInKm = 0,
-                //    EstimatedArrival = "N/A",
-                //    Protocol = charger.Protocol.Name,
-                //    Capacity = charger.Capacity.kw,
-                //    PricePerHour = $"{charger.PriceOption.Value} EGP",
-                //    AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available",
-                //    PriceEstimated = "Estimated"
-                //};
+                await CreateNotification(userOwnerChargerId, userId, chargingRequest.Id);
 
                 return new ApiResponse<ChargerDetailsDto>("Charging request sent successfully", true);
             }
@@ -124,39 +67,26 @@ namespace Voltyks.Application.Services.ChargingRequest
         }
         public async Task<ApiResponse<bool>> RegisterDeviceTokenAsync(DeviceTokenDto tokenDto)
         {
-            var userId = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = GetCurrentUserId();
 
             if (string.IsNullOrWhiteSpace(tokenDto?.DeviceToken) || string.IsNullOrWhiteSpace(userId))
                 return new ApiResponse<bool>(false, "Invalid DeviceToken or User", false);
 
-            var existing = await _unitOfWork.GetRepository<DeviceToken, int>().GetFirstOrDefaultAsync(t =>
-               t.Token == tokenDto.DeviceToken &&
-               t.UserId == userId) ;
-               //t.RoleContext == tokenDto.RoleContext);
-
-            if (existing == null)
+            var alreadyExists = await CheckIfTokenExists(tokenDto.DeviceToken, userId);
+            if (!alreadyExists)
             {
-                await _unitOfWork.GetRepository<DeviceToken, int>().AddAsync(new DeviceToken
-                {
-                    Token = tokenDto.DeviceToken,
-                    UserId = userId,
-                   // RoleContext = tokenDto.RoleContext,
-                    RegisteredAt = DateTime.UtcNow
-                });
-
-                await _unitOfWork.SaveChangesAsync();
+                await SaveNewDeviceToken(tokenDto.DeviceToken, userId);
             }
-            // Update DeviceToken For Current User .
 
             return new ApiResponse<bool>(true, "Token registered", true);
         }
-        public async Task<ApiResponse<bool>> AcceptRequestAsync(int requestId)
+        public async Task<ApiResponse<bool>> AcceptRequestAsync(TransRequest dto)
         {
             try
             {
                 var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
                     .GetAllWithIncludeAsync(
-                        r => r.Id == requestId,
+                        r => r.Id == dto.RequestId,
                         false,
                         r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
                     .FirstOrDefault();
@@ -185,7 +115,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     foreach (var token in carOwnerTokens)
                     {
-                        await _firebaseService.SendNotificationAsync(token, title, body);
+                        await _firebaseService.SendNotificationAsync(token, title, body, request.Id);
                     }
                 }
 
@@ -213,13 +143,13 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<bool>(false, ex.Message, false);
             }
         }
-        public async Task<ApiResponse<bool>> RejectRequestAsync(int requestId)
+        public async Task<ApiResponse<bool>> RejectRequestAsync(TransRequest dto)
         {
             try
             {
                 var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
                     .GetAllWithIncludeAsync(
-                        r => r.Id == requestId,
+                        r => r.Id == dto.RequestId,
                         false,
                         r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include CarOwner
                     .FirstOrDefault();
@@ -246,7 +176,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     foreach (var token in carOwnerTokens)
                     {
-                        await _firebaseService.SendNotificationAsync(token, title, body);
+                        await _firebaseService.SendNotificationAsync(token, title, body , request.Id);
                     }
                 }
                 var notifi = new Notification()
@@ -272,7 +202,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<bool>(false, ex.Message, false);
             }
         }
-        public async Task<ApiResponse<bool>> ConfirmRequestAsync(int requestId)
+        public async Task<ApiResponse<bool>> ConfirmRequestAsync(TransRequest dto)
         {
             try
             {
@@ -282,7 +212,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
                     .GetAllWithIncludeAsync(
-                        r => r.Id == requestId,
+                        r => r.Id == dto.RequestId,
                         false,
                         r => r.CarOwner, r => r.Charger, r => r.Charger.User)) // include both users
                     .FirstOrDefault();
@@ -312,7 +242,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     foreach (var token in stationOwnerTokens)
                     {
-                        await _firebaseService.SendNotificationAsync(token, title, body);
+                        await _firebaseService.SendNotificationAsync(token, title, body , request.Id);
                     }
                 }
                 var notifi = new Notification()
@@ -339,27 +269,55 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<bool>(false, ex.Message, false);
             }
         }
-        public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(int requestId)
+
+        //public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(int requestId)
+        //{
+        //    try
+        //    {
+        //        var request = await GetRequestWithDetailsAsync(requestId);
+
+        //        if (request == null)
+        //            return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
+
+        //        var dto = MapToDto(request);
+
+        //        return new ApiResponse<ChargingRequestDetailsDto>(dto, "Charging request details fetched", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
+        //    }
+        //}
+        public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
         {
             try
             {
-                var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-                    .GetAllWithIncludeAsync(
-                        r => r.Id == requestId,
-                        false,
-                        r => r.CarOwner,                    // Car owner
-                        r => r.Charger,
-                        r => r.Charger.User,           // Station owner
-                        r => r.Charger.Address,
-                        r => r.Charger.Protocol,
-                        r => r.Charger.Capacity,
-                        r => r.Charger.PriceOption
-                    )).FirstOrDefault();
+                var request = await GetRequestWithDetailsAsync(dto.RequestId);
 
                 if (request == null)
                     return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
 
-                var dto = new ChargingRequestDetailsDto
+                // 🧠 حساب المسافة بين السيارة والشاحن
+                string estimatedArrival = "N/A";
+                if (dto.Latitude.HasValue && dto.Longitude.HasValue && request.Charger.Address?.Latitude != null && request.Charger.Address?.Longitude != null)
+                {
+                    double distanceKm = CalculateDistance(
+                        dto.Latitude.Value,
+                        dto.Longitude.Value,
+                        request.Charger.Address.Latitude, 
+                        request.Charger.Address.Longitude 
+                    );
+
+                    double estimatedMinutes = (distanceKm / 40.0) * 60.0; 
+                    estimatedArrival = $"~ {Math.Ceiling(estimatedMinutes)} min";
+                }
+
+
+                string estimatedPrice = request.Charger.PriceOption != null
+                    ? $"{request.Charger.PriceOption.Value} EGP/hour"
+                    : "N/A";
+
+                var response = new ChargingRequestDetailsDto
                 {
                     RequestId = request.Id,
                     Status = request.Status,
@@ -387,11 +345,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                     Rating = request.Charger.AverageRating,
                     RatingCount = request.Charger.RatingCount,
 
-                    EstimatedArrival = "N/A", // يمكنك حسابها لاحقًا بناءً على موقع السيارة مثلاً
-                    EstimatedPrice = "Estimated"
+                    EstimatedArrival = estimatedArrival,
+                    EstimatedPrice = estimatedPrice
                 };
 
-                return new ApiResponse<ChargingRequestDetailsDto>(dto, "Charging request details fetched", true);
+                return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
             }
             catch (Exception ex)
             {
@@ -399,10 +357,162 @@ namespace Voltyks.Application.Services.ChargingRequest
             }
         }
 
+
+
+        // SendChargingRequestAsync ===> Helper Private Mehtods
+        private async Task<Charger?> GetChargerWithIncludes(int chargerId)
+        {
+            return (await _unitOfWork.GetRepository<Charger, int>()
+                .GetAllWithIncludeAsync(
+                    c => c.Id == chargerId,
+                    false,
+                    c => c.Address,
+                    c => c.Protocol,
+                    c => c.Capacity,
+                    c => c.PriceOption,
+                    c => c.User))
+                .FirstOrDefault();
+        }
+        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId)
+        {
+            var request = new ChargingRequestEntity
+            {
+                UserId = userId,
+                ChargerId = chargerId,
+                RequestedAt = DateTime.UtcNow,
+                Status = "pending"
+            };
+
+            await _unitOfWork.GetRepository<ChargingRequestEntity, int>().AddAsync(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            return request;
+        }
+        private async Task<List<string>> GetDeviceTokens(string userId)
+        {
+            var tokens = await _unitOfWork.GetRepository<DeviceToken, int>()
+                .GetAllAsync(t => t.UserId == userId);
+            return tokens.Select(t => t.Token).ToList();
+        }
+        private async Task SendFcmNotifications(List<string> tokens, string title, string body , int chargingRequestID)
+        {
+            foreach (var token in tokens)
+            {
+                await _firebaseService.SendNotificationAsync(token, title, body , chargingRequestID);
+            }
+        }
+        private async Task CreateNotification(string receiverUserId, string senderUserId, int relatedRequestId)
+        {
+            var notification = new Notification
+            {
+                Title = "New Charging Request 🚗",
+                Body = $"Driver {senderUserId} requested to charge at your station.",
+                IsRead = false,
+                SentAt = DateTime.UtcNow,
+                UserId = receiverUserId,
+                RelatedRequestId = relatedRequestId,
+                UserTypeId = 1 // ChargerOwner
+            };
+
+            await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+
+        // RegisterDeviceTokenAsync ===> Helper Private Mehtods
+        private async Task<bool> CheckIfTokenExists(string token, string userId)
+        {
+            var existing = await _unitOfWork.GetRepository<DeviceToken, int>()
+                .GetFirstOrDefaultAsync(t => t.Token == token && t.UserId == userId);
+            return existing != null;
+        }
+        private async Task SaveNewDeviceToken(string token, string userId)
+        {
+            var newToken = new DeviceToken
+            {
+                Token = token,
+                UserId = userId,
+                RoleContext = "Owner", // ثابت حاليًا
+                RegisteredAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.GetRepository<DeviceToken, int>().AddAsync(newToken);
+            await _unitOfWork.SaveChangesAsync();
+        }
         private string? GetCurrentUserId()
         {
             return _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         }
+
+
+
+        private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+        {
+            double R = 6371; // Radius of earth in KM
+            var dLat = DegreesToRadians(lat2 - lat1);
+            var dLon = DegreesToRadians(lon2 - lon1);
+
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(DegreesToRadians(lat1)) * Math.Cos(DegreesToRadians(lat2)) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            var distance = R * c;
+
+            return distance;
+        }
+        private double DegreesToRadians(double deg) => deg * (Math.PI / 180);
+
+        // GetRequestDetailsAsync ===> Helper Private Mehtods
+        private async Task<ChargingRequestEntity?> GetRequestWithDetailsAsync(int requestId)
+        {
+            return (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
+                .GetAllWithIncludeAsync(
+                    r => r.Id == requestId,
+                    false,
+                    r => r.CarOwner,
+                    r => r.Charger,
+                    r => r.Charger.User,
+                    r => r.Charger.Address,
+                    r => r.Charger.Protocol,
+                    r => r.Charger.Capacity,
+                    r => r.Charger.PriceOption
+                )).FirstOrDefault();
+        }
+        //private ChargingRequestDetailsDto MapToDto(ChargingRequestEntity request)
+        //{
+        //    return new ChargingRequestDetailsDto
+        //    {
+        //        RequestId = request.Id,
+        //        Status = request.Status,
+        //        RequestedAt = request.RequestedAt,
+        //        RespondedAt = request.RespondedAt,
+        //        ConfirmedAt = request.ConfirmedAt,
+
+        //        CarOwnerId = request.CarOwner.Id,
+        //        CarOwnerName = request.CarOwner.FullName,
+
+        //        StationOwnerId = request.Charger.User.Id,
+        //        StationOwnerName = request.Charger.User.FullName,
+
+        //        ChargerId = request.ChargerId,
+        //        Protocol = request.Charger.Protocol?.Name ?? "Unknown",
+        //        CapacityKw = request.Charger.Capacity?.kw ?? 0,
+        //        PricePerHour = request.Charger.PriceOption != null
+        //            ? $"{request.Charger.PriceOption.Value} EGP"
+        //            : "N/A",
+        //        AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
+
+        //        Area = request.Charger.Address?.Area ?? "N/A",
+        //        Street = request.Charger.Address?.Street ?? "N/A",
+
+        //        Rating = request.Charger.AverageRating,
+        //        RatingCount = request.Charger.RatingCount,
+
+        //        EstimatedArrival = "N/A",
+        //        EstimatedPrice = "Estimated"
+        //    };
+        //}
     }
 
 

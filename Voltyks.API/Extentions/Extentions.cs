@@ -65,7 +65,7 @@ namespace Voltyks.API.Extentions
             {
                 FirebaseApp.Create(new AppOptions()
                 {
-                    Credential = GoogleCredential.FromFile("Firebase/evchargingsystem-c253f-4d17ff84cba0.json")
+                    Credential = GoogleCredential.FromFile("Firebase/service-account-key.json")
                 });
             }
             return services;

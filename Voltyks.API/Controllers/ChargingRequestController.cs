@@ -21,6 +21,7 @@ namespace Voltyks.API.Controllers
 
 
         [HttpPost("registerDeviceToken")]
+        [Authorize]
         public async Task<IActionResult> RegisterDeviceToken([FromBody] DeviceTokenDto token)
         {
             var result = await _service.ChargingRequestService.RegisterDeviceTokenAsync(token);
@@ -36,38 +37,39 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
 
-        [HttpPut("accept/{requestId}")]
+        [HttpPut("AcceptRequest")]
         [Authorize]
-        public async Task<IActionResult> AcceptRequest(int requestId)
+        public async Task<IActionResult> AcceptRequest([FromBody] TransRequest dto)
         {
-            var result = await _service.ChargingRequestService.AcceptRequestAsync(requestId);
+            var result = await _service.ChargingRequestService.AcceptRequestAsync(dto);
             return Ok(result);
         }
 
 
-        [HttpPut("reject/{requestId}")]
+        [HttpPut("RejectRequest")]
         [Authorize]
-        public async Task<IActionResult> RejectRequest(int requestId)
+        public async Task<IActionResult> RejectRequest([FromBody] TransRequest dto)
         {
-            var result = await _service.ChargingRequestService.RejectRequestAsync(requestId);
+            var result = await _service.ChargingRequestService.RejectRequestAsync(dto);
             return Ok(result);
         }
 
 
-        [HttpPut("confirm/{requestId}")]
+        [HttpPut("ConfirmRequest")]
         [Authorize]
-        public async Task<IActionResult> ConfirmRequest(int requestId)
+        public async Task<IActionResult> ConfirmRequest([FromBody] TransRequest dto)
         {
-            var result = await _service.ChargingRequestService.ConfirmRequestAsync(requestId);
+            var result = await _service.ChargingRequestService.ConfirmRequestAsync(dto);
             return Ok(result);
         }
 
+   
 
-        [HttpGet("details/{requestId}")]
+        [HttpPost("GetRequestDetailsById")]
         [Authorize]
-        public async Task<IActionResult> GetRequestDetails(int requestId)
+        public async Task<IActionResult> GetRequestDetails([FromBody] RequestDetailsDto dto)
         {
-            var result = await _service.ChargingRequestService.GetRequestDetailsAsync(requestId);
+            var result = await _service.ChargingRequestService.GetRequestDetailsAsync(dto);
             return Ok(result);
         }
 

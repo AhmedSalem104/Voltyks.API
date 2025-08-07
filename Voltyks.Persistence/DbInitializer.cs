@@ -18,8 +18,6 @@ namespace Voltyks.Persistence
         private readonly UserManager<AppUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
 
-
-
         public DbInitializer(VoltyksDbContext context
             , UserManager<AppUser> userManager
             , RoleManager<IdentityRole> roleManager)
@@ -150,7 +148,6 @@ namespace Voltyks.Persistence
                 throw;
             }
         }
-
         public async Task InitializeIdentityAsync()
         {
 

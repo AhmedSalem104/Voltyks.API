@@ -12,16 +12,12 @@ namespace Voltyks.Application.Interfaces.ChargingRequest
     public interface IChargingRequestService
     {
         Task<ApiResponse<ChargerDetailsDto>> SendChargingRequestAsync(SendChargingRequestDto dto);
-
         Task<ApiResponse<bool>> RegisterDeviceTokenAsync(DeviceTokenDto token);
-
-        Task<ApiResponse<bool>> AcceptRequestAsync(int requestId);
-
-        Task<ApiResponse<bool>> RejectRequestAsync(int requestId);
-
-        Task<ApiResponse<bool>> ConfirmRequestAsync(int requestId);
-
-        Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(int requestId);
+        Task<ApiResponse<bool>> AcceptRequestAsync(TransRequest dto);
+        Task<ApiResponse<bool>> RejectRequestAsync(TransRequest dto);
+        Task<ApiResponse<bool>> ConfirmRequestAsync(TransRequest dto);
+        Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto); 
     }
+
 
 }

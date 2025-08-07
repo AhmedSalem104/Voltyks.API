@@ -18,7 +18,7 @@ namespace Voltyks.Core.Mapping
 
 
             // ===== Simple Mappings =====
-            CreateMap<Capacity, CapacityDto>();
+            CreateMap<Capacity, CapacityDto>().ReverseMap();
             CreateMap<Protocol, ProtocolDto>();
             CreateMap<PriceOption, PriceByCapacityDto>();
             CreateMap<PriceOption, PriceOptionDto>();

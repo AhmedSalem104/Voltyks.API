@@ -195,20 +195,54 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<List<NearChargerDto>>(result, "Success", true);
         }
+        public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(ChargerDetailsRequestDto request)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.UnauthorizedAccess, false);
+
+            var charger = await GetChargerById(request.ChargerId);
+            if (charger == null)
+                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
+
+            //var dto = _mapper.Map<ChargerDetailsDto>(charger);
+
+            var dto = new ChargerDetailsDto
+            {
+                FullName = charger.User.FullName,
+                Rating = charger.AverageRating,
+                RatingCount = charger.RatingCount,
+                Area = charger.Address?.Area,
+                Street = charger.Address?.Street,
+                Protocol = charger.Protocol?.Name,
+                Capacity = charger.Capacity != null ? new CapacityDto { KW = charger.Capacity.kw } : null,
+                PricePerHour = charger.PriceOption != null ? $"{charger.PriceOption.Value} EGP" : "N/A",
+                AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available"
+            };
+
+
+            CalculateDistanceAndArrival(request.UserLat, request.UserLon, charger, dto);
+            SetEstimatedPrice(request.KwNeed, charger, dto);
+
+            return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
+        }
+
+
+
         private async Task<List<Charger>> GetChargersFromDbAsync(NearChargerSearchDto searchDto, string currentUserId)
         {
-          return (await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
-             c => !c.IsDeleted && c.IsActive &&
-                  (c.ProtocolId == searchDto.ProtocolId ||
-                   (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
-                   c.User.IsAvailable == true &&             
-                   c.User.Id != currentUserId,
-             false,
-             c => c.Capacity,
-             c => c.PriceOption,
-             c => c.Address,
-             c => c.User
-         )).ToList();
+            return (await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
+               c => !c.IsDeleted && c.IsActive &&
+                    (c.ProtocolId == searchDto.ProtocolId ||
+                     (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
+                     c.User.IsAvailable == true &&
+                     c.User.Id != currentUserId,
+               false,
+               c => c.Capacity,
+               c => c.PriceOption,
+               c => c.Address,
+               c => c.User
+           )).ToList();
 
         }
         private List<(Charger Charger, double Distance)> FilterChargersByDistance(List<Charger> chargers, NearChargerSearchDto searchDto)
@@ -243,78 +277,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return result;
         }
-
-
-        //public async Task<ApiResponse<List<NearChargerDto>>> GetNearChargersAsync(NearChargerSearchDto searchDto)
-        //{
-        //    var currentUserId = GetCurrentUserId();
-        //    if (currentUserId == null)
-        //        return new ApiResponse<List<NearChargerDto>>(ErrorMessages.UnauthorizedAccess, false);
-
-        //    var chargers = await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
-        //        c => !c.IsDeleted && c.IsActive &&
-        //             (c.ProtocolId == searchDto.ProtocolId ||
-        //              (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
-        //             c.User.IsAvailable == true &&
-        //             c.User.Id != currentUserId,
-        //        false,
-        //        c => c.Capacity,
-        //        c => c.PriceOption,
-        //        c => c.Address,
-        //        c => c.User
-        //    );
-
-        //    // احسب المسافة وفلتر حسب النطاق
-        //    var filtered = chargers
-        //        .Select(charger => new
-        //        {
-        //            Charger = charger,
-        //            Distance = CalculateDistanceInKm(
-        //                searchDto.Latitude,
-        //                searchDto.Longitude,
-        //                charger.Address.Latitude,
-        //                charger.Address.Longitude)
-        //        })
-        //        .Where(x => x.Distance <= searchDto.SearchRangeInKm)
-        //        .OrderBy(x => x.Distance)
-        //        .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-        //        .Take(searchDto.PageSize)
-        //        .ToList();
-
-        //    // بناء قائمة DTO من النتائج بعد Pagination
-        //    var result = filtered.Select(x => new NearChargerDto
-        //    {
-        //        ChargerId = x.Charger.Id,
-        //        Capacity = x.Charger.Capacity.kw,
-        //        Price = x.Charger.PriceOption.Value,
-        //        DistanceInKm = Math.Round(x.Distance, 2),
-        //        Latitude = x.Charger.Address.Latitude,
-        //        Longitude = x.Charger.Address.Longitude
-        //    }).ToList();
-
-        //    return new ApiResponse<List<NearChargerDto>>(result, "Success", true);
-        //}
-
-        public async Task<ApiResponse<ChargerDetailsDto>> GetChargerByIdAsync(ChargerDetailsRequestDto request)
-        {
-            var userId = GetCurrentUserId();
-            if (userId == null)
-                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.UnauthorizedAccess, false);
-
-            var charger = await GetChargerById(request.ChargerId);
-            if (charger == null)
-                return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
-
-            var dto = _mapper.Map<ChargerDetailsDto>(charger);
-
-            CalculateDistanceAndArrival(request.UserLat, request.UserLon, charger, dto);
-            SetEstimatedPrice(request.KwNeed, charger, dto);
-
-            return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
-        }
-
-     
-
 
         private string? GetCurrentUserId()
         {

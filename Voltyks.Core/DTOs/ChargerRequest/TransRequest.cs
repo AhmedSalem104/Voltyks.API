@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.ChargerRequest
 {
-    public class SendChargingRequestDto
+   
+    public class TransRequest
     {
-        public int ChargerId { get; set; }
-        // public string? DeviceToken { get; set; } // ✅ أضف دي
-
+        public int RequestId { get; set; }
+      
     }
-
 }

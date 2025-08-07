@@ -8,7 +8,7 @@ namespace Voltyks.Application.Interfaces.Firebase
 {
     public interface IFirebaseService
     {
-        Task SendNotificationAsync(string deviceToken, string title, string body);
+        Task SendNotificationAsync(string deviceToken, string title, string body, int chargingRequestID);
     }
 
 }
