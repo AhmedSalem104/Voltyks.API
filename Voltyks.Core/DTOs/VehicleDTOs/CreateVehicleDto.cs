@@ -10,7 +10,6 @@ namespace Voltyks.Core.DTOs.VehicleDTOs
     {
         public string Color { get; set; }
         public string Plate { get; set; }
-
         public int BrandId { get; set; }
         public int ModelId { get; set; }
         public int Year { get; set; }

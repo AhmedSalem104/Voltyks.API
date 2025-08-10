@@ -207,9 +207,16 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             //var dto = _mapper.Map<ChargerDetailsDto>(charger);
 
+             
+
             var dto = new ChargerDetailsDto
             {
-                FullName = charger.User.FullName,
+
+                FullName = new StringBuilder()
+                    .Append(charger.User.FirstName)
+                    .Append(" ") // إضافة مسافة بين الاسم الأول واسم العائلة
+                    .Append(charger.User.LastName)
+                    .ToString(),
                 Rating = charger.AverageRating,
                 RatingCount = charger.RatingCount,
                 Area = charger.Address?.Area,

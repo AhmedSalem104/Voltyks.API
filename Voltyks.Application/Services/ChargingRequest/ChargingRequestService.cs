@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
@@ -321,16 +322,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                 {
                     RequestId = request.Id,
                     Status = request.Status,
-                    RequestedAt = request.RequestedAt,
-                    RespondedAt = request.RespondedAt,
-                    ConfirmedAt = request.ConfirmedAt,
-
-                    CarOwnerId = request.CarOwner.Id,
-                    CarOwnerName = request.CarOwner.FullName,
-
-                    StationOwnerId = request.Charger.User.Id,
-                    StationOwnerName = request.Charger.User.FullName,
-
+                    RequestedAt = request.RequestedAt,                
+                    CarOwnerId = request.CarOwner.Id,                 
+                    CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
+                    StationOwnerId = request.Charger.User.Id,                   
+                    StationOwnerName =  new StringBuilder().Append(request.Charger.User.FirstName).Append(" ") .Append(request.Charger.User.LastName).ToString(),
                     ChargerId = request.ChargerId,
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
@@ -338,15 +334,14 @@ namespace Voltyks.Application.Services.ChargingRequest
                         ? $"{request.Charger.PriceOption.Value} EGP"
                         : "N/A",
                     AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
-
                     Area = request.Charger.Address?.Area ?? "N/A",
                     Street = request.Charger.Address?.Street ?? "N/A",
-
-                    Rating = request.Charger.AverageRating,
-                    RatingCount = request.Charger.RatingCount,
-
                     EstimatedArrival = estimatedArrival,
-                    EstimatedPrice = estimatedPrice
+                    EstimatedPrice = estimatedPrice,
+
+
+                   
+
                 };
 
                 return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
@@ -479,6 +474,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     r => r.Charger.PriceOption
                 )).FirstOrDefault();
         }
+
+
         //private ChargingRequestDetailsDto MapToDto(ChargingRequestEntity request)
         //{
         //    return new ChargingRequestDetailsDto
