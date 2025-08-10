@@ -13,8 +13,8 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         // Request Info
         public string Status { get; set; }
         public DateTime RequestedAt { get; set; }
-        public DateTime? RespondedAt { get; set; }
-        public DateTime? ConfirmedAt { get; set; }
+        //public DateTime? RespondedAt { get; set; }
+        //public DateTime? ConfirmedAt { get; set; }
 
         // Car Owner Info
         public string CarOwnerId { get; set; }
@@ -36,19 +36,19 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         public string Street { get; set; }
 
         // Ratings
-        public double Rating { get; set; }
-        public int RatingCount { get; set; }
+        //public double Rating { get; set; }
+        //public int RatingCount { get; set; }
 
         // Extras
         public string EstimatedArrival { get; set; }
         public string EstimatedPrice { get; set; }
 
         public double DistanceInKm { get; set; }
-        public double Kws { get; set; }
-        public string VehicleBrand { get; set; }
-        public string VehicleModel { get; set; }
-        public string VehicleColor { get; set; }
-        public string VehicleName { get; set; }
+        //public double Kws { get; set; }
+        //public string VehicleBrand { get; set; }
+        //public string VehicleModel { get; set; }
+        //public string VehicleColor { get; set; }
+        //public string VehicleName { get; set; }
 
     }
 
