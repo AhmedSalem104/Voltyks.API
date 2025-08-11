@@ -44,11 +44,11 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         public string EstimatedPrice { get; set; }
 
         public double DistanceInKm { get; set; }
-        //public double Kws { get; set; }
-        //public string VehicleBrand { get; set; }
-        //public string VehicleModel { get; set; }
-        //public string VehicleColor { get; set; }
-        //public string VehicleName { get; set; }
+        public double Kws { get; set; }
+        public string VehicleBrand { get; set; }
+        public string VehicleModel { get; set; }
+        public string VehicleColor { get; set; }
+        public string VehiclePlate { get; set; }
 
     }
 

@@ -208,7 +208,7 @@ namespace Voltyks.Application.Services
 
             plate = plate.Trim();
 
-            var regex = new System.Text.RegularExpressions.Regex(@"^[0-9\u0660-\u0669]{4}\s\$\s[A-Za-z\u0621-\u064A]{3}$");
+            var regex = new System.Text.RegularExpressions.Regex(@"^[0-9\u0660-\u0669A-Za-z\u0621-\u064A\s]*\$[0-9\u0660-\u0669A-Za-z\u0621-\u064A\s]*$");
 
             return regex.IsMatch(plate);
         }

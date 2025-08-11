@@ -36,7 +36,8 @@ namespace Voltyks.Application.ServicesManager
         , IUnitOfWork unitOfWork
         , VoltyksDbContext context
         , IMapper mapper
-        , IFirebaseService firebaseService) : IServiceManager
+        , IFirebaseService firebaseService
+        , IVehicleService vehicleService) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context);
@@ -45,7 +46,7 @@ namespace Voltyks.Application.ServicesManager
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
-        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor);
+        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService);
 
 
 

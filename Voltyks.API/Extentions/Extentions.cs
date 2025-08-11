@@ -24,6 +24,9 @@ using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
+using Voltyks.Application.Interfaces.Brand;
+using Voltyks.Application.Services;
+using Voltyks.Application.Interfaces;
 
 
 namespace Voltyks.API.Extentions
@@ -170,12 +173,29 @@ namespace Voltyks.API.Extentions
         }
         private static IServiceCollection ConfigureServices(this IServiceCollection services)
         {
-            services.AddHttpContextAccessor();  // إضافة IHttpContextAccessor
-            services.AddScoped<IAuthService, AuthService>(); // إضافة خدمة المصادقة
-            services.AddScoped<IServiceManager, ServiceManager>(); // إضافة ServiceManager إذا كان مطلوبًا
+
+
+            // تسجيل IBrandService مع BrandService
+            services.AddScoped<IBrandService, BrandService>();
+
+            // إضافة IHttpContextAccessor
+            services.AddHttpContextAccessor();
+
+            // إضافة خدمة المصادقة
+            services.AddScoped<IAuthService, AuthService>();
+
+            // إضافة ServiceManager إذا كان مطلوبًا
+            services.AddScoped<IServiceManager, ServiceManager>();
+
+            // إضافة وحدة العمل (UnitOfWork)
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+            services.AddScoped<IVehicleService, VehicleService>();
+
             return services;
+
+
+            
         }
         private static IServiceCollection ConfigureJwtServices(this IServiceCollection services, IConfiguration configuration)
         {

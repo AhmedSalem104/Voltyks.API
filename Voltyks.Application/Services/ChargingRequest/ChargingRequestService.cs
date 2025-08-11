@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Core.DTOs;
@@ -25,12 +26,14 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly IUnitOfWork _unitOfWork;
         private readonly IFirebaseService _firebaseService;
         private readonly IHttpContextAccessor _httpContext;
+        private readonly IVehicleService _vehicleService ;
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
             _httpContext = httpContext;
+            _vehicleService = vehicleService;
         }
 
         public async Task<ApiResponse<ChargerDetailsDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -289,6 +292,70 @@ namespace Voltyks.Application.Services.ChargingRequest
         //        return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
         //    }
         //}
+        //public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
+        //{
+        //    try
+        //    {
+        //        var request = await GetRequestWithDetailsAsync(dto.RequestId);
+
+        //        if (request == null)
+        //            return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
+
+        //        // 🧠 حساب المسافة بين السيارة والشاحن
+        //        string estimatedArrival = "N/A";
+        //        if (dto.Latitude.HasValue && dto.Longitude.HasValue && request.Charger.Address?.Latitude != null && request.Charger.Address?.Longitude != null)
+        //        {
+        //            double distanceKm = CalculateDistance(
+        //                dto.Latitude.Value,
+        //                dto.Longitude.Value,
+        //                request.Charger.Address.Latitude, 
+        //                request.Charger.Address.Longitude 
+        //            );
+
+        //            double estimatedMinutes = (distanceKm / 40.0) * 60.0; 
+        //            estimatedArrival = $"~ {Math.Ceiling(estimatedMinutes)} min";
+        //        }
+
+
+        //        string estimatedPrice = request.Charger.PriceOption != null
+        //            ? $"{request.Charger.PriceOption.Value} EGP/hour"
+        //            : "N/A";
+
+        //        var response = new ChargingRequestDetailsDto
+        //        {
+        //            RequestId = request.Id,
+        //            Status = request.Status,
+        //            RequestedAt = request.RequestedAt,                
+        //            CarOwnerId = request.CarOwner.Id, 
+
+
+        //            CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
+        //            StationOwnerId = request.Charger.User.Id,                   
+        //            StationOwnerName =  new StringBuilder().Append(request.Charger.User.FirstName).Append(" ") .Append(request.Charger.User.LastName).ToString(),
+        //            ChargerId = request.ChargerId,
+        //            Protocol = request.Charger.Protocol?.Name ?? "Unknown",
+        //            CapacityKw = request.Charger.Capacity?.kw ?? 0,
+        //            PricePerHour = request.Charger.PriceOption != null
+        //                ? $"{request.Charger.PriceOption.Value} EGP"
+        //                : "N/A",
+        //            AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
+        //            Area = request.Charger.Address?.Area ?? "N/A",
+        //            Street = request.Charger.Address?.Street ?? "N/A",
+        //            EstimatedArrival = estimatedArrival,
+        //            EstimatedPrice = estimatedPrice,
+
+
+
+
+        //        };
+
+        //        return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
+        //    }
+        //}
         public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
         {
             try
@@ -300,48 +367,59 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 // 🧠 حساب المسافة بين السيارة والشاحن
                 string estimatedArrival = "N/A";
+                double distanceKm = 0;
                 if (dto.Latitude.HasValue && dto.Longitude.HasValue && request.Charger.Address?.Latitude != null && request.Charger.Address?.Longitude != null)
                 {
-                    double distanceKm = CalculateDistance(
+                    distanceKm = CalculateDistance(
                         dto.Latitude.Value,
                         dto.Longitude.Value,
-                        request.Charger.Address.Latitude, 
-                        request.Charger.Address.Longitude 
+                        request.Charger.Address.Latitude,
+                        request.Charger.Address.Longitude
                     );
 
-                    double estimatedMinutes = (distanceKm / 40.0) * 60.0; 
+                    double estimatedMinutes = (distanceKm / 40.0) * 60.0;
                     estimatedArrival = $"~ {Math.Ceiling(estimatedMinutes)} min";
                 }
-
 
                 string estimatedPrice = request.Charger.PriceOption != null
                     ? $"{request.Charger.PriceOption.Value} EGP/hour"
                     : "N/A";
 
+              
+
+                var vehicles = await _vehicleService.GetVehiclesByUserIdAsync();
+
+                // إذا كان المستخدم يمتلك سيارات متعددة، سنختار السيارة الأولى أو نضع منطق لاختيار السيارة المناسبة
+                var vehicle = vehicles?.Data.FirstOrDefault(); // اختيار السيارة الأولى
+
                 var response = new ChargingRequestDetailsDto
                 {
                     RequestId = request.Id,
                     Status = request.Status,
-                    RequestedAt = request.RequestedAt,                
-                    CarOwnerId = request.CarOwner.Id,                 
+                    RequestedAt = request.RequestedAt,
+                    CarOwnerId = request.CarOwner.Id,
                     CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
-                    StationOwnerId = request.Charger.User.Id,                   
-                    StationOwnerName =  new StringBuilder().Append(request.Charger.User.FirstName).Append(" ") .Append(request.Charger.User.LastName).ToString(),
+
+                    // إضافة معلومات السيارة باستخدام VehicleDto
+                    VehicleBrand = vehicle?.BrandName ?? "Unknown", // اسم العلامة التجارية
+                    VehicleModel = vehicle?.ModelName ?? "Unknown", // اسم الطراز
+                    VehicleColor = vehicle?.Color ?? "Unknown", // اللون
+                    VehiclePlate = vehicle?.Plate ?? "Unknown", // لو كان اسم السيارة عبارة عن رقم اللوحة
+
+                    StationOwnerId = request.Charger.User.Id,
+                    StationOwnerName = new StringBuilder().Append(request.Charger.User.FirstName).Append(" ").Append(request.Charger.User.LastName).ToString(),
                     ChargerId = request.ChargerId,
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
                     PricePerHour = request.Charger.PriceOption != null
-                        ? $"{request.Charger.PriceOption.Value} EGP"
-                        : "N/A",
+                ? $"{request.Charger.PriceOption.Value} EGP"
+                : "N/A",
                     AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
                     Area = request.Charger.Address?.Area ?? "N/A",
                     Street = request.Charger.Address?.Street ?? "N/A",
                     EstimatedArrival = estimatedArrival,
                     EstimatedPrice = estimatedPrice,
-
-
-                   
-
+                    DistanceInKm = distanceKm // إضافة المسافة إلى الاستجابة
                 };
 
                 return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
