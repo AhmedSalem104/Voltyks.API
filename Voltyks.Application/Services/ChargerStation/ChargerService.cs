@@ -211,7 +211,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             var dto = new ChargerDetailsDto
             {
-
                 FullName = new StringBuilder()
                     .Append(charger.User.FirstName)
                     .Append(" ") // إضافة مسافة بين الاسم الأول واسم العائلة
@@ -266,13 +265,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 .OrderBy(x => x.Distance)
                 .ToList();
         }
-        //private List<(Charger Charger, double Distance)> ApplyPagination(List<(Charger Charger, double Distance)> filteredChargers, NearChargerSearchDto searchDto)
-        //{
-        //    return filteredChargers
-        //        .Skip((searchDto.PageNumber - 1) * searchDto.PageSize)
-        //        .Take(searchDto.PageSize)
-        //        .ToList();
-        //}
         private List<NearChargerDto> MapToDto(List<(Charger Charger, double Distance)> paginatedChargers)
         {
             var result = _mapper.Map<List<NearChargerDto>>(paginatedChargers.Select(x => x.Charger).ToList());

@@ -22,18 +22,32 @@ namespace Voltyks.Infrastructure
             _context = context;
         }
 
+        //public async Task<IEnumerable<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>>? filter = null, bool trackChanges = false)
+        //{
+        //    IQueryable<TEntity> query = _context.Set<TEntity>();
+
+        //    if (!trackChanges)
+        //        query = query.AsNoTracking();
+
+        //    if (filter is not null)
+        //        query = query.Where(filter);
+
+        //    return await query.ToListAsync();
+        //}
+
         public async Task<IEnumerable<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>>? filter = null, bool trackChanges = false)
         {
             IQueryable<TEntity> query = _context.Set<TEntity>();
 
             if (!trackChanges)
-                query = query.AsNoTracking();
+                query = query.AsNoTracking();  // تفعيل AsNoTracking عند عدم تتبع التغييرات
 
             if (filter is not null)
                 query = query.Where(filter);
 
             return await query.ToListAsync();
         }
+
 
         public async Task<TEntity?> GetAsync(TKey id)
         {
@@ -74,16 +88,22 @@ namespace Voltyks.Infrastructure
             await _context.Set<TEntity>().AddAsync(entity);
         }
 
+
         public void Update(TEntity entity)
         {
-            _context.Set<TEntity>().Update(entity);
+            _context.Entry(entity).State = EntityState.Modified;
         }
 
         public void Delete(TEntity entity)
         {
-            _context.Set<TEntity>().Remove(entity);
+            var existingEntity = _context.Set<TEntity>().Find(entity.Id);
+            if (existingEntity != null)
+            {
+                _context.Set<TEntity>().Remove(existingEntity);
+            }
         }
 
+  
         public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate)
         {
             return await _context.Set<TEntity>().AnyAsync(predicate);

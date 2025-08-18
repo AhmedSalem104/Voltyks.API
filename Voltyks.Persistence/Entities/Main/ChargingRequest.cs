@@ -12,6 +12,7 @@ namespace Voltyks.Persistence.Entities.Main
 
         public string UserId { get; set; }
         public AppUser CarOwner { get; set; }
+        public double KwNeeded { get; set; }
 
         public int ChargerId { get; set; }
         public Charger Charger { get; set; }

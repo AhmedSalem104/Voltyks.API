@@ -9,6 +9,8 @@ namespace Voltyks.Core.DTOs.ChargerRequest
     public class SendChargingRequestDto
     {
         public int ChargerId { get; set; }
+        public double KwNeeded { get; set; }
+
         // public string? DeviceToken { get; set; } // ✅ أضف دي
 
     }

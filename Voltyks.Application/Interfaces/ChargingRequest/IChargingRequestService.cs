@@ -16,6 +16,8 @@ namespace Voltyks.Application.Interfaces.ChargingRequest
         Task<ApiResponse<bool>> AcceptRequestAsync(TransRequest dto);
         Task<ApiResponse<bool>> RejectRequestAsync(TransRequest dto);
         Task<ApiResponse<bool>> ConfirmRequestAsync(TransRequest dto);
+        Task<ApiResponse<bool>> AbortRequestAsync(TransRequest dto);
+
         Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto); 
     }
 

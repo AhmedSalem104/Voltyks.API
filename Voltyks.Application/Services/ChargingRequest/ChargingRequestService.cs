@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json.Linq;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
@@ -48,7 +50,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (userId == null)
                     return new ApiResponse<ChargerDetailsDto>(null, "Car owner not found", false);
 
-                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId);
+                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId,dto.KwNeeded);
 
                 var userOwnerChargerId = charger.UserId;
                 var tokenList = await GetDeviceTokens(userOwnerChargerId);
@@ -57,7 +59,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                 {
                     string title = "New Charging Request 🚗";
                     string body = $"Driver {userId} requested to charge at your station.";
-                    await SendFcmNotifications(tokenList, title, body , chargingRequest.Id);
+                    string NotificationType = "VehicleOwner_RequestCharger";
+                    await SendFcmNotifications(tokenList, title, body , chargingRequest.Id, NotificationType);
                 }
 
                 await CreateNotification(userOwnerChargerId, userId, chargingRequest.Id);
@@ -84,63 +87,27 @@ namespace Voltyks.Application.Services.ChargingRequest
 
             return new ApiResponse<bool>(true, "Token registered", true);
         }
+
         public async Task<ApiResponse<bool>> AcceptRequestAsync(TransRequest dto)
         {
             try
             {
-                var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-                    .GetAllWithIncludeAsync(
-                        r => r.Id == dto.RequestId,
-                        false,
-                        r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
-                    .FirstOrDefault();
+                var request = await GetAndUpdateRequestAsync(dto, "accepted");
 
                 if (request == null)
                     return new ApiResponse<bool>(false, "Charging request not found", false);
 
-                // optional: authorize the current user if needed (station owner)
+                string title = "Charging Request Accepted ";
+                string body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.";
+                string notificationType = "ChargerOwner_AcceptRequest";
 
-                request.Status = "accepted";
-                request.RespondedAt = DateTime.UtcNow;
+                // إرسال إشعار
+                await SendNotificationAsync(request, title, body, notificationType);
 
-                _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-                await _unitOfWork.SaveChangesAsync();
+                // إضافة إشعار إلى قاعدة البيانات
+                await AddNotificationAsync(request, title, body, 2); // "VehicleOwner"
 
-                // 🔔 Notify the car owner
-                var carOwnerTokens = request.CarOwner.DeviceTokens?
-                    .Where(t => t.UserId == request.UserId)
-                    .Select(t => t.Token)
-                    .ToList();
-
-                if (carOwnerTokens != null && carOwnerTokens.Any())
-                {
-                    string title = "Charging Request Accepted ";
-                    string body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.";
-
-                    foreach (var token in carOwnerTokens)
-                    {
-                        await _firebaseService.SendNotificationAsync(token, title, body, request.Id);
-                    }
-                }
-
-                var notifi = new Notification()
-                {
-                    Title = "Charging Request Accepted ",
-                    Body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.",
-                    IsRead = false,
-                    SentAt = DateTime.UtcNow,
-                    UserId = request.UserId,
-                    RelatedRequestId = request.Id,
-                    UserTypeId = 2 // "VehicleOwner"
-
-
-                    //  add new property UserSenderId
-                };
-
-                await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
-
-
-                return new ApiResponse<bool>(true, "Charging request accepted and user notified", true);
+                return new ApiResponse<bool>(true, "Charging request accepted ", true);
             }
             catch (Exception ex)
             {
@@ -151,55 +118,22 @@ namespace Voltyks.Application.Services.ChargingRequest
         {
             try
             {
-                var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-                    .GetAllWithIncludeAsync(
-                        r => r.Id == dto.RequestId,
-                        false,
-                        r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include CarOwner
-                    .FirstOrDefault();
+                var request = await GetAndUpdateRequestAsync(dto, "rejected");
 
                 if (request == null)
                     return new ApiResponse<bool>(false, "Charging request not found", false);
 
-                request.Status = "rejected";
-                request.RespondedAt = DateTime.UtcNow;
+                string title = "Charging Request Rejected ❌";
+                string body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.";
+                string notificationType = "ChargerOwner_RejectRequest";
 
-                _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-                await _unitOfWork.SaveChangesAsync();
+                // إرسال إشعار
+                await SendNotificationAsync(request, title, body, notificationType);
 
-                // 🔔 Notify the car owner
-                var carOwnerTokens = request.CarOwner.DeviceTokens?
-                    .Where(t => t.UserId == request.UserId)
-                    .Select(t => t.Token)
-                    .ToList();
+                // إضافة إشعار إلى قاعدة البيانات
+                await AddNotificationAsync(request, title, body, 2); // "VehicleOwner"
 
-                if (carOwnerTokens != null && carOwnerTokens.Any())
-                {
-                    string title = "Charging Request Rejected ❌";
-                    string body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.";
-
-                    foreach (var token in carOwnerTokens)
-                    {
-                        await _firebaseService.SendNotificationAsync(token, title, body , request.Id);
-                    }
-                }
-                var notifi = new Notification()
-                {
-                    Title = "Charging Request Rejected ❌",
-                    Body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.",
-                    IsRead = false,
-                    SentAt = DateTime.UtcNow,
-                    UserId = request.UserId,
-                    RelatedRequestId = request.Id,
-                    UserTypeId = 2 // "VehicleOwner"
-
-                    //  add new property UserSenderId
-                };
-
-                await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
-
-
-                return new ApiResponse<bool>(true, "Charging request rejected and car owner notified", true);
+                return new ApiResponse<bool>(true, "Charging request rejected ", true);
             }
             catch (Exception ex)
             {
@@ -214,12 +148,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (string.IsNullOrEmpty(userId))
                     return new ApiResponse<bool>(false, "Unauthorized", false);
 
-                var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-                    .GetAllWithIncludeAsync(
-                        r => r.Id == dto.RequestId,
-                        false,
-                        r => r.CarOwner, r => r.Charger, r => r.Charger.User)) // include both users
-                    .FirstOrDefault();
+                var request = await GetAndUpdateRequestAsync(dto, "confirmed");
 
                 if (request == null)
                     return new ApiResponse<bool>(false, "Charging request not found", false);
@@ -227,46 +156,50 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (request.CarOwner.Id != userId)
                     return new ApiResponse<bool>(false, "Not your request", false);
 
-                request.Status = "confirmed";
-                request.ConfirmedAt = DateTime.UtcNow;
+                string title = "Request Confirmed ✅";
+                string body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.";
+                string notificationType = "VehicleOwner_CompleteProcessSuccessfully";
 
-                _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-                await _unitOfWork.SaveChangesAsync();
+                // إرسال إشعار
+                await SendNotificationAsync(request, title, body, notificationType);
 
-                // 🔔 Notify the station owner
-                var stationOwnerTokens = request.Charger.User.DeviceTokens?
-                    .Where(t => t.UserId == request.UserId)
-                    .Select(t => t.Token)
-                    .ToList();
+                // إضافة إشعار إلى قاعدة البيانات
+                await AddNotificationAsync(request, title, body, 1); // "ChargerOwner"
 
-                if (stationOwnerTokens != null && stationOwnerTokens.Any())
-                {
-                    string title = "Request Confirmed ✅";
-                    string body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.";
+                return new ApiResponse<bool>(true, "Charging request confirmed ", true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<bool>(false, ex.Message, false);
+            }
+        }
+        public async Task<ApiResponse<bool>> AbortRequestAsync(TransRequest dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return new ApiResponse<bool>(false, "Unauthorized", false);
 
-                    foreach (var token in stationOwnerTokens)
-                    {
-                        await _firebaseService.SendNotificationAsync(token, title, body , request.Id);
-                    }
-                }
-                var notifi = new Notification()
-                {
-                    Title = "Request Confirmed ✅",
-                    Body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.",
-                    IsRead = false,
-                    SentAt = DateTime.UtcNow,
-                    UserId = request.UserId,
-                    RelatedRequestId = request.Id,
-                    UserTypeId = 1 // "ChargerOwner"
+                var request = await GetAndUpdateRequestAsync(dto, "Abort");
 
+                if (request == null)
+                    return new ApiResponse<bool>(false, "Charging request not found", false);
 
-                    //  add new property UserSenderId
-                };
+                if (request.CarOwner.Id != userId)
+                    return new ApiResponse<bool>(false, "Not your request", false);
 
-                await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
+                string title = "Request Aborted ❌";
+                string body = $"The driver {request.CarOwner.FullName} aborted the charging session at your station after payment.";
+                string notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
 
+                // إرسال إشعار
+                await SendNotificationAsync(request, title, body, notificationType);
 
-                return new ApiResponse<bool>(true, "Charging request confirmed and station owner notified", true);
+                // إضافة إشعار إلى قاعدة البيانات
+                await AddNotificationAsync(request, title, body, 1); // "ChargerOwner"
+
+                return new ApiResponse<bool>(true, "Charging request aborted ", true);
             }
             catch (Exception ex)
             {
@@ -274,88 +207,319 @@ namespace Voltyks.Application.Services.ChargingRequest
             }
         }
 
-        //public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(int requestId)
+        private async Task<ChargingRequestEntity?> GetAndUpdateRequestAsync(TransRequest dto, string newStatus)
+        {
+            var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
+                            .GetAllWithIncludeAsync(
+                                r => r.Id == dto.RequestId,
+                                false,
+                                r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
+                            .FirstOrDefault();
+
+            if (request == null)
+                return null;
+
+            request.Status = newStatus;
+            request.RespondedAt = DateTime.UtcNow;
+
+            _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            return request;
+        }
+        private async Task SendNotificationAsync(ChargingRequestEntity request, string title, string body, string notificationType)
+        {
+            var carOwnerTokens = request.CarOwner.DeviceTokens?
+                .Where(t => t.UserId == request.UserId)
+                .Select(t => t.Token)
+                .ToList();
+
+            if (carOwnerTokens != null && carOwnerTokens.Any())
+            {
+                foreach (var token in carOwnerTokens)
+                {
+                    await _firebaseService.SendNotificationAsync(token, title, body, request.Id, notificationType);
+                }
+            }
+        }
+        private async Task AddNotificationAsync(ChargingRequestEntity request, string title, string body, int userTypeId)
+        {
+            var notification = new Notification()
+            {
+                Title = title,
+                Body = body,
+                IsRead = false,
+                SentAt = DateTime.UtcNow,
+                UserId = request.UserId,
+                RelatedRequestId = request.Id,
+                UserTypeId = userTypeId
+            };
+
+            await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
+        }
+
+        //public async Task<ApiResponse<bool>> AcceptRequestAsync(TransRequest dto)
         //{
         //    try
         //    {
-        //        var request = await GetRequestWithDetailsAsync(requestId);
+        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
+        //            .GetAllWithIncludeAsync(
+        //                r => r.Id == dto.RequestId,
+        //                false,
+        //                r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
+
+        //            .FirstOrDefault();
 
         //        if (request == null)
-        //            return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
+        //            return new ApiResponse<bool>(false, "Charging request not found", false);
 
-        //        var dto = MapToDto(request);
+        //        // optional: authorize the current user if needed (station owner)
 
-        //        return new ApiResponse<ChargingRequestDetailsDto>(dto, "Charging request details fetched", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
-        //    }
-        //}
-        //public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
-        //{
-        //    try
-        //    {
-        //        var request = await GetRequestWithDetailsAsync(dto.RequestId);
+        //        request.Status = "accepted";
+        //        request.RespondedAt = DateTime.UtcNow;
 
-        //        if (request == null)
-        //            return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
+        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
+        //        await _unitOfWork.SaveChangesAsync();
 
-        //        // 🧠 حساب المسافة بين السيارة والشاحن
-        //        string estimatedArrival = "N/A";
-        //        if (dto.Latitude.HasValue && dto.Longitude.HasValue && request.Charger.Address?.Latitude != null && request.Charger.Address?.Longitude != null)
+        //        // 🔔 Notify the car owner
+        //        var carOwnerTokens = request.CarOwner.DeviceTokens?
+        //            .Where(t => t.UserId == request.UserId)
+        //            .Select(t => t.Token)
+        //            .ToList();
+
+        //        if (carOwnerTokens != null && carOwnerTokens.Any())
         //        {
-        //            double distanceKm = CalculateDistance(
-        //                dto.Latitude.Value,
-        //                dto.Longitude.Value,
-        //                request.Charger.Address.Latitude, 
-        //                request.Charger.Address.Longitude 
-        //            );
+        //            string title = "Charging Request Accepted ";
+        //            string body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.";
+        //            string NotificationType = "ChargerOwner_AcceptRequest";
 
-        //            double estimatedMinutes = (distanceKm / 40.0) * 60.0; 
-        //            estimatedArrival = $"~ {Math.Ceiling(estimatedMinutes)} min";
+        //            foreach (var token in carOwnerTokens)
+        //            {
+        //                await _firebaseService.SendNotificationAsync(token, title, body, request.Id , NotificationType);
+        //            }
         //        }
 
-
-        //        string estimatedPrice = request.Charger.PriceOption != null
-        //            ? $"{request.Charger.PriceOption.Value} EGP/hour"
-        //            : "N/A";
-
-        //        var response = new ChargingRequestDetailsDto
+        //        var notifi = new Notification()
         //        {
-        //            RequestId = request.Id,
-        //            Status = request.Status,
-        //            RequestedAt = request.RequestedAt,                
-        //            CarOwnerId = request.CarOwner.Id, 
+        //            Title = "Charging Request Accepted ",
+        //            Body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.",
+        //            IsRead = false,
+        //            SentAt = DateTime.UtcNow,
+        //            UserId = request.UserId,
+        //            RelatedRequestId = request.Id,
+        //            UserTypeId = 2 // "VehicleOwner"
 
 
-        //            CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
-        //            StationOwnerId = request.Charger.User.Id,                   
-        //            StationOwnerName =  new StringBuilder().Append(request.Charger.User.FirstName).Append(" ") .Append(request.Charger.User.LastName).ToString(),
-        //            ChargerId = request.ChargerId,
-        //            Protocol = request.Charger.Protocol?.Name ?? "Unknown",
-        //            CapacityKw = request.Charger.Capacity?.kw ?? 0,
-        //            PricePerHour = request.Charger.PriceOption != null
-        //                ? $"{request.Charger.PriceOption.Value} EGP"
-        //                : "N/A",
-        //            AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
-        //            Area = request.Charger.Address?.Area ?? "N/A",
-        //            Street = request.Charger.Address?.Street ?? "N/A",
-        //            EstimatedArrival = estimatedArrival,
-        //            EstimatedPrice = estimatedPrice,
-
-
-
-
+        //            //  add new property UserSenderId
         //        };
 
-        //        return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
+        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
+
+
+        //        return new ApiResponse<bool>(true, "Charging request accepted and user notified", true);
         //    }
         //    catch (Exception ex)
         //    {
-        //        return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
+        //        return new ApiResponse<bool>(false, ex.Message, false);
         //    }
         //}
+        //public async Task<ApiResponse<bool>> RejectRequestAsync(TransRequest dto)
+        //{
+        //    try
+        //    {
+        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
+        //            .GetAllWithIncludeAsync(
+        //                r => r.Id == dto.RequestId,
+        //                false,
+        //                r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include CarOwner
+        //            .FirstOrDefault();
+
+        //        if (request == null)
+        //            return new ApiResponse<bool>(false, "Charging request not found", false);
+
+        //        request.Status = "rejected";
+        //        request.RespondedAt = DateTime.UtcNow;
+
+        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
+        //        await _unitOfWork.SaveChangesAsync();
+
+        //        // 🔔 Notify the car owner
+        //        var carOwnerTokens = request.CarOwner.DeviceTokens?
+        //            .Where(t => t.UserId == request.UserId)
+        //            .Select(t => t.Token)
+        //            .ToList();
+
+        //        if (carOwnerTokens != null && carOwnerTokens.Any())
+        //        {
+        //            string title = "Charging Request Rejected ❌";
+        //            string body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.";
+        //            string NotificationType = "ChargerOwner_RejectRequest";
+
+        //            foreach (var token in carOwnerTokens)
+        //            {
+        //                await _firebaseService.SendNotificationAsync(token, title, body , request.Id , NotificationType);
+        //            }
+        //        }
+        //        var notifi = new Notification()
+        //        {
+        //            Title = "Charging Request Rejected ❌",
+        //            Body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.",
+        //            IsRead = false,
+        //            SentAt = DateTime.UtcNow,
+        //            UserId = request.UserId,
+        //            RelatedRequestId = request.Id,
+        //            UserTypeId = 2 // "VehicleOwner"
+
+        //            //  add new property UserSenderId
+        //        };
+
+        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
+
+
+        //        return new ApiResponse<bool>(true, "Charging request rejected and car owner notified", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<bool>(false, ex.Message, false);
+        //    }
+        //}
+        //public async Task<ApiResponse<bool>> ConfirmRequestAsync(TransRequest dto)
+        //{
+        //    try
+        //    {
+        //        var userId = GetCurrentUserId();
+        //        if (string.IsNullOrEmpty(userId))
+        //            return new ApiResponse<bool>(false, "Unauthorized", false);
+
+        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
+        //            .GetAllWithIncludeAsync(
+        //                r => r.Id == dto.RequestId,
+        //                false,
+        //                r => r.CarOwner, r => r.Charger, r => r.Charger.User)) // include both users
+        //            .FirstOrDefault();
+
+        //        if (request == null)
+        //            return new ApiResponse<bool>(false, "Charging request not found", false);
+
+        //        if (request.CarOwner.Id != userId)
+        //            return new ApiResponse<bool>(false, "Not your request", false);
+
+        //        request.Status = "confirmed";
+        //        request.ConfirmedAt = DateTime.UtcNow;
+
+        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
+        //        await _unitOfWork.SaveChangesAsync();
+
+        //        // 🔔 Notify the station owner
+        //        var stationOwnerTokens = request.Charger.User.DeviceTokens?
+        //            .Where(t => t.UserId == request.UserId)
+        //            .Select(t => t.Token)
+        //            .ToList();
+
+        //        if (stationOwnerTokens != null && stationOwnerTokens.Any())
+        //        {
+        //            string title = "Request Confirmed ✅";
+        //            string body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.";
+        //            string NotificationType = "VehicleOwner_CompleteProcessSuccessfully";
+
+        //            foreach (var token in stationOwnerTokens)
+        //            {
+        //                await _firebaseService.SendNotificationAsync(token, title, body , request.Id , NotificationType);
+        //            }
+        //        }
+        //        var notifi = new Notification()
+        //        {
+        //            Title = "Request Confirmed ✅",
+        //            Body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.",
+        //            IsRead = false,
+        //            SentAt = DateTime.UtcNow,
+        //            UserId = request.UserId,
+        //            RelatedRequestId = request.Id,
+        //            UserTypeId = 1 // "ChargerOwner"
+
+
+        //            //  add new property UserSenderId
+        //        };
+
+        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
+
+
+        //        return new ApiResponse<bool>(true, "Charging request confirmed and station owner notified", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<bool>(false, ex.Message, false);
+        //    }
+        //}
+        //public async Task<ApiResponse<bool>> AbortRequestAsync(TransRequest dto)
+        //{
+        //    try
+        //    {
+        //        var userId = GetCurrentUserId();
+        //        if (string.IsNullOrEmpty(userId))
+        //            return new ApiResponse<bool>(false, "Unauthorized", false);
+
+        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
+        //            .GetAllWithIncludeAsync(
+        //                r => r.Id == dto.RequestId,
+        //                false,
+        //                r => r.CarOwner, r => r.Charger, r => r.Charger.User)) // include both users
+        //            .FirstOrDefault();
+
+        //        if (request == null)
+        //            return new ApiResponse<bool>(false, "Charging request not found", false);
+
+        //        if (request.CarOwner.Id != userId)
+        //            return new ApiResponse<bool>(false, "Not your request", false);
+
+        //        request.Status = "Abort";
+        //        request.ConfirmedAt = DateTime.UtcNow;
+
+        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
+        //        await _unitOfWork.SaveChangesAsync();
+
+        //        // 🔔 Notify the station owner
+        //        var stationOwnerTokens = request.Charger.User.DeviceTokens?
+        //            .Where(t => t.UserId == request.UserId)
+        //            .Select(t => t.Token)
+        //            .ToList();
+
+        //        if (stationOwnerTokens != null && stationOwnerTokens.Any())
+        //        {
+        //            string title = "Request Confirmed ✅";
+        //            string body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.";
+        //            string NotificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+
+        //            foreach (var token in stationOwnerTokens)
+        //            {
+        //                await _firebaseService.SendNotificationAsync(token, title, body, request.Id, NotificationType);
+        //            }
+        //        }
+        //        var notifi = new Notification()
+        //        {
+        //            Title = "Request Confirmed ✅",
+        //            Body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.",
+        //            IsRead = false,
+        //            SentAt = DateTime.UtcNow,
+        //            UserId = request.UserId,
+        //            RelatedRequestId = request.Id,
+        //            UserTypeId = 1 // "ChargerOwner"
+
+
+        //            //  add new property UserSenderId
+        //        };
+
+        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
+
+
+        //        return new ApiResponse<bool>(true, "Charging request confirmed and station owner notified", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<bool>(false, ex.Message, false);
+        //    }
+        //}
+
         public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
         {
             try
@@ -392,12 +556,33 @@ namespace Voltyks.Application.Services.ChargingRequest
                 // إذا كان المستخدم يمتلك سيارات متعددة، سنختار السيارة الأولى أو نضع منطق لاختيار السيارة المناسبة
                 var vehicle = vehicles?.Data.FirstOrDefault(); // اختيار السيارة الأولى
 
+
+
+
+
+                string vehicleArea = "";
+                string vehicleStreet = "";
+                if (dto.Latitude.HasValue && dto.Longitude.HasValue)
+                {
+                    try
+                    {
+                        var (area, street) = await GetAddressFromLatLongNominatimAsync(
+                            dto.Latitude.Value, dto.Longitude.Value);
+                        vehicleArea = string.IsNullOrWhiteSpace(area) ? "N/A" : area;
+                        vehicleStreet = string.IsNullOrWhiteSpace(street) ? "N/A" : street;
+                    }
+                    catch
+                    {
+                        // تجاهل الخطأ وخلي القيم N/A
+                    }
+                }
                 var response = new ChargingRequestDetailsDto
                 {
                     RequestId = request.Id,
                     Status = request.Status,
                     RequestedAt = request.RequestedAt,
                     CarOwnerId = request.CarOwner.Id,
+                    KwNeeded = request.KwNeeded,
                     CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
 
                     // إضافة معلومات السيارة باستخدام VehicleDto
@@ -405,18 +590,21 @@ namespace Voltyks.Application.Services.ChargingRequest
                     VehicleModel = vehicle?.ModelName ?? "Unknown", // اسم الطراز
                     VehicleColor = vehicle?.Color ?? "Unknown", // اللون
                     VehiclePlate = vehicle?.Plate ?? "Unknown", // لو كان اسم السيارة عبارة عن رقم اللوحة
-
+                    VehicleCapacity = vehicle.Capacity,
                     StationOwnerId = request.Charger.User.Id,
                     StationOwnerName = new StringBuilder().Append(request.Charger.User.FirstName).Append(" ").Append(request.Charger.User.LastName).ToString(),
                     ChargerId = request.ChargerId,
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
                     PricePerHour = request.Charger.PriceOption != null
-                ? $"{request.Charger.PriceOption.Value} EGP"
-                : "N/A",
+                ? $"{request.Charger.PriceOption.Value} EGP": "N/A",
                     AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
-                    Area = request.Charger.Address?.Area ?? "N/A",
-                    Street = request.Charger.Address?.Street ?? "N/A",
+                    ChargerArea = request.Charger.Address?.Area ?? "N/A",
+                    ChargerStreet = request.Charger.Address?.Street ?? "N/A",
+
+                    VehicleArea = vehicleArea,
+                    VehicleStreet = vehicleStreet,
+
                     EstimatedArrival = estimatedArrival,
                     EstimatedPrice = estimatedPrice,
                     DistanceInKm = distanceKm // إضافة المسافة إلى الاستجابة
@@ -429,7 +617,58 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
             }
         }
+        public async Task<(string Area, string Street)> GetAddressFromLatLongNominatimAsync(double latitude, double longitude)
+        {
+            // Nominatim API (مجاني)
+            string url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={latitude}&lon={longitude}&addressdetails=1&accept-language=ar";
 
+            using (var client = new HttpClient())
+            {
+                // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
+                client.DefaultRequestHeaders.UserAgent.Clear();
+                client.DefaultRequestHeaders.UserAgent.Add(
+                    new ProductInfoHeaderValue("YourAppName", "1.0"));
+                client.DefaultRequestHeaders.UserAgent.Add(
+                    new ProductInfoHeaderValue("(contact@yourdomain.com)"));
+
+                var resp = await client.GetAsync(url);
+                if (!resp.IsSuccessStatusCode)
+                    return ("N/A", "N/A");
+
+                var body = await resp.Content.ReadAsStringAsync();
+                var json = JObject.Parse(body);
+                var address = json["address"] as JObject;
+                if (address == null)
+                    return ("N/A", "N/A");
+
+                // نحاول نطلع الشارع
+                // Nominatim ممكن يرجع street تحت مفاتيح مختلفة (road, pedestrian, footway...)
+                string street =
+                    (string)address["road"] ??
+                    (string)address["pedestrian"] ??
+                    (string)address["footway"] ??
+                    (string)address["path"] ??
+                    (string)address["residential"] ??
+                    (string)address["neighbourhood"] ??
+                    "N/A";
+
+                // نحاول نطلع المنطقة/الحَي/المدينة
+                // بنستخدم fallback ذكي حسب المتاح
+                string area =
+                    (string)address["suburb"] ??
+                    (string)address["neighbourhood"] ??
+                    (string)address["city_district"] ??
+                    (string)address["city"] ??
+                    (string)address["town"] ??
+                    (string)address["village"] ??
+                    (string)address["county"] ??
+                    (string)address["state_district"] ??
+                    (string)address["state"] ??
+                    "N/A";
+
+                return (area, street);
+            }
+        }
 
 
         // SendChargingRequestAsync ===> Helper Private Mehtods
@@ -446,14 +685,15 @@ namespace Voltyks.Application.Services.ChargingRequest
                     c => c.User))
                 .FirstOrDefault();
         }
-        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId)
+        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded )
         {
             var request = new ChargingRequestEntity
             {
                 UserId = userId,
                 ChargerId = chargerId,
                 RequestedAt = DateTime.UtcNow,
-                Status = "pending"
+                Status = "pending",
+                KwNeeded = KwNeeded
             };
 
             await _unitOfWork.GetRepository<ChargingRequestEntity, int>().AddAsync(request);
@@ -467,11 +707,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                 .GetAllAsync(t => t.UserId == userId);
             return tokens.Select(t => t.Token).ToList();
         }
-        private async Task SendFcmNotifications(List<string> tokens, string title, string body , int chargingRequestID)
+        private async Task SendFcmNotifications(List<string> tokens, string title, string body , int chargingRequestID , string NotificationType)
         {
             foreach (var token in tokens)
             {
-                await _firebaseService.SendNotificationAsync(token, title, body , chargingRequestID);
+                await _firebaseService.SendNotificationAsync(token, title, body , chargingRequestID , NotificationType);
             }
         }
         private async Task CreateNotification(string receiverUserId, string senderUserId, int relatedRequestId)

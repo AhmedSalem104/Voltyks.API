@@ -62,8 +62,14 @@ namespace Voltyks.API.Controllers
             var result = await _service.ChargingRequestService.ConfirmRequestAsync(dto);
             return Ok(result);
         }
+        [HttpPut("abortRequest")]
+        [Authorize]
+        public async Task<IActionResult> AbortRequest([FromBody] TransRequest dto)
+        {
+            var result = await _service.ChargingRequestService.AbortRequestAsync(dto);
+            return Ok(result);
+        }
 
-   
 
         [HttpPost("GetRequestDetailsById")]
         [Authorize]

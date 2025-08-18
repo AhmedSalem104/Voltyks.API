@@ -9,8 +9,8 @@ namespace Voltyks.Core.DTOs.ChargerRequest
     public class RequestDetailsDto
     {
         public int RequestId { get; set; }
-        public double? Latitude { get; set; }      // موقع السائق
-        public double? Longitude { get; set; }     // موقع السائق
+        public double? Latitude { get; set; }      // Vehicle Owner
+        public double? Longitude { get; set; }     // Vehicle Owner
     }
 
 }

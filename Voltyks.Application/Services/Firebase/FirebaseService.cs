@@ -33,7 +33,7 @@ namespace Voltyks.Application.Services.Firebase
 
 
         
-        public async Task SendNotificationAsync(string deviceToken, string title, string body , int chargingRequestID)
+        public async Task SendNotificationAsync(string deviceToken, string title, string body , int chargingRequestID, string NotificationType)
         {
             try
             {
@@ -61,7 +61,8 @@ namespace Voltyks.Application.Services.Firebase
                         },
                         data = new
                         {
-                            requestId = chargingRequestID.ToString()
+                            requestId = chargingRequestID.ToString(),
+                            NotificationType = NotificationType
                         }
                     }
                 };
