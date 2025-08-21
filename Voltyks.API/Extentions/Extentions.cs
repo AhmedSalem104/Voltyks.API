@@ -19,7 +19,6 @@ using Voltyks.Core.Mapping;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence;
 using Voltyks.Persistence.Data;
-using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using FirebaseAdmin;
@@ -27,6 +26,9 @@ using Google.Apis.Auth.OAuth2;
 using Voltyks.Application.Interfaces.Brand;
 using Voltyks.Application.Services;
 using Voltyks.Application.Interfaces;
+using Voltyks.Application.Services.Paymob;
+using Voltyks.Core.DTOs.Paymob.Options;
+using Voltyks.Application.Interfaces.Paymob;
 
 
 namespace Voltyks.API.Extentions
@@ -48,6 +50,10 @@ namespace Voltyks.API.Extentions
             services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsSettings"));
             services.AddSingleton<SqlConnectionFactory>();
             services.AddAutoMapper(typeof(MappingProfile).Assembly);
+            services.AddHttpClient<PaymobService>();
+            services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
+            services.AddScoped<PaymobService>();
+
 
             services.AddAuthentication()
             .AddGoogle("Google", options =>
@@ -191,6 +197,8 @@ namespace Voltyks.API.Extentions
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             services.AddScoped<IVehicleService, VehicleService>();
+            services.AddScoped<IPaymobService, PaymobService>();
+
 
             return services;
 
@@ -236,7 +244,6 @@ namespace Voltyks.API.Extentions
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey)),

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
+using Voltyks.Persistence.Entities.Main.Paymob;
 
 namespace Voltyks.Persistence.Data
 {
@@ -30,6 +31,12 @@ namespace Voltyks.Persistence.Data
         public DbSet<DeviceToken> DeviceTokens { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<UserType> UserTypes { get; set; }
+
+        //// Paymob 
+        //public DbSet<PaymentOrder> PaymentOrders => Set<PaymentOrder>();
+        //public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+        //public DbSet<WebhookLog> WebhookLogs => Set<WebhookLog>();
+        //public DbSet<PaymentAction> PaymentActions => Set<PaymentAction>();
 
 
     }

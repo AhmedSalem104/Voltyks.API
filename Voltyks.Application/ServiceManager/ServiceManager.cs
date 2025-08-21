@@ -4,6 +4,7 @@ using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.Auth;
@@ -11,14 +12,17 @@ using Voltyks.Application.Interfaces.Brand;
 using Voltyks.Application.Interfaces.ChargerStation;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Services;
 using Voltyks.Application.Services.Auth;
 using Voltyks.Application.Services.ChargingRequest;
+using Voltyks.Application.Services.Paymob;
 using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
+using Voltyks.Core.DTOs.Paymob.Options;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
@@ -37,7 +41,10 @@ namespace Voltyks.Application.ServicesManager
         , VoltyksDbContext context
         , IMapper mapper
         , IFirebaseService firebaseService
-        , IVehicleService vehicleService) : IServiceManager
+        , IVehicleService vehicleService
+        , HttpClient _http
+        ,IOptions<PaymobOptions> _opt
+        ,ILogger<PaymobService> _log) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context);
@@ -47,6 +54,7 @@ namespace Voltyks.Application.ServicesManager
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
         public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService);
+        public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log);
 
 
 
