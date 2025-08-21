@@ -29,6 +29,7 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         public string Protocol { get; set; }
         public double CapacityKw { get; set; }
         public double KwNeeded { get; set; }
+        public int CurrentBatteryPercentage { get; set; }
 
         public string PricePerHour { get; set; }
         public string AdapterAvailability { get; set; }

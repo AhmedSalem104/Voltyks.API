@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
@@ -107,6 +108,25 @@ namespace Voltyks.Infrastructure
         public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate)
         {
             return await _context.Set<TEntity>().AnyAsync(predicate);
+        }
+        public IQueryable<TEntity> Query(bool trackChanges = false)
+        {
+            var q = _context.Set<TEntity>().AsQueryable();
+            return trackChanges ? q : q.AsNoTracking();
+        }
+        public async Task ExecuteInTransactionAsync(Func<Task> action, IsolationLevel level = IsolationLevel.ReadCommitted)
+        {
+            using var tx = await _context.Database.BeginTransactionAsync(level);
+            try
+            {
+                await action();
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
     }

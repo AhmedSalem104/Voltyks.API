@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Entity.Infrastructure;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
@@ -8,12 +10,14 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json.Linq;
+using Twilio.TwiML.Voice;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.Charger;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.Enums;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
@@ -38,487 +42,195 @@ namespace Voltyks.Application.Services.ChargingRequest
             _vehicleService = vehicleService;
         }
 
-        public async Task<ApiResponse<ChargerDetailsDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
+
+        public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
         {
             try
             {
                 var charger = await GetChargerWithIncludes(dto.ChargerId);
                 if (charger == null)
-                    return new ApiResponse<ChargerDetailsDto>(null, "Charger not found", false);
+                    return new ApiResponse<NotificationResultDto>(null, "Charger not found", false);
 
                 var userId = GetCurrentUserId();
                 if (userId == null)
-                    return new ApiResponse<ChargerDetailsDto>(null, "Car owner not found", false);
+                    return new ApiResponse<NotificationResultDto>(null, "Car owner not found", false);
 
-                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId,dto.KwNeeded);
+                // 1) أنشئ الطلب
+                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage);
 
-                var userOwnerChargerId = charger.UserId;
-                var tokenList = await GetDeviceTokens(userOwnerChargerId);
+                // 2) جهّز بيانات الإشعار
+                var recipientUserId = charger.UserId; // صاحب المحطة
+                var title = "New Charging Request 🚗";
+                var body = $"Driver {userId} requested to charge at your station.";
+                var notificationType = NotificationTypes.VehicleOwner_RequestCharger; // ثوابت
+                var userTypeId = (int)NotificationUserType.ChargerOwner;              // 1
 
-                if (tokenList.Any())
-                {
-                    string title = "New Charging Request 🚗";
-                    string body = $"Driver {userId} requested to charge at your station.";
-                    string NotificationType = "VehicleOwner_RequestCharger";
-                    await SendFcmNotifications(tokenList, title, body , chargingRequest.Id, NotificationType);
-                }
+                // 3) إرسال + تسجيل + إرجاع DTO
+                var result = await SendAndPersistNotificationAsync(
+                    receiverUserId: recipientUserId,
+                    requestId: chargingRequest.Id,
+                    title: title,
+                    body: body,
+                    notificationType: notificationType,
+                    userTypeId: userTypeId
+                );
 
-                await CreateNotification(userOwnerChargerId, userId, chargingRequest.Id);
-
-                return new ApiResponse<ChargerDetailsDto>("Charging request sent successfully", true);
+                return new ApiResponse<NotificationResultDto>(result, "Charging request sent successfully", true);
             }
             catch (Exception ex)
             {
-                return new ApiResponse<ChargerDetailsDto>(null, ex.Message, false);
+                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
+
         public async Task<ApiResponse<bool>> RegisterDeviceTokenAsync(DeviceTokenDto tokenDto)
         {
             var userId = GetCurrentUserId();
+            var token = tokenDto?.DeviceToken?.Trim();
 
-            if (string.IsNullOrWhiteSpace(tokenDto?.DeviceToken) || string.IsNullOrWhiteSpace(userId))
+            if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(userId))
                 return new ApiResponse<bool>(false, "Invalid DeviceToken or User", false);
 
-            var alreadyExists = await CheckIfTokenExists(tokenDto.DeviceToken, userId);
-            if (!alreadyExists)
-            {
-                await SaveNewDeviceToken(tokenDto.DeviceToken, userId);
-            }
+           
 
-            return new ApiResponse<bool>(true, "Token registered", true);
+            var ok = await SaveOrUpdateDeviceTokenAsync(token, userId);
+            return new ApiResponse<bool>(ok, "Token registered", ok);
         }
 
-        public async Task<ApiResponse<bool>> AcceptRequestAsync(TransRequest dto)
+        public async Task<ApiResponse<NotificationResultDto>> AcceptRequestAsync(TransRequest dto)
         {
             try
             {
-                var request = await GetAndUpdateRequestAsync(dto, "accepted");
-
+                var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Accepted);
                 if (request == null)
-                    return new ApiResponse<bool>(false, "Charging request not found", false);
+                    return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
-                string title = "Charging Request Accepted ";
-                string body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.";
-                string notificationType = "ChargerOwner_AcceptRequest";
+                var recipientUserId = request.CarOwner?.Id; // VehicleOwner
+                var title = "Charging Request Accepted";
+                var body = $"Your request to charge at {request.Charger?.User?.FullName}'s station has been accepted.";
+                var notificationType = "ChargerOwner_AcceptRequest";
 
-                // إرسال إشعار
-                await SendNotificationAsync(request, title, body, notificationType);
+                var result = await SendAndPersistNotificationAsync(
+                    receiverUserId: recipientUserId!,
+                    requestId: request.Id,
+                    title: title,
+                    body: body,
+                    notificationType: notificationType,
+                    userTypeId: 2 // VehicleOwner
+                );
 
-                // إضافة إشعار إلى قاعدة البيانات
-                await AddNotificationAsync(request, title, body, 2); // "VehicleOwner"
+                return new ApiResponse<NotificationResultDto>(result, "Charging request accepted", true);
 
-                return new ApiResponse<bool>(true, "Charging request accepted ", true);
             }
             catch (Exception ex)
             {
-                return new ApiResponse<bool>(false, ex.Message, false);
+                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-        public async Task<ApiResponse<bool>> RejectRequestAsync(TransRequest dto)
+        public async Task<ApiResponse<NotificationResultDto>> RejectRequestAsync(TransRequest dto)
         {
             try
             {
-                var request = await GetAndUpdateRequestAsync(dto, "rejected");
-
+                var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Rejected);
                 if (request == null)
-                    return new ApiResponse<bool>(false, "Charging request not found", false);
+                    return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
-                string title = "Charging Request Rejected ❌";
-                string body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.";
-                string notificationType = "ChargerOwner_RejectRequest";
+                var recipientUserId = request.CarOwner?.Id; // VehicleOwner
+                var title = "Charging Request Rejected ❌";
+                var body = $"Your request to charge at {request.Charger?.User?.FullName}'s station was rejected.";
+                var notificationType = "ChargerOwner_RejectRequest";
 
-                // إرسال إشعار
-                await SendNotificationAsync(request, title, body, notificationType);
+                var result = await SendAndPersistNotificationAsync(
+                    receiverUserId: recipientUserId!,
+                    requestId: request.Id,
+                    title: title,
+                    body: body,
+                    notificationType: notificationType,
+                    userTypeId: 2 // VehicleOwner
+                );
+                return new ApiResponse<NotificationResultDto>(result, "Charging request rejected", true);
 
-                // إضافة إشعار إلى قاعدة البيانات
-                await AddNotificationAsync(request, title, body, 2); // "VehicleOwner"
-
-                return new ApiResponse<bool>(true, "Charging request rejected ", true);
+              
             }
             catch (Exception ex)
             {
-                return new ApiResponse<bool>(false, ex.Message, false);
+                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-        public async Task<ApiResponse<bool>> ConfirmRequestAsync(TransRequest dto)
-        {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                    return new ApiResponse<bool>(false, "Unauthorized", false);
-
-                var request = await GetAndUpdateRequestAsync(dto, "confirmed");
-
-                if (request == null)
-                    return new ApiResponse<bool>(false, "Charging request not found", false);
-
-                if (request.CarOwner.Id != userId)
-                    return new ApiResponse<bool>(false, "Not your request", false);
-
-                string title = "Request Confirmed ✅";
-                string body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.";
-                string notificationType = "VehicleOwner_CompleteProcessSuccessfully";
-
-                // إرسال إشعار
-                await SendNotificationAsync(request, title, body, notificationType);
-
-                // إضافة إشعار إلى قاعدة البيانات
-                await AddNotificationAsync(request, title, body, 1); // "ChargerOwner"
-
-                return new ApiResponse<bool>(true, "Charging request confirmed ", true);
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse<bool>(false, ex.Message, false);
-            }
-        }
-        public async Task<ApiResponse<bool>> AbortRequestAsync(TransRequest dto)
+        public async Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto)
         {
             try
             {
                 var userId = GetCurrentUserId();
                 if (string.IsNullOrEmpty(userId))
-                    return new ApiResponse<bool>(false, "Unauthorized", false);
+                    return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
 
-                var request = await GetAndUpdateRequestAsync(dto, "Abort");
-
+                var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Confirmed);
                 if (request == null)
-                    return new ApiResponse<bool>(false, "Charging request not found", false);
+                    return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
-                if (request.CarOwner.Id != userId)
-                    return new ApiResponse<bool>(false, "Not your request", false);
+                if (request.CarOwner?.Id != userId)
+                    return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
 
-                string title = "Request Aborted ❌";
-                string body = $"The driver {request.CarOwner.FullName} aborted the charging session at your station after payment.";
-                string notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+                var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
+                var title = "Request Confirmed ✅";
+                var body = $"The driver {request.CarOwner?.FullName} confirmed the charging session at your station.";
+                var notificationType = "VehicleOwner_CompleteProcessSuccessfully";
 
-                // إرسال إشعار
-                await SendNotificationAsync(request, title, body, notificationType);
+                var result = await SendAndPersistNotificationAsync(
+                    receiverUserId: recipientUserId!,
+                    requestId: request.Id,
+                    title: title,
+                    body: body,
+                    notificationType: notificationType,
+                    userTypeId: 1 // ChargerOwner
+                );
+                return new ApiResponse<NotificationResultDto>(result, "Charging request confirmed", true);
 
-                // إضافة إشعار إلى قاعدة البيانات
-                await AddNotificationAsync(request, title, body, 1); // "ChargerOwner"
-
-                return new ApiResponse<bool>(true, "Charging request aborted ", true);
+              
             }
             catch (Exception ex)
             {
-                return new ApiResponse<bool>(false, ex.Message, false);
+                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-
-        private async Task<ChargingRequestEntity?> GetAndUpdateRequestAsync(TransRequest dto, string newStatus)
+        public async Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto)
         {
-            var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-                            .GetAllWithIncludeAsync(
-                                r => r.Id == dto.RequestId,
-                                false,
-                                r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
-                            .FirstOrDefault();
-
-            if (request == null)
-                return null;
-
-            request.Status = newStatus;
-            request.RespondedAt = DateTime.UtcNow;
-
-            _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-            await _unitOfWork.SaveChangesAsync();
-
-            return request;
-        }
-        private async Task SendNotificationAsync(ChargingRequestEntity request, string title, string body, string notificationType)
-        {
-            var carOwnerTokens = request.CarOwner.DeviceTokens?
-                .Where(t => t.UserId == request.UserId)
-                .Select(t => t.Token)
-                .ToList();
-
-            if (carOwnerTokens != null && carOwnerTokens.Any())
+            try
             {
-                foreach (var token in carOwnerTokens)
-                {
-                    await _firebaseService.SendNotificationAsync(token, title, body, request.Id, notificationType);
-                }
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
+
+                var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Aborted);
+                if (request == null)
+                    return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
+
+                if (request.CarOwner?.Id != userId)
+                    return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
+
+                var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
+                var title = "Request Aborted ❌";
+                var body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
+                var notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+
+                var result = await SendAndPersistNotificationAsync(
+                    receiverUserId: recipientUserId!,
+                    requestId: request.Id,
+                    title: title,
+                    body: body,
+                    notificationType: notificationType,
+                    userTypeId: 1 // ChargerOwner
+                );
+                return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
+
+               
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-        private async Task AddNotificationAsync(ChargingRequestEntity request, string title, string body, int userTypeId)
-        {
-            var notification = new Notification()
-            {
-                Title = title,
-                Body = body,
-                IsRead = false,
-                SentAt = DateTime.UtcNow,
-                UserId = request.UserId,
-                RelatedRequestId = request.Id,
-                UserTypeId = userTypeId
-            };
-
-            await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
-        }
-
-        //public async Task<ApiResponse<bool>> AcceptRequestAsync(TransRequest dto)
-        //{
-        //    try
-        //    {
-        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-        //            .GetAllWithIncludeAsync(
-        //                r => r.Id == dto.RequestId,
-        //                false,
-        //                r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
-
-        //            .FirstOrDefault();
-
-        //        if (request == null)
-        //            return new ApiResponse<bool>(false, "Charging request not found", false);
-
-        //        // optional: authorize the current user if needed (station owner)
-
-        //        request.Status = "accepted";
-        //        request.RespondedAt = DateTime.UtcNow;
-
-        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-        //        await _unitOfWork.SaveChangesAsync();
-
-        //        // 🔔 Notify the car owner
-        //        var carOwnerTokens = request.CarOwner.DeviceTokens?
-        //            .Where(t => t.UserId == request.UserId)
-        //            .Select(t => t.Token)
-        //            .ToList();
-
-        //        if (carOwnerTokens != null && carOwnerTokens.Any())
-        //        {
-        //            string title = "Charging Request Accepted ";
-        //            string body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.";
-        //            string NotificationType = "ChargerOwner_AcceptRequest";
-
-        //            foreach (var token in carOwnerTokens)
-        //            {
-        //                await _firebaseService.SendNotificationAsync(token, title, body, request.Id , NotificationType);
-        //            }
-        //        }
-
-        //        var notifi = new Notification()
-        //        {
-        //            Title = "Charging Request Accepted ",
-        //            Body = $"Your request to charge at {request.Charger.User.FullName}'s station has been accepted.",
-        //            IsRead = false,
-        //            SentAt = DateTime.UtcNow,
-        //            UserId = request.UserId,
-        //            RelatedRequestId = request.Id,
-        //            UserTypeId = 2 // "VehicleOwner"
-
-
-        //            //  add new property UserSenderId
-        //        };
-
-        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
-
-
-        //        return new ApiResponse<bool>(true, "Charging request accepted and user notified", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<bool>(false, ex.Message, false);
-        //    }
-        //}
-        //public async Task<ApiResponse<bool>> RejectRequestAsync(TransRequest dto)
-        //{
-        //    try
-        //    {
-        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-        //            .GetAllWithIncludeAsync(
-        //                r => r.Id == dto.RequestId,
-        //                false,
-        //                r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include CarOwner
-        //            .FirstOrDefault();
-
-        //        if (request == null)
-        //            return new ApiResponse<bool>(false, "Charging request not found", false);
-
-        //        request.Status = "rejected";
-        //        request.RespondedAt = DateTime.UtcNow;
-
-        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-        //        await _unitOfWork.SaveChangesAsync();
-
-        //        // 🔔 Notify the car owner
-        //        var carOwnerTokens = request.CarOwner.DeviceTokens?
-        //            .Where(t => t.UserId == request.UserId)
-        //            .Select(t => t.Token)
-        //            .ToList();
-
-        //        if (carOwnerTokens != null && carOwnerTokens.Any())
-        //        {
-        //            string title = "Charging Request Rejected ❌";
-        //            string body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.";
-        //            string NotificationType = "ChargerOwner_RejectRequest";
-
-        //            foreach (var token in carOwnerTokens)
-        //            {
-        //                await _firebaseService.SendNotificationAsync(token, title, body , request.Id , NotificationType);
-        //            }
-        //        }
-        //        var notifi = new Notification()
-        //        {
-        //            Title = "Charging Request Rejected ❌",
-        //            Body = $"Your request to charge at {request.Charger.User.FullName}'s station was rejected.",
-        //            IsRead = false,
-        //            SentAt = DateTime.UtcNow,
-        //            UserId = request.UserId,
-        //            RelatedRequestId = request.Id,
-        //            UserTypeId = 2 // "VehicleOwner"
-
-        //            //  add new property UserSenderId
-        //        };
-
-        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
-
-
-        //        return new ApiResponse<bool>(true, "Charging request rejected and car owner notified", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<bool>(false, ex.Message, false);
-        //    }
-        //}
-        //public async Task<ApiResponse<bool>> ConfirmRequestAsync(TransRequest dto)
-        //{
-        //    try
-        //    {
-        //        var userId = GetCurrentUserId();
-        //        if (string.IsNullOrEmpty(userId))
-        //            return new ApiResponse<bool>(false, "Unauthorized", false);
-
-        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-        //            .GetAllWithIncludeAsync(
-        //                r => r.Id == dto.RequestId,
-        //                false,
-        //                r => r.CarOwner, r => r.Charger, r => r.Charger.User)) // include both users
-        //            .FirstOrDefault();
-
-        //        if (request == null)
-        //            return new ApiResponse<bool>(false, "Charging request not found", false);
-
-        //        if (request.CarOwner.Id != userId)
-        //            return new ApiResponse<bool>(false, "Not your request", false);
-
-        //        request.Status = "confirmed";
-        //        request.ConfirmedAt = DateTime.UtcNow;
-
-        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-        //        await _unitOfWork.SaveChangesAsync();
-
-        //        // 🔔 Notify the station owner
-        //        var stationOwnerTokens = request.Charger.User.DeviceTokens?
-        //            .Where(t => t.UserId == request.UserId)
-        //            .Select(t => t.Token)
-        //            .ToList();
-
-        //        if (stationOwnerTokens != null && stationOwnerTokens.Any())
-        //        {
-        //            string title = "Request Confirmed ✅";
-        //            string body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.";
-        //            string NotificationType = "VehicleOwner_CompleteProcessSuccessfully";
-
-        //            foreach (var token in stationOwnerTokens)
-        //            {
-        //                await _firebaseService.SendNotificationAsync(token, title, body , request.Id , NotificationType);
-        //            }
-        //        }
-        //        var notifi = new Notification()
-        //        {
-        //            Title = "Request Confirmed ✅",
-        //            Body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.",
-        //            IsRead = false,
-        //            SentAt = DateTime.UtcNow,
-        //            UserId = request.UserId,
-        //            RelatedRequestId = request.Id,
-        //            UserTypeId = 1 // "ChargerOwner"
-
-
-        //            //  add new property UserSenderId
-        //        };
-
-        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
-
-
-        //        return new ApiResponse<bool>(true, "Charging request confirmed and station owner notified", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<bool>(false, ex.Message, false);
-        //    }
-        //}
-        //public async Task<ApiResponse<bool>> AbortRequestAsync(TransRequest dto)
-        //{
-        //    try
-        //    {
-        //        var userId = GetCurrentUserId();
-        //        if (string.IsNullOrEmpty(userId))
-        //            return new ApiResponse<bool>(false, "Unauthorized", false);
-
-        //        var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
-        //            .GetAllWithIncludeAsync(
-        //                r => r.Id == dto.RequestId,
-        //                false,
-        //                r => r.CarOwner, r => r.Charger, r => r.Charger.User)) // include both users
-        //            .FirstOrDefault();
-
-        //        if (request == null)
-        //            return new ApiResponse<bool>(false, "Charging request not found", false);
-
-        //        if (request.CarOwner.Id != userId)
-        //            return new ApiResponse<bool>(false, "Not your request", false);
-
-        //        request.Status = "Abort";
-        //        request.ConfirmedAt = DateTime.UtcNow;
-
-        //        _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
-        //        await _unitOfWork.SaveChangesAsync();
-
-        //        // 🔔 Notify the station owner
-        //        var stationOwnerTokens = request.Charger.User.DeviceTokens?
-        //            .Where(t => t.UserId == request.UserId)
-        //            .Select(t => t.Token)
-        //            .ToList();
-
-        //        if (stationOwnerTokens != null && stationOwnerTokens.Any())
-        //        {
-        //            string title = "Request Confirmed ✅";
-        //            string body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.";
-        //            string NotificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
-
-        //            foreach (var token in stationOwnerTokens)
-        //            {
-        //                await _firebaseService.SendNotificationAsync(token, title, body, request.Id, NotificationType);
-        //            }
-        //        }
-        //        var notifi = new Notification()
-        //        {
-        //            Title = "Request Confirmed ✅",
-        //            Body = $"The driver {request.CarOwner.FullName} confirmed the charging session at your station.",
-        //            IsRead = false,
-        //            SentAt = DateTime.UtcNow,
-        //            UserId = request.UserId,
-        //            RelatedRequestId = request.Id,
-        //            UserTypeId = 1 // "ChargerOwner"
-
-
-        //            //  add new property UserSenderId
-        //        };
-
-        //        await _unitOfWork.GetRepository<Notification, int>().AddAsync(notifi);
-
-
-        //        return new ApiResponse<bool>(true, "Charging request confirmed and station owner notified", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<bool>(false, ex.Message, false);
-        //    }
-        //}
 
         public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
         {
@@ -549,7 +261,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     ? $"{request.Charger.PriceOption.Value} EGP/hour"
                     : "N/A";
 
-              
+
 
                 var vehicles = await _vehicleService.GetVehiclesByUserIdAsync();
 
@@ -583,6 +295,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     RequestedAt = request.RequestedAt,
                     CarOwnerId = request.CarOwner.Id,
                     KwNeeded = request.KwNeeded,
+                    CurrentBatteryPercentage = request.CurrentBatteryPercentage,
                     CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
 
                     // إضافة معلومات السيارة باستخدام VehicleDto
@@ -597,7 +310,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
                     PricePerHour = request.Charger.PriceOption != null
-                ? $"{request.Charger.PriceOption.Value} EGP": "N/A",
+                ? $"{request.Charger.PriceOption.Value} EGP" : "N/A",
                     AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
                     ChargerArea = request.Charger.Address?.Area ?? "N/A",
                     ChargerStreet = request.Charger.Address?.Street ?? "N/A",
@@ -671,12 +384,102 @@ namespace Voltyks.Application.Services.ChargingRequest
         }
 
 
+        private async Task<ChargingRequestEntity?> GetAndUpdateRequestAsync(TransRequest dto, string newStatus)
+        {
+            var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
+                            .GetAllWithIncludeAsync(
+                                r => r.Id == dto.RequestId,
+                                false,
+                                r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
+                            .FirstOrDefault();
+
+            if (request == null)
+                return null;
+
+            request.Status = newStatus;
+            request.RespondedAt = DateTime.UtcNow;
+
+            _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
+            await _unitOfWork.SaveChangesAsync();
+
+            return request;
+        }
+        private async Task<Notification> AddNotificationAsync(
+            string receiverUserId,
+            int relatedRequestId,
+            string title,
+            string body,
+            int userTypeId // 1 = ChargerOwner, 2 = VehicleOwner
+        )
+        {
+            var notification = new Notification
+            {
+                Title = title,
+                Body = body,
+                IsRead = false,
+                SentAt = DateTime.UtcNow,
+                UserId = receiverUserId,
+                RelatedRequestId = relatedRequestId,
+                UserTypeId = userTypeId
+            };
+
+            await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
+            await _unitOfWork.SaveChangesAsync(); // مهم
+
+            return notification;
+        }
+        private async Task<NotificationResultDto> SendAndPersistNotificationAsync(
+        string receiverUserId,
+        int requestId,
+        string title,
+        string body,
+        string notificationType,
+        int userTypeId
+    )
+        {
+            if (string.IsNullOrWhiteSpace(receiverUserId))
+                throw new ArgumentException("receiverUserId is required", nameof(receiverUserId));
+
+            var tokens = await GetDeviceTokens(receiverUserId) ?? new List<string>();
+
+            // إرسال متوازي أسرع + أهدى
+            if (tokens.Count > 0)
+            {
+                await System.Threading.Tasks.Task.WhenAll(tokens.Select(t =>
+                    _firebaseService.SendNotificationAsync(t, title, body, requestId, notificationType)
+                ));
+            }
+
+            var notification = await AddNotificationAsync(
+                receiverUserId: receiverUserId,
+                relatedRequestId: requestId,
+                title: title,
+                body: body,
+                userTypeId: userTypeId
+            );
+
+            return new NotificationResultDto(
+                NotificationId: notification.Id,
+                RequestId: requestId,
+                RecipientUserId: receiverUserId,
+                Title: title,
+                Body: body,
+                NotificationType: notificationType,
+                SentAt: notification.SentAt,
+                PushSentCount: tokens.Count
+            );
+        }
+
+
+
+
+
         // SendChargingRequestAsync ===> Helper Private Mehtods
         private async Task<Charger?> GetChargerWithIncludes(int chargerId)
         {
             return (await _unitOfWork.GetRepository<Charger, int>()
                 .GetAllWithIncludeAsync(
-                    c => c.Id == chargerId,
+                    c => c.Id == chargerId && c.IsActive == true,
                     false,
                     c => c.Address,
                     c => c.Protocol,
@@ -685,7 +488,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     c => c.User))
                 .FirstOrDefault();
         }
-        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded )
+        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage)
         {
             var request = new ChargingRequestEntity
             {
@@ -693,7 +496,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                 ChargerId = chargerId,
                 RequestedAt = DateTime.UtcNow,
                 Status = "pending",
-                KwNeeded = KwNeeded
+                KwNeeded = KwNeeded,
+                CurrentBatteryPercentage = CurrentBatteryPercentage
+                
             };
 
             await _unitOfWork.GetRepository<ChargingRequestEntity, int>().AddAsync(request);
@@ -707,54 +512,139 @@ namespace Voltyks.Application.Services.ChargingRequest
                 .GetAllAsync(t => t.UserId == userId);
             return tokens.Select(t => t.Token).ToList();
         }
-        private async Task SendFcmNotifications(List<string> tokens, string title, string body , int chargingRequestID , string NotificationType)
-        {
-            foreach (var token in tokens)
-            {
-                await _firebaseService.SendNotificationAsync(token, title, body , chargingRequestID , NotificationType);
-            }
-        }
-        private async Task CreateNotification(string receiverUserId, string senderUserId, int relatedRequestId)
-        {
-            var notification = new Notification
-            {
-                Title = "New Charging Request 🚗",
-                Body = $"Driver {senderUserId} requested to charge at your station.",
-                IsRead = false,
-                SentAt = DateTime.UtcNow,
-                UserId = receiverUserId,
-                RelatedRequestId = relatedRequestId,
-                UserTypeId = 1 // ChargerOwner
-            };
+  
 
-            await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-
-        // RegisterDeviceTokenAsync ===> Helper Private Mehtods
-        private async Task<bool> CheckIfTokenExists(string token, string userId)
-        {
-            var existing = await _unitOfWork.GetRepository<DeviceToken, int>()
-                .GetFirstOrDefaultAsync(t => t.Token == token && t.UserId == userId);
-            return existing != null;
-        }
-        private async Task SaveNewDeviceToken(string token, string userId)
-        {
-            var newToken = new DeviceToken
-            {
-                Token = token,
-                UserId = userId,
-                RoleContext = "Owner", // ثابت حاليًا
-                RegisteredAt = DateTime.UtcNow
-            };
-
-            await _unitOfWork.GetRepository<DeviceToken, int>().AddAsync(newToken);
-            await _unitOfWork.SaveChangesAsync();
-        }
+        // RegisterDeviceTokenAsync ===> Helper Private Mehtods 
         private string? GetCurrentUserId()
         {
             return _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+        private async Task<bool> SaveOrUpdateDeviceTokenAsync(string token, string userId)
+        {
+            var repo = _unitOfWork.GetRepository<DeviceToken, int>();
+
+            // 1) امسح كل التوكنات القديمة للمستخدم
+            var oldTokens = await repo.GetAllAsync(t => t.UserId == userId && t.Token != token);
+            foreach (var ot in oldTokens)
+                repo.Delete(ot);
+
+            // 2) شوف لو التوكن ده موجود أصلًا
+            var existing = await repo.GetFirstOrDefaultAsync(t => t.Token == token);
+
+            if (existing != null)
+            {
+                // Update + ربطه بالمستخدم الحالي
+                if (existing.UserId != userId)
+                    existing.UserId = userId;
+
+                existing.RegisteredAt = DateTime.UtcNow;
+                repo.Update(existing);
+            }
+            else
+            {
+                // Add جديد
+                await repo.AddAsync(new DeviceToken
+                {
+                    Token = token,
+                    UserId = userId,
+                    RoleContext = "Owner",
+                    RegisteredAt = DateTime.UtcNow,
+                });
+            }
+
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                // معالجة سباق الكتابة
+                var again = await repo.GetFirstOrDefaultAsync(t => t.Token == token);
+                if (again == null) throw;
+
+                if (again.UserId != userId)
+                    again.UserId = userId;
+
+                again.RegisteredAt = DateTime.UtcNow;
+                repo.Update(again);
+                await _unitOfWork.SaveChangesAsync();
+                return true;
+            }
+        }
+
+        // لو عايز المستخدم يكون ليه اكتر من Token
+
+        //private async Task<bool> SaveOrUpdateDeviceTokenAsync(string token, string userId)
+        //{
+        //    var repo = _unitOfWork.GetRepository<DeviceToken, int>();
+
+        //    var existing = await repo.GetFirstOrDefaultAsync(t => t.Token == token /* trackChanges=false by default */);
+
+        //    if (existing != null)
+        //    {
+        //        // إديمبوتنت: لو التعيين كما هو، اكتفي بتحديث الطابع الزمني
+        //        if (existing.UserId != userId)
+        //            existing.UserId = userId;
+
+        //        existing.RegisteredAt = DateTime.UtcNow;
+
+        //        // لو عندك أعمدة حالة، أعد التفعيل
+        //        // existing.IsActive = true;
+        //        // existing.IsRevoked = false;
+        //        // existing.LastSeenAt = DateTime.UtcNow; // لو موجود
+
+        //        // Update عبر الـ Repo (هيعلم Modified)
+        //        repo.Update(existing);
+        //    }
+        //    else
+        //    {
+        //        await repo.AddAsync(new DeviceToken
+        //        {
+        //            Token = token,
+        //            UserId = userId,
+        //            RoleContext = "Owner",
+        //            RegisteredAt = DateTime.UtcNow,
+        //            // IsActive = true,
+        //            // IsRevoked = false,
+        //            // LastSeenAt = DateTime.UtcNow
+        //            // Platform = tokenDto.Platform, DeviceId = tokenDto.DeviceId ... (لو متاح)
+        //        });
+        //    }
+
+        //    try
+        //    {
+        //        await _unitOfWork.SaveChangesAsync();
+        //        return true;
+        //    }
+        //    catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        //    {
+        //        // في حالة وجود Unique Index وحدوث سباق
+        //        var again = await repo.GetFirstOrDefaultAsync(t => t.Token == token);
+        //        if (again == null) throw;
+
+        //        if (again.UserId != userId)
+        //            again.UserId = userId;
+
+        //        again.RegisteredAt = DateTime.UtcNow;
+        //        // again.IsActive = true;
+        //        // again.IsRevoked = false;
+        //        // again.LastSeenAt = DateTime.UtcNow;
+
+        //        repo.Update(again);
+        //        await _unitOfWork.SaveChangesAsync();
+        //        return true;
+        //    }
+        //}
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+        {
+            if (ex?.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+                return true;
+
+            if (ex?.InnerException?.InnerException is SqlException deepSqlEx && (deepSqlEx.Number == 2601 || deepSqlEx.Number == 2627))
+                return true;
+
+            return false;
         }
 
 
@@ -776,6 +666,7 @@ namespace Voltyks.Application.Services.ChargingRequest
         }
         private double DegreesToRadians(double deg) => deg * (Math.PI / 180);
 
+
         // GetRequestDetailsAsync ===> Helper Private Mehtods
         private async Task<ChargingRequestEntity?> GetRequestWithDetailsAsync(int requestId)
         {
@@ -793,41 +684,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 )).FirstOrDefault();
         }
 
-
-        //private ChargingRequestDetailsDto MapToDto(ChargingRequestEntity request)
-        //{
-        //    return new ChargingRequestDetailsDto
-        //    {
-        //        RequestId = request.Id,
-        //        Status = request.Status,
-        //        RequestedAt = request.RequestedAt,
-        //        RespondedAt = request.RespondedAt,
-        //        ConfirmedAt = request.ConfirmedAt,
-
-        //        CarOwnerId = request.CarOwner.Id,
-        //        CarOwnerName = request.CarOwner.FullName,
-
-        //        StationOwnerId = request.Charger.User.Id,
-        //        StationOwnerName = request.Charger.User.FullName,
-
-        //        ChargerId = request.ChargerId,
-        //        Protocol = request.Charger.Protocol?.Name ?? "Unknown",
-        //        CapacityKw = request.Charger.Capacity?.kw ?? 0,
-        //        PricePerHour = request.Charger.PriceOption != null
-        //            ? $"{request.Charger.PriceOption.Value} EGP"
-        //            : "N/A",
-        //        AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
-
-        //        Area = request.Charger.Address?.Area ?? "N/A",
-        //        Street = request.Charger.Address?.Street ?? "N/A",
-
-        //        Rating = request.Charger.AverageRating,
-        //        RatingCount = request.Charger.RatingCount,
-
-        //        EstimatedArrival = "N/A",
-        //        EstimatedPrice = "Estimated"
-        //    };
-        //}
+     
     }
 
 
