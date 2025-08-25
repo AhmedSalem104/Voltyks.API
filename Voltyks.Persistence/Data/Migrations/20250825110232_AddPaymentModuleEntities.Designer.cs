@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Voltyks.Persistence.Data;
 
@@ -11,9 +12,11 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    partial class VoltyksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250825110232_AddPaymentModuleEntities")]
+    partial class AddPaymentModuleEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -663,9 +666,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<string>("GatewayResponseMessage")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("HmacVerified")
-                        .HasColumnType("bit");
-
                     b.Property<string>("IntegrationType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -724,9 +724,6 @@ namespace Voltyks.Persistence.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<bool>("IsHmacValid")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsValid")
                         .HasColumnType("bit");
 
                     b.Property<string>("MerchantOrderId")

@@ -10,23 +10,12 @@ using Voltyks.Core.DTOs.Paymob.Generic_Result_DTOs;
 using Voltyks.Core.DTOs.Paymob.Input_DTOs;
 using Voltyks.Core.DTOs.Paymob.Options;
 using Voltyks.Persistence.Entities.Main.Paymob;
+using Voltyks.Infrastructure.UnitOfWork;
+using Voltyks.Infrastructure;
+using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 namespace Voltyks.Application.Services.Paymob
 {
-
-
-
-
-    using System.Net.Http.Json;
-    using System.Security.Cryptography;
-    using System.Text;
-    using Microsoft.Extensions.Logging;
-    using Microsoft.Extensions.Options;
-    using Voltyks.Infrastructure.UnitOfWork;
-    using Voltyks.Infrastructure;
-
-    // using Voltyks.Infrastructure.UnitOfWork;           // IUnitOfWork
-    // using Voltyks.Infrastructure.Interfaces;           // IGenericRepository<,>
-    // using Voltyks.Domain.Entities.Payments;            // PaymentOrder, PaymentTransaction, WebhookLog, PaymentAction
 
     public class PaymobService : IPaymobService
     {
@@ -305,6 +294,117 @@ namespace Voltyks.Application.Services.Paymob
         }
 
 
+        public async Task<bool> HandleWebhookAsync(HttpRequest req, string rawBody)
+        {
+            // 1) Parse the webhook data into a dictionary
+            var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+            // A) Handle query parameters (Paymob sends them via GET in the URL)
+            foreach (var kv in req.Query)
+                fields[kv.Key] = kv.Value.ToString();
+
+            // B) Handle the form data (Paymob sends it as form data or JSON payload)
+            try
+            {
+                if (req.HasFormContentType)
+                {
+                    var form = await req.ReadFormAsync();
+                    foreach (var kv in form)
+                        fields[kv.Key] = kv.Value.ToString();
+                }
+                else
+                {
+                    // If it's JSON (usually happens for some callbacks), parse it
+                    if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
+                    {
+                        using var doc = JsonDocument.Parse(rawBody);
+                        void Walk(string prefix, JsonElement el)
+                        {
+                            switch (el.ValueKind)
+                            {
+                                case JsonValueKind.Object:
+                                    foreach (var p in el.EnumerateObject())
+                                        Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
+                                    break;
+                                case JsonValueKind.Array:
+                                    fields[prefix] = el.ToString();
+                                    break;
+                                default:
+                                    fields[prefix] = el.ToString();
+                                    break;
+                            }
+                        }
+                        Walk("", doc.RootElement);
+                    }
+                }
+            }
+            catch { /* ignore parsing issues */ }
+
+            // 2) Verify HMAC (using the provided HMAC secret)
+            bool valid = false;
+            try { valid = VerifyHmacSha512(fields); }
+            catch { valid = false; }
+
+            // 3) Log the webhook (valid or invalid)
+            await WebhookRepo.AddAsync(new WebhookLog
+            {
+                RawPayload = rawBody,                                      // Store the raw data received from Paymob
+                EventType = valid ? "Processed" : "Failure",                // "Processed" if valid, "Failure" if invalid
+                MerchantOrderId = fields.GetValueOrDefault("merchant_order_id"),
+                PaymobOrderId = long.TryParse(fields.GetValueOrDefault("order.id"), out var paymobOrderId) ? paymobOrderId : (long?)null,
+                PaymobTransactionId = long.TryParse(fields.GetValueOrDefault("id"), out var paymobTxId) ? paymobTxId : (long?)null,
+                IsHmacValid = valid,                                        // True if HMAC is valid
+                HttpStatus = 200,                                           // Example HTTP Status (200 OK)
+                HeadersJson = req.Headers.ToString(),                       // Store the headers as JSON (optional)
+                ReceivedAt = DateTime.UtcNow,                                // Timestamp of webhook reception
+                IsValid = valid                                              // Final validation flag
+            });
+            await _uow.SaveChangesAsync();
+
+            if (!valid)
+                return false;
+
+            // 4) Extract important fields for transaction and order update
+            paymobTxId = TryParseLong(fields, "id");
+            paymobOrderId = TryParseLong(fields, "order.id");
+            string? merchantOrderId = fields.TryGetValue("merchant_order_id", out var mo) ? mo : null;
+
+            bool success = TryParseBool(fields, "success");
+            bool pending = TryParseBool(fields, "pending");
+
+            long amountCents = TryParseLong(fields, "amount_cents");
+            string currency = fields.TryGetValue("currency", out var cur) ? cur ?? _opt.Currency : _opt.Currency;
+
+            // 5) Update the payment transaction (if PaymobTransactionId is available)
+            if (paymobTxId > 0)
+            {
+                await UpdateTransactionByPaymobIdAsync(paymobTxId, tx =>
+                {
+                    tx.PaymobOrderId = (tx.PaymobOrderId is null || tx.PaymobOrderId == 0) ? paymobOrderId : tx.PaymobOrderId;
+                    tx.MerchantOrderId = tx.MerchantOrderId ?? merchantOrderId;
+                    if (amountCents > 0) tx.AmountCents = amountCents;
+                    tx.Currency = currency;
+                    tx.IsSuccess = success;
+                    tx.Status = success ? "Paid" : (pending ? "Pending" : "Failed");
+                    tx.HmacVerified = true;
+                });
+            }
+
+            // 6) Update the order status (if merchantOrderId is available)
+            if (!string.IsNullOrWhiteSpace(merchantOrderId))
+            {
+                await UpdateOrderStatusAsync(merchantOrderId, success ? "Paid" : (pending ? "Pending" : "Failed"));
+            }
+
+            return true;
+        }
+
+        // Helper functions for parsing
+        static long TryParseLong(IDictionary<string, string?> d, string k)
+            => (d.TryGetValue(k, out var v) && long.TryParse(v, out var n)) ? n : 0L;
+
+        static bool TryParseBool(IDictionary<string, string?> d, string k)
+            => (d.TryGetValue(k, out var v) && bool.TryParse(v, out var b)) ? b : string.Equals(v, "true", StringComparison.OrdinalIgnoreCase);
 
 
 
@@ -314,6 +414,51 @@ namespace Voltyks.Application.Services.Paymob
 
 
         // ============== Helpers (Repository-based) ==============
+        private bool VerifyHmacSha512(IDictionary<string, string?> fields)
+{
+    // ترتيب الحقول كما هو موضح في مستندات Paymob (حاول عدم تغييره)
+    string[] orderedKeys = new[]
+    {
+        "amount_cents",
+        "created_at",
+        "currency",
+        "error_occured",
+        "has_parent_transaction",
+        "id",
+        "integration_id",
+        "is_3d_secure",
+        "is_auth",
+        "is_capture",
+        "is_refunded",
+        "is_standalone_payment",
+        "is_voided",
+        "order.id",
+        "owner",
+        "pending",
+        "source_data.pan",
+        "source_data.sub_type",
+        "source_data.type",
+        "success"
+    };
+
+    // بناء السلسلة النصية باستخدام القيم في الـ fields حسب الترتيب
+    var sb = new StringBuilder();
+    foreach (var k in orderedKeys)
+        sb.Append(fields.TryGetValue(k, out var v) ? v ?? "" : "");
+
+    // حساب HMAC باستخدام SHA512
+    var secret = _opt.HmacSecret ?? throw new InvalidOperationException("HMAC secret not set");
+    using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(secret));
+    var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
+    var hex = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+
+    var received = (fields.TryGetValue("hmac", out var hv) ? hv : "")?.ToLowerInvariant() ?? "";
+    return CryptographicOperations.FixedTimeEquals(
+        Encoding.UTF8.GetBytes(hex),
+        Encoding.UTF8.GetBytes(received)
+    );
+}
+
         private async Task<PaymentOrder> UpsertOrderAsync(string merchantOrderId, long amountCents, string currency)
         {
             var order = await OrdersRepo.GetFirstOrDefaultAsync(o => o.MerchantOrderId == merchantOrderId, trackChanges: true);

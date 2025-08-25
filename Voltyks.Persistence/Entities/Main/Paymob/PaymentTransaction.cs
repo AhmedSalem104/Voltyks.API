@@ -24,7 +24,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public string? CardBrand { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
-
+        public bool HmacVerified { get; set; }                           // تحقق من صحة HMAC
         public PaymentOrder Order { get; set; } = default!;
     }
 }

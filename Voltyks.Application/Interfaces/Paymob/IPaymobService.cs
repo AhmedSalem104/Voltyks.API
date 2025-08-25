@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 namespace Voltyks.Application.Interfaces.Paymob
 {
     using System.Threading.Tasks;
+    using Microsoft.AspNetCore.Http;
     using Voltyks.Core.DTOs.Paymob.Generic_Result_DTOs;
     using Voltyks.Core.DTOs.Paymob.Input_DTOs;
 
@@ -41,6 +42,9 @@ namespace Voltyks.Application.Interfaces.Paymob
 
         // 10) Capture
         Task<PayActionRes> CaptureAsync(CaptureDto dto);
+
+        // 11) Webhook Handler (لتعامل مع Webhooks من Paymob)
+        Task<bool> HandleWebhookAsync(HttpRequest req, string rawBody);
     }
 
 }

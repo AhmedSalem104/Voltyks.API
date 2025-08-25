@@ -32,11 +32,11 @@ namespace Voltyks.Persistence.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<UserType> UserTypes { get; set; }
 
-        //// Paymob 
-        //public DbSet<PaymentOrder> PaymentOrders => Set<PaymentOrder>();
-        //public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
-        //public DbSet<WebhookLog> WebhookLogs => Set<WebhookLog>();
-        //public DbSet<PaymentAction> PaymentActions => Set<PaymentAction>();
+        // Paymob 
+        public DbSet<PaymentOrder> PaymentOrders => Set<PaymentOrder>();
+        public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+        public DbSet<WebhookLog> WebhookLogs => Set<WebhookLog>();
+        public DbSet<PaymentAction> PaymentActions => Set<PaymentAction>();
 
 
     }

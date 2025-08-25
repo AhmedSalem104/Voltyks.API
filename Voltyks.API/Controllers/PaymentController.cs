@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Voltyks.Application.Interfaces.Paymob;
@@ -107,6 +108,23 @@ namespace Voltyks.API.Controllers
             var res = await _svc.CaptureAsync(dto);
             return Ok(res);
         }
+
+        [HttpPost("webhook")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Webhook()
+        {
+            // Get raw body content from request
+            string rawBody;
+            using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
+                rawBody = await reader.ReadToEndAsync();
+
+            // Pass the raw body content to the service for processing
+            var result = await _svc.HandleWebhookAsync(Request, rawBody);
+
+            // Always return 200 OK to avoid re-sending the webhook
+            return Ok(result ? "OK" : "INVALID_HMAC");
+        }
+
     }
 
 
