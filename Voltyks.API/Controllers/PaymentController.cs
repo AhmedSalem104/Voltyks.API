@@ -113,16 +113,16 @@ namespace Voltyks.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Webhook()
         {
-            // Get raw body content from request
+            // read raw body once
             string rawBody;
             using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
                 rawBody = await reader.ReadToEndAsync();
 
-            // Pass the raw body content to the service for processing
-            var result = await _svc.HandleWebhookAsync(Request, rawBody);
+            var resp = await _svc.HandleWebhookAsync(Request, rawBody);
 
-            // Always return 200 OK to avoid re-sending the webhook
-            return Ok(result ? "OK" : "INVALID_HMAC");
+            // نرجّع 200 دايمًا عشان Paymob مايعيدش الإرسال
+            // لو حابب تشوف الاستجابة الموحّدة، بص على resp (ApiResponse<bool>)
+            return Ok(resp.Status ? "OK" : "INVALID_HMAC");
         }
 
     }

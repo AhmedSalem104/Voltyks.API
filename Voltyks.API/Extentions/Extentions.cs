@@ -196,6 +196,9 @@ namespace Voltyks.API.Extentions
             // إضافة وحدة العمل (UnitOfWork)
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+            services.AddHttpClient("paymob"); // تقدر تضيف BaseAddress لو تحب
+            services.AddSingleton<IPaymobAuthTokenProvider, PaymobAuthTokenProviderRedis>();
+
             services.AddScoped<IVehicleService, VehicleService>();
             services.AddScoped<IPaymobService, PaymobService>();
 

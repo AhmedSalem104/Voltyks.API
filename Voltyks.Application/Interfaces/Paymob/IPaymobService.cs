@@ -8,43 +8,24 @@ namespace Voltyks.Application.Interfaces.Paymob
 {
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Http;
+    using Voltyks.Core.DTOs;
     using Voltyks.Core.DTOs.Paymob.Generic_Result_DTOs;
     using Voltyks.Core.DTOs.Paymob.Input_DTOs;
 
     public interface IPaymobService
     {
-        // 1) استرجاع Auth Token
-        Task<string> GetAuthTokenAsync();
-
-        // 2) Create Order
-        Task<int> CreateOrderAsync(CreateOrderDto dto);
-
-        // 3) Create Payment Key
-        Task<string> CreatePaymentKeyAsync(CreatePaymentKeyDto dto);
-
-        // 4) بناء رابط iFrame للبطاقات
-        string BuildCardIframeUrl(string paymentKey);
-
-        // 5) دفع المحافظ
-        Task<PayActionRes> PayWithWalletAsync(WalletPaymentDto dto);
-
-        // 6) التحقق من HMAC
-        bool VerifyHmac(HmacVerifyDto dto);
-
-        // 7) Inquiry
-        Task<InquiryRes> InquiryAsync(InquiryDto dto);
-
-        // 8) Refund
-        Task<PayActionRes> RefundAsync(RefundDto dto);
-
-        // 9) Void
-        Task<PayActionRes> VoidAsync(VoidDto dto);
-
-        // 10) Capture
-        Task<PayActionRes> CaptureAsync(CaptureDto dto);
-
-        // 11) Webhook Handler (لتعامل مع Webhooks من Paymob)
-        Task<bool> HandleWebhookAsync(HttpRequest req, string rawBody);
+        Task<ApiResponse<string>> GetAuthTokenAsync();
+        Task<ApiResponse<int>> CreateOrderAsync(CreateOrderDto dto);
+        Task<ApiResponse<string>> CreatePaymentKeyAsync(CreatePaymentKeyDto dto);
+        ApiResponse<string> BuildCardIframeUrl(string paymentKey);
+        Task<ApiResponse<PayActionRes>> PayWithWalletAsync(WalletPaymentDto dto);
+        ApiResponse<bool> VerifyHmac(HmacVerifyDto dto);
+        Task<ApiResponse<InquiryRes>> InquiryAsync(InquiryDto dto);
+        Task<ApiResponse<PayActionRes>> RefundAsync(RefundDto dto);
+        Task<ApiResponse<PayActionRes>> VoidAsync(VoidDto dto);
+        Task<ApiResponse<PayActionRes>> CaptureAsync(CaptureDto dto);
+        Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody);
     }
+
 
 }

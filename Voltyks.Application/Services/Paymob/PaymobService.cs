@@ -14,6 +14,7 @@ using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using System.Text.Json;
+using Voltyks.Core.DTOs;
 namespace Voltyks.Application.Services.Paymob
 {
 
@@ -23,6 +24,8 @@ namespace Voltyks.Application.Services.Paymob
         private readonly PaymobOptions _opt;
         private readonly IUnitOfWork _uow;
         private readonly ILogger<PaymobService> _log;
+        private readonly IPaymobAuthTokenProvider _tokenProvider;
+
 
         // NOTE: غيّري نوع المفتاح TKey لو الكيان عندك مفتاحه مش int
         private IGenericRepository<PaymentOrder, int> OrdersRepo
@@ -41,46 +44,45 @@ namespace Voltyks.Application.Services.Paymob
             HttpClient http,
             IOptions<PaymobOptions> opt,
             IUnitOfWork uow,
-            ILogger<PaymobService> log)
+            ILogger<PaymobService> log,
+             IPaymobAuthTokenProvider tokenProvider)
         {
             _http = http;
             _opt = opt.Value;
             _uow = uow;
             _log = log;
+            _tokenProvider = tokenProvider;
+            
         }
 
-       
-        // ============== 1) Auth ==============
-        public async Task<string> GetAuthTokenAsync()
+
+
+
+        // 1) Auth
+        public async Task<ApiResponse<string>> GetAuthTokenAsync()
         {
             var res = await _http.PostAsJsonAsync($"{_opt.ApiBase}/auth/tokens", new PaymobAuthReq(_opt.ApiKey));
             res.EnsureSuccessStatusCode();
             var data = await res.Content.ReadFromJsonAsync<PaymobAuthRes>();
-            return data!.token;
+            return new ApiResponse<string> { Status = true, Message = "Token issued", Data = data!.token };
         }
 
-        // ============== 2) Create Order ==============
-        public async Task<int> CreateOrderAsync(CreateOrderDto dto)
+        // 2) Create Order
+        public async Task<ApiResponse<int>> CreateOrderAsync(CreateOrderDto dto)
         {
+            var auth = string.IsNullOrWhiteSpace(dto.AuthToken) ? await _tokenProvider.GetAsync() : dto.AuthToken;
             var currency = dto.Currency ?? _opt.Currency;
 
-            // Upsert محلي
             await UpsertOrderAsync(dto.MerchantOrderId, dto.AmountCents, currency);
 
-            // اتصال Paymob
-            var body = new PaymobOrderReq(
-                auth_token: dto.AuthToken,
-                amount_cents: dto.AmountCents,
-                currency: currency,
-                merchant_order_id: dto.MerchantOrderId,
-                items: Array.Empty<object>());
+            var body = new PaymobOrderReq(auth_token: auth, amount_cents: dto.AmountCents, currency: currency,
+                                          merchant_order_id: dto.MerchantOrderId, items: Array.Empty<object>());
 
             var res = await _http.PostAsJsonAsync($"{_opt.ApiBase}/ecommerce/orders", body);
             res.EnsureSuccessStatusCode();
             var data = await res.Content.ReadFromJsonAsync<PaymobOrderRes>();
             var paymobOrderId = data!.id;
 
-            // تحديث محلي
             var order = await OrdersRepo.GetFirstOrDefaultAsync(o => o.MerchantOrderId == dto.MerchantOrderId, trackChanges: true);
             if (order != null)
             {
@@ -91,29 +93,24 @@ namespace Voltyks.Application.Services.Paymob
                 await _uow.SaveChangesAsync();
             }
 
-            return paymobOrderId;
+            return new ApiResponse<int> { Status = true, Message = "Order created", Data = paymobOrderId };
         }
 
-        // ============== 3) Payment Key ==============
-        public async Task<string> CreatePaymentKeyAsync(CreatePaymentKeyDto dto)
+        // 3) Create Payment Key
+        public async Task<ApiResponse<string>> CreatePaymentKeyAsync(CreatePaymentKeyDto dto)
         {
+            var auth = string.IsNullOrWhiteSpace(dto.AuthToken) ? await _tokenProvider.GetAsync() : dto.AuthToken;
             var currency = dto.Currency ?? _opt.Currency;
 
-            var body = new PaymobPaymentKeyReq(
-                auth_token: dto.AuthToken,
-                amount_cents: dto.AmountCents,
-                expiration: dto.ExpirationSeconds,
-                order_id: dto.OrderId,
-                billing_data: dto.Billing,
-                currency: currency,
-                integration_id: dto.IntegrationId);
+            var body = new PaymobPaymentKeyReq(auth_token: auth, amount_cents: dto.AmountCents, expiration: dto.ExpirationSeconds,
+                                               order_id: dto.OrderId, billing_data: dto.Billing, currency: currency,
+                                               integration_id: dto.IntegrationId);
 
             var res = await _http.PostAsJsonAsync($"{_opt.ApiBase}/acceptance/payment_keys", body);
             res.EnsureSuccessStatusCode();
             var data = await res.Content.ReadFromJsonAsync<PaymobPaymentKeyRes>();
             var paymentKey = data!.token;
 
-            // تحديث حالة الطلب + إنشاء محاولة معاملة
             var order = await OrdersRepo.GetFirstOrDefaultAsync(o => o.PaymobOrderId == dto.OrderId, trackChanges: true);
             if (order != null)
             {
@@ -132,44 +129,65 @@ namespace Voltyks.Application.Services.Paymob
                     isSuccess: false);
             }
 
-            return paymentKey;
+            return new ApiResponse<string> { Status = true, Message = "Payment key created", Data = paymentKey };
         }
 
-        // ============== 4) iFrame URL ==============
-        public string BuildCardIframeUrl(string paymentKey)
-            => $"https://accept.paymob.com/api/acceptance/iframes/{_opt.IFrameId}?payment_token={paymentKey}";
-
-        // ============== 5) Wallet Pay ==============
-        public async Task<PayActionRes> PayWithWalletAsync(WalletPaymentDto dto)
+        // 4) iFrame URL
+        public ApiResponse<string> BuildCardIframeUrl(string paymentKey)
         {
+            var url = $"https://accept.paymob.com/api/acceptance/iframes/{_opt.IFrameId}?payment_token={paymentKey}";
+            return new ApiResponse<string> { Status = true, Message = "iFrame URL ready", Data = url };
+        }
+
+        // 5) Wallet Pay
+        public async Task<ApiResponse<PayActionRes>> PayWithWalletAsync(WalletPaymentDto dto)
+        {
+
             var req = new WalletPayReq("WALLET", dto.PaymentToken, _opt.Integration.Wallet, dto.WalletPhone);
             var res = await _http.PostAsJsonAsync($"{_opt.ApiBase}/acceptance/payments/pay", req);
 
             object? payload = res.IsSuccessStatusCode
                 ? await res.Content.ReadFromJsonAsync<object>()
                 : await res.Content.ReadAsStringAsync();
-
-            // لو قدرتي تستخرجي transaction_id من payload، نادِ UpdateTransactionByPaymobIdAsync هنا
-            return new PayActionRes(res.IsSuccessStatusCode, payload);
+            var success = res.IsSuccessStatusCode;
+            var result = new PayActionRes(success, payload);
+            return new ApiResponse<PayActionRes>
+            {
+                 
+                Status = success,
+                Message = success ? "Wallet payment initiated" : "Wallet payment failed",
+                Data = result,
+                Errors = success ? null : new List<string> { payload?.ToString() ?? "Unknown error" }
+            };
         }
 
-        // ============== 6) HMAC Verify ==============
-        public bool VerifyHmac(HmacVerifyDto dto)
+        // 6) Verify HMAC
+        public ApiResponse<bool> VerifyHmac(HmacVerifyDto dto)
         {
             var secret = _opt.HmacSecret ?? throw new InvalidOperationException("HMAC secret not set");
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
             var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dto.MessageToSign));
             var hex = Convert.ToHexString(hash).ToLowerInvariant();
 
-            return CryptographicOperations.FixedTimeEquals(
+            var ok = CryptographicOperations.FixedTimeEquals(
                 Encoding.UTF8.GetBytes(hex),
                 Encoding.UTF8.GetBytes(dto.ReceivedHexSignature.ToLowerInvariant())
             );
+
+            return new ApiResponse<bool>
+            {
+                Status = ok,
+                Message = ok ? "HMAC valid" : "Invalid HMAC",
+                Data = ok,
+                Errors = ok ? null : new List<string> { "Signature mismatch" }
+            };
         }
 
-        // ============== 7) Inquiry ==============
-        public async Task<InquiryRes> InquiryAsync(InquiryDto dto)
+        // 7) Inquiry
+        public async Task<ApiResponse<InquiryRes>> InquiryAsync(InquiryDto dto)
         {
+            var auth = string.IsNullOrWhiteSpace(dto.AuthToken) ? await _tokenProvider.GetAsync() : dto.AuthToken;
+
             var url = $"{_opt.ApiBase}/acceptance/transactions/";
             var qs = new List<string>();
             if (!string.IsNullOrWhiteSpace(dto.MerchantOrderId)) qs.Add($"merchant_order_id={Uri.EscapeDataString(dto.MerchantOrderId)}");
@@ -178,21 +196,23 @@ namespace Voltyks.Application.Services.Paymob
             var full = url + (qs.Count > 0 ? $"?{string.Join("&", qs)}" : string.Empty);
 
             using var req = new HttpRequestMessage(HttpMethod.Get, full);
-            req.Headers.Add("Authorization", $"Bearer {dto.AuthToken}");
+            req.Headers.Add("Authorization", $"Bearer {auth}");
             var res = await _http.SendAsync(req);
 
             object? data = res.IsSuccessStatusCode
                 ? await res.Content.ReadFromJsonAsync<object>()
                 : await res.Content.ReadAsStringAsync();
 
-            // بعد ما تعملي parsing للـ response، تقدري تحدّثي الـ Transaction/Order عبر الـ Repos
-            return new InquiryRes(data);
+            var inquiry = new InquiryRes(data);
+            return new ApiResponse<InquiryRes> { Status = true, Message = "Inquiry done", Data = inquiry };
         }
 
-        // ============== 8) Refund ==============
-        public async Task<PayActionRes> RefundAsync(RefundDto dto)
+        // 8) Refund
+        public async Task<ApiResponse<PayActionRes>> RefundAsync(RefundDto dto)
         {
-            var body = new RefundReq(dto.AuthToken, dto.TransactionId, dto.AmountCents);
+            var auth = string.IsNullOrWhiteSpace(dto.AuthToken) ? await _tokenProvider.GetAsync() : dto.AuthToken;
+
+            var body = new RefundReq(auth, dto.TransactionId, dto.AmountCents);
             var res = await _http.PostAsJsonAsync($"{_opt.ApiBase}/acceptance/void_refund/refund", body);
 
             object? data = res.IsSuccessStatusCode
@@ -221,13 +241,23 @@ namespace Voltyks.Application.Services.Paymob
             }
 
             await _uow.SaveChangesAsync();
-            return new PayActionRes(res.IsSuccessStatusCode, data);
+            var success = res.IsSuccessStatusCode;
+            var result = new PayActionRes(success, data);
+            return new ApiResponse<PayActionRes>
+            {
+                Status = success,
+                Message = success ? "Refund succeeded" : "Refund failed",
+                Data = result,
+                Errors = success ? null : new List<string> { data?.ToString() ?? "Unknown error" }
+            };
         }
 
-        // ============== 9) Void ==============
-        public async Task<PayActionRes> VoidAsync(VoidDto dto)
+        // 9) Void
+        public async Task<ApiResponse<PayActionRes>> VoidAsync(VoidDto dto)
         {
-            var body = new VoidOrCaptureReq(dto.AuthToken, dto.TransactionId, dto.AmountCents);
+            var auth = string.IsNullOrWhiteSpace(dto.AuthToken) ? await _tokenProvider.GetAsync() : dto.AuthToken;
+            var body = new VoidOrCaptureReq(auth, dto.TransactionId, dto.AmountCents);
+
             var res = await _http.PostAsJsonAsync($"{_opt.ApiBase}/acceptance/void_refund/void", body);
 
             object? data = res.IsSuccessStatusCode
@@ -255,13 +285,23 @@ namespace Voltyks.Application.Services.Paymob
             }
 
             await _uow.SaveChangesAsync();
-            return new PayActionRes(res.IsSuccessStatusCode, data);
+            var success = res.IsSuccessStatusCode;
+            var result = new PayActionRes(success, data);
+            return new ApiResponse<PayActionRes>
+            {
+                Status = success,
+                Message = success ? "Void succeeded" : "Void failed",
+                Data = result,
+                Errors = success ? null : new List<string> { data?.ToString() ?? "Unknown error" }
+            };
         }
 
-        // ============== 10) Capture ==============
-        public async Task<PayActionRes> CaptureAsync(CaptureDto dto)
+        // 10) Capture
+        public async Task<ApiResponse<PayActionRes>> CaptureAsync(CaptureDto dto)
         {
-            var body = new VoidOrCaptureReq(dto.AuthToken, dto.TransactionId, dto.AmountCents);
+            var auth = string.IsNullOrWhiteSpace(dto.AuthToken) ? await _tokenProvider.GetAsync() : dto.AuthToken;
+            var body = new VoidOrCaptureReq(auth, dto.TransactionId, dto.AmountCents);
+
             var res = await _http.PostAsJsonAsync($"{_opt.ApiBase}/acceptance/capture", body);
 
             object? data = res.IsSuccessStatusCode
@@ -290,20 +330,26 @@ namespace Voltyks.Application.Services.Paymob
             }
 
             await _uow.SaveChangesAsync();
-            return new PayActionRes(res.IsSuccessStatusCode, data);
+            var success = res.IsSuccessStatusCode;
+            var result = new PayActionRes(success, data);
+            return new ApiResponse<PayActionRes>
+            {
+                Status = success,
+                Message = success ? "Capture succeeded" : "Capture failed",
+                Data = result,
+                Errors = success ? null : new List<string> { data?.ToString() ?? "Unknown error" }
+            };
         }
 
-
-        public async Task<bool> HandleWebhookAsync(HttpRequest req, string rawBody)
+        // 11) Webhook
+        public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
         {
-            // 1) Parse the webhook data into a dictionary
+            // نفس منطقك بالضبط لحد قبل الـ return
             var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
-            // A) Handle query parameters (Paymob sends them via GET in the URL)
             foreach (var kv in req.Query)
                 fields[kv.Key] = kv.Value.ToString();
 
-            // B) Handle the form data (Paymob sends it as form data or JSON payload)
             try
             {
                 if (req.HasFormContentType)
@@ -312,61 +358,55 @@ namespace Voltyks.Application.Services.Paymob
                     foreach (var kv in form)
                         fields[kv.Key] = kv.Value.ToString();
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
                 {
-                    // If it's JSON (usually happens for some callbacks), parse it
-                    if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
+                    using var doc = JsonDocument.Parse(rawBody);
+                    void Walk(string prefix, JsonElement el)
                     {
-                        using var doc = JsonDocument.Parse(rawBody);
-                        void Walk(string prefix, JsonElement el)
+                        switch (el.ValueKind)
                         {
-                            switch (el.ValueKind)
-                            {
-                                case JsonValueKind.Object:
-                                    foreach (var p in el.EnumerateObject())
-                                        Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
-                                    break;
-                                case JsonValueKind.Array:
-                                    fields[prefix] = el.ToString();
-                                    break;
-                                default:
-                                    fields[prefix] = el.ToString();
-                                    break;
-                            }
+                            case JsonValueKind.Object:
+                                foreach (var p in el.EnumerateObject())
+                                    Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
+                                break;
+                            case JsonValueKind.Array:
+                                fields[prefix] = el.ToString();
+                                break;
+                            default:
+                                fields[prefix] = el.ToString();
+                                break;
                         }
-                        Walk("", doc.RootElement);
                     }
+                    Walk("", doc.RootElement);
                 }
             }
             catch { /* ignore parsing issues */ }
 
-            // 2) Verify HMAC (using the provided HMAC secret)
             bool valid = false;
             try { valid = VerifyHmacSha512(fields); }
             catch { valid = false; }
 
-            // 3) Log the webhook (valid or invalid)
             await WebhookRepo.AddAsync(new WebhookLog
             {
-                RawPayload = rawBody,                                      // Store the raw data received from Paymob
-                EventType = valid ? "Processed" : "Failure",                // "Processed" if valid, "Failure" if invalid
+                RawPayload = rawBody,
+                EventType = valid ? "Processed" : "Failure",
                 MerchantOrderId = fields.GetValueOrDefault("merchant_order_id"),
-                PaymobOrderId = long.TryParse(fields.GetValueOrDefault("order.id"), out var paymobOrderId) ? paymobOrderId : (long?)null,
-                PaymobTransactionId = long.TryParse(fields.GetValueOrDefault("id"), out var paymobTxId) ? paymobTxId : (long?)null,
-                IsHmacValid = valid,                                        // True if HMAC is valid
-                HttpStatus = 200,                                           // Example HTTP Status (200 OK)
-                HeadersJson = req.Headers.ToString(),                       // Store the headers as JSON (optional)
-                ReceivedAt = DateTime.UtcNow,                                // Timestamp of webhook reception
-                IsValid = valid                                              // Final validation flag
+                PaymobOrderId = long.TryParse(fields.GetValueOrDefault("order.id"), out var _paymobOrderId) ? _paymobOrderId : (long?)null,
+                PaymobTransactionId = long.TryParse(fields.GetValueOrDefault("id"), out var _paymobTxId) ? _paymobTxId : (long?)null,
+                IsHmacValid = valid,
+                HttpStatus = 200,
+                HeadersJson = req.Headers.ToString(),
+                ReceivedAt = DateTime.UtcNow,
+                IsValid = valid
             });
             await _uow.SaveChangesAsync();
 
             if (!valid)
-                return false;
+                return new ApiResponse<bool> { Status = false, Message = "Invalid HMAC", Data = false, Errors = new List<string> { "Signature mismatch" } };
 
-            // 4) Extract important fields for transaction and order update
-            paymobTxId = TryParseLong(fields, "id");
-            paymobOrderId = TryParseLong(fields, "order.id");
+            // لاحظ إن عندك متغيرات تحت كانت غير مُعرَّفة في النسخة السابقة
+            var paymobTxId = TryParseLong(fields, "id");
+            var paymobOrderId = TryParseLong(fields, "order.id");
             string? merchantOrderId = fields.TryGetValue("merchant_order_id", out var mo) ? mo : null;
 
             bool success = TryParseBool(fields, "success");
@@ -375,7 +415,6 @@ namespace Voltyks.Application.Services.Paymob
             long amountCents = TryParseLong(fields, "amount_cents");
             string currency = fields.TryGetValue("currency", out var cur) ? cur ?? _opt.Currency : _opt.Currency;
 
-            // 5) Update the payment transaction (if PaymobTransactionId is available)
             if (paymobTxId > 0)
             {
                 await UpdateTransactionByPaymobIdAsync(paymobTxId, tx =>
@@ -390,13 +429,10 @@ namespace Voltyks.Application.Services.Paymob
                 });
             }
 
-            // 6) Update the order status (if merchantOrderId is available)
             if (!string.IsNullOrWhiteSpace(merchantOrderId))
-            {
                 await UpdateOrderStatusAsync(merchantOrderId, success ? "Paid" : (pending ? "Pending" : "Failed"));
-            }
 
-            return true;
+            return new ApiResponse<bool> { Status = true, Message = "Webhook processed", Data = true };
         }
 
         // Helper functions for parsing
@@ -533,6 +569,25 @@ namespace Voltyks.Application.Services.Paymob
             }
         }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     }
+   
 
 }
