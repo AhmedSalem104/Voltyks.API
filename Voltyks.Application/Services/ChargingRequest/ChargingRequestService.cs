@@ -56,7 +56,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     return new ApiResponse<NotificationResultDto>(null, "Car owner not found", false);
 
                 // 1) أنشئ الطلب
-                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage);
+                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage , dto.Latitude,dto.Longitude);
 
                 // 2) جهّز بيانات الإشعار
                 var recipientUserId = charger.UserId; // صاحب المحطة
@@ -236,58 +236,87 @@ namespace Voltyks.Application.Services.ChargingRequest
         {
             try
             {
-                var request = await GetRequestWithDetailsAsync(dto.RequestId);
+                // (0) مصادقة
+                var currentUserId = GetCurrentUserId();
+                if (currentUserId is null)
+                    return new ApiResponse<ChargingRequestDetailsDto>(null, "Unauthorized", false);
 
+                // (1) هات الطلب
+                var request = await GetRequestWithDetailsAsync(dto.RequestId);
                 if (request == null)
                     return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
+                // (2) تحقّق الملكية: صاحب المحطة فقط
+                if (request.Charger?.User == null)
+                    return new ApiResponse<ChargingRequestDetailsDto>(null, "Forbidden: charger owner unknown", false);
 
-                // 🧠 حساب المسافة بين السيارة والشاحن
+                // هات الـ UserId من التوكن كنص (استدعاء الدالة!)
+                var currentUserIdRaw = GetCurrentUserIdRaw();
+                if (string.IsNullOrWhiteSpace(currentUserIdRaw))
+                    return new ApiResponse<ChargingRequestDetailsDto>(null, "Unauthorized", false);
+
+                // حوّل StationOwnerId لنص للمقارنة
+                var stationOwnerIdRaw = request.Charger.User.Id?.ToString();
+
+                if (string.IsNullOrWhiteSpace(stationOwnerIdRaw) ||
+                    !string.Equals(stationOwnerIdRaw, currentUserIdRaw, StringComparison.Ordinal))
+                {
+                    return new ApiResponse<ChargingRequestDetailsDto>(null, "Forbidden: not your station", false);
+                }
+                // (3) حساب المسافة والوقت
                 string estimatedArrival = "N/A";
                 double distanceKm = 0;
-                if (dto.Latitude.HasValue && dto.Longitude.HasValue && request.Charger.Address?.Latitude != null && request.Charger.Address?.Longitude != null)
+                if (request.Latitude != null && request.Longitude != null
+                    && request.Charger?.Address?.Latitude != null
+                    && request.Charger?.Address?.Longitude != null)
                 {
                     distanceKm = CalculateDistance(
-                        dto.Latitude.Value,
-                        dto.Longitude.Value,
+                        request.Latitude,
+                        request.Longitude,
                         request.Charger.Address.Latitude,
                         request.Charger.Address.Longitude
                     );
 
                     double estimatedMinutes = (distanceKm / 40.0) * 60.0;
-                    estimatedArrival = $"~ {Math.Ceiling(estimatedMinutes)} min";
+                    estimatedArrival = $" {Math.Ceiling(estimatedMinutes)} min";
                 }
 
-                string estimatedPrice = request.Charger.PriceOption != null
-                    ? $"{request.Charger.PriceOption.Value} EGP/hour"
-                    : "N/A";
+                // (4) السعر التقديري
+                string estimatedPrice;
+
+                if (request.Charger?.PriceOption != null && request.Charger.Capacity?.kw > 0)
+                {
+                    decimal pricePerHour = request.Charger.PriceOption.Value
+                                           * (decimal)request.KwNeeded
+                                           / (decimal)request.Charger.Capacity.kw;
+
+                    estimatedPrice = $"{pricePerHour:F2} EGP/hour"; // يظهر 2 decimal places
+                }
+                else
+                {
+                    estimatedPrice = "N/A";
+                }
 
 
 
-                var vehicles = await _vehicleService.GetVehiclesByUserIdAsync();
+                // (5) بيانات السيارة
+                var vehicles = await _vehicleService.GetVehiclesByUserIdAsync(request.CarOwner.Id);
+                var vehicle = vehicles?.Data?.FirstOrDefault();
 
-                // إذا كان المستخدم يمتلك سيارات متعددة، سنختار السيارة الأولى أو نضع منطق لاختيار السيارة المناسبة
-                var vehicle = vehicles?.Data.FirstOrDefault(); // اختيار السيارة الأولى
-
-
-
-
-
-                string vehicleArea = "";
-                string vehicleStreet = "";
-                if (dto.Latitude.HasValue && dto.Longitude.HasValue)
+                // (6) عنوان موقع السيارة (اختياري)
+                string vehicleArea = "N/A";
+                string vehicleStreet = "N/A";
+                if (request.Latitude != null && request.Longitude != null)
                 {
                     try
                     {
-                        var (area, street) = await GetAddressFromLatLongNominatimAsync(
-                            dto.Latitude.Value, dto.Longitude.Value);
-                        vehicleArea = string.IsNullOrWhiteSpace(area) ? "N/A" : area;
-                        vehicleStreet = string.IsNullOrWhiteSpace(street) ? "N/A" : street;
+                        var (area, street) = await GetAddressFromLatLongNominatimAsync(request.Latitude, request.Longitude);
+                        if (!string.IsNullOrWhiteSpace(area)) vehicleArea = area;
+                        if (!string.IsNullOrWhiteSpace(street)) vehicleStreet = street;
                     }
-                    catch
-                    {
-                        // تجاهل الخطأ وخلي القيم N/A
-                    }
+                    catch { /* تجاهل وخلّيها N/A */ }
                 }
+
+                // (7) بناء الاستجابة
                 var response = new ChargingRequestDetailsDto
                 {
                     RequestId = request.Id,
@@ -296,31 +325,30 @@ namespace Voltyks.Application.Services.ChargingRequest
                     CarOwnerId = request.CarOwner.Id,
                     KwNeeded = request.KwNeeded,
                     CurrentBatteryPercentage = request.CurrentBatteryPercentage,
-                    CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
+                    CarOwnerName = $"{request.CarOwner.FirstName} {request.CarOwner.LastName}",
 
-                    // إضافة معلومات السيارة باستخدام VehicleDto
-                    VehicleBrand = vehicle?.BrandName ?? "Unknown", // اسم العلامة التجارية
-                    VehicleModel = vehicle?.ModelName ?? "Unknown", // اسم الطراز
-                    VehicleColor = vehicle?.Color ?? "Unknown", // اللون
-                    VehiclePlate = vehicle?.Plate ?? "Unknown", // لو كان اسم السيارة عبارة عن رقم اللوحة
-                    VehicleCapacity = vehicle.Capacity,
+                    VehicleBrand = vehicle?.BrandName ?? "Unknown",
+                    VehicleModel = vehicle?.ModelName ?? "Unknown",
+                    VehicleColor = vehicle?.Color ?? "Unknown",
+                    VehiclePlate = vehicle?.Plate ?? "Unknown",
+                    VehicleCapacity = vehicle?.Capacity ?? 0, 
+
                     StationOwnerId = request.Charger.User.Id,
-                    StationOwnerName = new StringBuilder().Append(request.Charger.User.FirstName).Append(" ").Append(request.Charger.User.LastName).ToString(),
+                    StationOwnerName = $"{request.Charger.User.FirstName} {request.Charger.User.LastName}",
                     ChargerId = request.ChargerId,
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
-                    PricePerHour = request.Charger.PriceOption != null
-                ? $"{request.Charger.PriceOption.Value} EGP" : "N/A",
+                    PricePerHour = request.Charger.PriceOption != null ? $"{request.Charger.PriceOption.Value} EGP" : "N/A",
                     AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
                     ChargerArea = request.Charger.Address?.Area ?? "N/A",
                     ChargerStreet = request.Charger.Address?.Street ?? "N/A",
-
                     VehicleArea = vehicleArea,
                     VehicleStreet = vehicleStreet,
-
                     EstimatedArrival = estimatedArrival,
                     EstimatedPrice = estimatedPrice,
-                    DistanceInKm = distanceKm // إضافة المسافة إلى الاستجابة
+                    //DistanceInKm = Math.Round(distanceKm, 2)
+                    DistanceInKm = distanceKm
+
                 };
 
                 return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
@@ -330,6 +358,119 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
             }
         }
+       
+        private string? GetCurrentUserIdRaw()
+        {
+            var user = _httpContext.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated != true) return null;
+
+            // عدّل أسماء الـ claims حسب اللي عندك فعلياً
+            return user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value
+                ?? user.FindFirst("uid")?.Value
+                ?? user.FindFirst("user_id")?.Value
+                ?? user.FindFirst("id")?.Value;
+        }
+
+        //public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
+        //{
+        //    try
+        //    {
+        //        var request = await GetRequestWithDetailsAsync(dto.RequestId);
+
+        //        if (request == null)
+        //            return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
+
+        //        // 🧠 حساب المسافة بين السيارة والشاحن
+        //        string estimatedArrival = "N/A";
+        //        double distanceKm = 0;
+        //        if (dto.Latitude.HasValue && dto.Longitude.HasValue && request.Charger.Address?.Latitude != null && request.Charger.Address?.Longitude != null)
+        //        {
+        //            distanceKm = CalculateDistance(
+        //                dto.Latitude.Value,
+        //                dto.Longitude.Value,
+        //                request.Charger.Address.Latitude,
+        //                request.Charger.Address.Longitude
+        //            );
+
+        //            double estimatedMinutes = (distanceKm / 40.0) * 60.0;
+        //            estimatedArrival = $" {Math.Ceiling(estimatedMinutes)} min";
+        //        }
+
+        //        string estimatedPrice = request.Charger.PriceOption != null
+        //            ? $"{request.Charger.PriceOption.Value} EGP/hour"
+        //            : "N/A";
+
+
+
+        //        var vehicles = await _vehicleService.GetVehiclesByUserIdAsync();
+
+        //        // إذا كان المستخدم يمتلك سيارات متعددة، سنختار السيارة الأولى أو نضع منطق لاختيار السيارة المناسبة
+        //        var vehicle = vehicles?.Data.FirstOrDefault(); // اختيار السيارة الأولى
+
+
+
+
+
+        //        string vehicleArea = "";
+        //        string vehicleStreet = "";
+        //        if (dto.Latitude.HasValue && dto.Longitude.HasValue)
+        //        {
+        //            try
+        //            {
+        //                var (area, street) = await GetAddressFromLatLongNominatimAsync(
+        //                    dto.Latitude.Value, dto.Longitude.Value);
+        //                vehicleArea = string.IsNullOrWhiteSpace(area) ? "N/A" : area;
+        //                vehicleStreet = string.IsNullOrWhiteSpace(street) ? "N/A" : street;
+        //            }
+        //            catch
+        //            {
+        //                // تجاهل الخطأ وخلي القيم N/A
+        //            }
+        //        }
+        //        var response = new ChargingRequestDetailsDto
+        //        {
+        //            RequestId = request.Id,
+        //            Status = request.Status,
+        //            RequestedAt = request.RequestedAt,
+        //            CarOwnerId = request.CarOwner.Id,
+        //            KwNeeded = request.KwNeeded,
+        //            CurrentBatteryPercentage = request.CurrentBatteryPercentage,
+        //            CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
+
+        //            // إضافة معلومات السيارة باستخدام VehicleDto
+        //            VehicleBrand = vehicle?.BrandName ?? "Unknown", // اسم العلامة التجارية
+        //            VehicleModel = vehicle?.ModelName ?? "Unknown", // اسم الطراز
+        //            VehicleColor = vehicle?.Color ?? "Unknown", // اللون
+        //            VehiclePlate = vehicle?.Plate ?? "Unknown", // لو كان اسم السيارة عبارة عن رقم اللوحة
+        //            VehicleCapacity = vehicle.Capacity,
+        //            StationOwnerId = request.Charger.User.Id,
+        //            StationOwnerName = new StringBuilder().Append(request.Charger.User.FirstName).Append(" ").Append(request.Charger.User.LastName).ToString(),
+        //            ChargerId = request.ChargerId,
+        //            Protocol = request.Charger.Protocol?.Name ?? "Unknown",
+        //            CapacityKw = request.Charger.Capacity?.kw ?? 0,
+        //            PricePerHour = request.Charger.PriceOption != null
+        //        ? $"{request.Charger.PriceOption.Value} EGP" : "N/A",
+        //            AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
+        //            ChargerArea = request.Charger.Address?.Area ?? "N/A",
+        //            ChargerStreet = request.Charger.Address?.Street ?? "N/A",
+
+        //            VehicleArea = vehicleArea,
+        //            VehicleStreet = vehicleStreet,
+
+        //            EstimatedArrival = estimatedArrival,
+        //            EstimatedPrice = estimatedPrice,
+        //            DistanceInKm = Math.Round(distanceKm, 2)
+
+        //        };
+
+        //        return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
+        //    }
+        //}
         public async Task<(string Area, string Street)> GetAddressFromLatLongNominatimAsync(double latitude, double longitude)
         {
             // Nominatim API (مجاني)
@@ -488,7 +629,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     c => c.User))
                 .FirstOrDefault();
         }
-        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage)
+        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage ,double Latitude,double Longitude)
         {
             var request = new ChargingRequestEntity
             {
@@ -497,7 +638,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                 RequestedAt = DateTime.UtcNow,
                 Status = "pending",
                 KwNeeded = KwNeeded,
-                CurrentBatteryPercentage = CurrentBatteryPercentage
+                CurrentBatteryPercentage = CurrentBatteryPercentage,
+                Latitude = Latitude,
+                Longitude = Longitude
                 
             };
 

@@ -7,9 +7,6 @@ using System.Threading.Tasks;
 namespace Voltyks.Core.DTOs.Paymob.Input_DTOs
 {
     // Capture
-    public record CaptureDto(
-        string AuthToken,
-        long TransactionId,
-        long AmountCents
-    );
+    public record CaptureDto(long TransactionId, long AmountCents, string? AuthToken = null);
+
 }

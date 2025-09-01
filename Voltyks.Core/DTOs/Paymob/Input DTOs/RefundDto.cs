@@ -7,9 +7,6 @@ using System.Threading.Tasks;
 namespace Voltyks.Core.DTOs.Paymob.Input_DTOs
 {
     // Refund
-    public record RefundDto(
-        string AuthToken,
-        long TransactionId,
-        long AmountCents
-    );
+    public record RefundDto(long TransactionId, long AmountCents, string? AuthToken = null);
+
 }

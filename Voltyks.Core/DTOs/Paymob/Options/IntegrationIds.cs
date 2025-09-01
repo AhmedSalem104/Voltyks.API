@@ -6,5 +6,9 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.Paymob.Options
 {
-    public class IntegrationIds { public int Card { get; set; } public int Wallet { get; set; } }
+    public class IntegrationIds {
+        public int Card { get; init; }
+        public int ApplePay { get; init; }
+        public int Wallet { get; init; }
+    }
 }

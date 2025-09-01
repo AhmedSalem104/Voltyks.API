@@ -44,7 +44,8 @@ namespace Voltyks.Application.ServicesManager
         , IVehicleService vehicleService
         , HttpClient _http
         ,IOptions<PaymobOptions> _opt
-        ,ILogger<PaymobService> _log) : IServiceManager
+        ,ILogger<PaymobService> _log
+        , IPaymobAuthTokenProvider tokenProvider) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context);
@@ -54,7 +55,7 @@ namespace Voltyks.Application.ServicesManager
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
         public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService);
-        public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log);
+        public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider);
 
 
 

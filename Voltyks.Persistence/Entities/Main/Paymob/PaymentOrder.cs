@@ -16,6 +16,9 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
 
+        public string? LastPaymentKey { get; set; }
+        public DateTime? PaymentKeyExpiresAt { get; set; }
+
         public ICollection<PaymentTransaction> Transactions { get; set; } = new List<PaymentTransaction>();
     }
 }

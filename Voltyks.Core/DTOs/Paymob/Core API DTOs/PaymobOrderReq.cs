@@ -7,5 +7,5 @@ using System.Threading.Tasks;
 namespace Voltyks.Core.DTOs.Paymob.Core_API_DTOs
 {
     public record PaymobOrderReq(string auth_token, long amount_cents, string currency,
-                              string merchant_order_id, object[] items);
+                              string merchant_order_id);
 }

@@ -11,9 +11,12 @@ namespace Voltyks.Core.DTOs.Paymob.Options
         public string ApiBase { get; set; } = default!;
         public string ApiKey { get; set; } = default!;
         public string HmacSecret { get; set; } = default!;
-        public string IFrameId { get; set; } = default!;
+        public string IframeId { get; set; } = default!;
         public string Currency { get; set; } = "EGP";
         public IntegrationIds Integration { get; set; } = new();
+
+
        
+
     }
 }

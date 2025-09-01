@@ -120,6 +120,40 @@ namespace Voltyks.Application.Services
             //var dtos = _mapper.Map<IEnumerable<VehicleDto>>(vehicles);
             return new ApiResponse<IEnumerable<VehicleDto>>(dtos, SuccessfulMessage.VehiclesRetrieved, true);
         }
+        public async Task<ApiResponse<IEnumerable<VehicleDto>>> GetVehiclesByUserIdAsync(string UserId)
+        {
+            //var currentUserId = GetCurrentUserId();
+
+            var vehicles = await _unitOfWork
+                .GetRepository<Vehicle, int>()
+                .GetAllWithIncludeAsync(
+                    filter: v => v.UserId == UserId && !v.IsDeleted,
+                    includes: new Expression<Func<Vehicle, object>>[]
+                    {
+                    v => v.Brand,
+                    v => v.Model
+                    });
+
+
+            var dtos = vehicles.Select(v => new VehicleDto
+            {
+                Id = v.Id,
+                Color = v.Color,
+                Plate = v.Plate,
+                CreationDate = v.CreationDate,
+                Year = v.Year,
+                BrandId = v.BrandId,
+                BrandName = v.Brand?.Name,
+                ModelId = v.ModelId,
+                ModelName = v.Model?.Name,
+                Capacity = v.Model?.Capacity ?? 0
+            }).ToList();
+
+
+
+            //var dtos = _mapper.Map<IEnumerable<VehicleDto>>(vehicles);
+            return new ApiResponse<IEnumerable<VehicleDto>>(dtos, SuccessfulMessage.VehiclesRetrieved, true);
+        }
         public async Task<ApiResponse<bool>> DeleteVehicleAsync(int vehicleId)
         {
             var repo = _unitOfWork.GetRepository<Vehicle, int>();

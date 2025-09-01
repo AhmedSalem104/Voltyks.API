@@ -14,6 +14,8 @@ namespace Voltyks.Application.Interfaces
         Task<ApiResponse<VehicleDto>> CreateVehicleAsync(CreateAndUpdateVehicleDto dto);
         Task<ApiResponse<VehicleDto>> UpdateVehicleAsync(int id, CreateAndUpdateVehicleDto dto);
         Task<ApiResponse<IEnumerable<VehicleDto>>> GetVehiclesByUserIdAsync();
+        Task<ApiResponse<IEnumerable<VehicleDto>>> GetVehiclesByUserIdAsync(string UserId);
+
         Task<ApiResponse<bool>> DeleteVehicleAsync(int vehicleId);
     }
 }
