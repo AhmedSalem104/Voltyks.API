@@ -10,6 +10,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
     {
         public string MerchantOrderId { get; set; } = default!;
         public long? PaymobOrderId { get; set; }
+        public string UserId { get; set; } 
         public long AmountCents { get; set; }
         public string Currency { get; set; } = "EGP";
         public string Status { get; set; } = "Pending";

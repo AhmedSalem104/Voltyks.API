@@ -263,7 +263,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     return new ApiResponse<ChargingRequestDetailsDto>(null, "Forbidden: not your station", false);
                 }
                 // (3) حساب المسافة والوقت
-                string estimatedArrival = "N/A";
+                double estimatedArrival = 0;
                 double distanceKm = 0;
                 if (request.Latitude != null && request.Longitude != null
                     && request.Charger?.Address?.Latitude != null
@@ -277,11 +277,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                     );
 
                     double estimatedMinutes = (distanceKm / 40.0) * 60.0;
-                    estimatedArrival = $" {Math.Ceiling(estimatedMinutes)} min";
+                    estimatedArrival =  Math.Ceiling(estimatedMinutes);
                 }
 
                 // (4) السعر التقديري
-                string estimatedPrice;
+                decimal estimatedPrice;
 
                 if (request.Charger?.PriceOption != null && request.Charger.Capacity?.kw > 0)
                 {
@@ -289,11 +289,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                                            * (decimal)request.KwNeeded
                                            / (decimal)request.Charger.Capacity.kw;
 
-                    estimatedPrice = $"{pricePerHour:F2} EGP/hour"; // يظهر 2 decimal places
+                    estimatedPrice = pricePerHour ; 
                 }
                 else
                 {
-                    estimatedPrice = "N/A";
+                    estimatedPrice = 0;
                 }
 
 
@@ -346,7 +346,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                     VehicleStreet = vehicleStreet,
                     EstimatedArrival = estimatedArrival,
                     EstimatedPrice = estimatedPrice,
-                    //DistanceInKm = Math.Round(distanceKm, 2)
                     DistanceInKm = distanceKm
 
                 };

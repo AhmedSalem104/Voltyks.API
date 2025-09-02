@@ -6,6 +6,6 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.Paymob.AddtionDTOs
 {
-    public record CreateServiceOrderDto(long AmountCents, string Currency = "EGP", int UserId = 0);
+    public record CreateServiceOrderDto(long AmountCents, string Currency = "EGP");
 
 }
