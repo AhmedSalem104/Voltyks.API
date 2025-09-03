@@ -56,15 +56,15 @@ namespace Voltyks.API.Controllers
 
         // ========= Webhook (لازم يفضل متاح) =========
         // ده لازم يبقى AllowAnonymous عشان Paymob يقدر يناديه
-        //[HttpPost("webhook")]
-        //[AllowAnonymous]
-        //public async Task<IActionResult> Webhook()
-        //{
-        //    using var reader = new StreamReader(Request.Body);
-        //    var raw = await reader.ReadToEndAsync();
-        //    var res = await _svc.HandleWebhookAsync(Request, raw);
-        //    return res.Status ? Ok(res) : BadRequest(res);
-        //}
+        [HttpPost("webhook")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Webhook()
+        {
+            using var reader = new StreamReader(Request.Body);
+            var raw = await reader.ReadToEndAsync();
+            var res = await _svc.HandleWebhookAsync(Request, raw);
+            return res.Status ? Ok(res) : BadRequest(res);
+        }
 
 
 
