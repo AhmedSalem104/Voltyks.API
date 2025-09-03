@@ -19,42 +19,8 @@ namespace Voltyks.Application.Interfaces.Paymob
 
         Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutRequest req);
         Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutRequest req);
-
-        // دول اختياريين لو عندك Webhook endpoint و/أو شاشة تتبع للطلب
         Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody);
-        Task<ApiResponse<OrderStatusDto>> GetStatusAsync(string merchantOrderId);
-
-
-
-
-
-
-
-        //Task<ApiResponse<string>> GetAuthTokenAsync();
-
-        //Task<ApiResponse<string>> CreateServiceOrderAsync(CreateServiceOrderDto dto);
-        //ApiResponse<PaymentMethodsDto> GetAvailableMethods(string merchantOrderId);
-
-        //Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutRequest req);
-        //Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutRequest req);
-        //Task<ApiResponse<WalletOnlyResponse>> CheckoutWalletOnlyAsync(WalletOnlyRequest req);
-
-        //Task<ApiResponse<OrderStatusDto>> GetStatusAsync(string merchantOrderId);
-
-        //Task<ApiResponse<int>> CreateOrderAsync(CreateOrderDto dto);
-        //Task<ApiResponse<string>> CreatePaymentKeyAsync(CreatePaymentKeyDto dto);
-        //ApiResponse<string> BuildCardIframeUrl(string paymentKey);
-        //Task<ApiResponse<PayActionRes>> PayWithWalletAsync(WalletPaymentDto dto);
-
-        //ApiResponse<bool> VerifyHmac(HmacVerifyDto dto);
-        //Task<ApiResponse<InquiryRes>> InquiryAsync(InquiryDto dto);
-
-        //Task<ApiResponse<PayActionRes>> RefundAsync(RefundDto dto);
-        //Task<ApiResponse<PayActionRes>> VoidAsync(VoidDto dto);
-        //Task<ApiResponse<PayActionRes>> CaptureAsync(CaptureDto dto);
-
-        //Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody);
-
+        Task<ApiResponse<OrderStatusDto>> GetOrderStatusFromPaymobAsync(long paymobOrderId);
 
     }
 
