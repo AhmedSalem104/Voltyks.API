@@ -19,7 +19,6 @@ namespace Voltyks.Application.Services
 
     public class ModelService(IUnitOfWork _unitOfWork , IMapper _mapper) : IModelService
     {
-
         public async Task<ApiResponse<IEnumerable<ModelDto>>> GetModelsByBrandIdAsync(int brandId)
         {
             var models = await _unitOfWork

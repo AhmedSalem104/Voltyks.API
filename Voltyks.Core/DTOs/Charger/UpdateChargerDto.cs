@@ -8,7 +8,6 @@ namespace Voltyks.Core.DTOs.Charger
 {
     public class UpdateChargerDto
     {
-        //public int ChargerId { get; set; }
         public int ProtocolId { get; set; }
         public int CapacityId { get; set; }
         public int PriceOptionId { get; set; }

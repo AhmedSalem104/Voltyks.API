@@ -86,7 +86,6 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
 
-
         [HttpPost("GetChargerDetailsById")]
         public async Task<IActionResult> GetChargerById([FromBody] ChargerDetailsRequestDto request)
         {

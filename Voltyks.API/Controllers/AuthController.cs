@@ -41,7 +41,6 @@ namespace Voltyks.Presentation
             return Ok(result);
         }
 
-
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDTO registerDTO)
         {
@@ -65,9 +64,6 @@ namespace Voltyks.Presentation
 
             return Ok(result);
         }
-
-
-
 
         [HttpPost("CheckPhoneNumberExists")]
         public async Task<IActionResult> CheckPhoneNumberExists([FromBody] PhoneNumberDto phoneNumberDto)
@@ -109,8 +105,6 @@ namespace Voltyks.Presentation
 
             return Ok(result);
         }
-
-        // بقية الأكواد كما هي بدون تعديل...
 
         [HttpPost("forget-password")]
         public async Task<IActionResult> ForgetPassword([FromBody] ForgetPasswordDto model)
@@ -154,7 +148,24 @@ namespace Voltyks.Presentation
             return Ok(response);
         }
 
-        #region SmsEgypt
+        [HttpGet("GetProfileDetails")]
+        public async Task<IActionResult> GetMyDetails()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); // من الـ JWT
+            var result = await serviceManager.AuthService.GetUserDetailsAsync(userId);
+            if (result == null) return NotFound();
+
+            return Ok(result);
+        }
+
+        [HttpPut("toggle-availability")]
+        [Authorize]
+        public async Task<IActionResult> ToggleAvailability()
+        {
+            var result = await serviceManager.AuthService.ToggleUserAvailabilityAsync();
+            return Ok(result);
+        }
+
         [HttpPost("SendSmsEgyptOtp")]
         public async Task<IActionResult> SendOtp([FromBody] SendSmsEgyptOtpDto dto)
         {
@@ -175,25 +186,6 @@ namespace Voltyks.Presentation
             return result.Status ? Ok(result) : BadRequest(result);
         }
 
-        #endregion
-
-        [HttpGet("GetProfileDetails")]
-        public async Task<IActionResult> GetMyDetails()
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); // من الـ JWT
-            var result = await serviceManager.AuthService.GetUserDetailsAsync(userId);
-            if (result == null) return NotFound();
-
-            return Ok(result);
-        }
-
-        [HttpPut("toggle-availability")]
-        [Authorize]
-        public async Task<IActionResult> ToggleAvailability()
-        {
-            var result = await serviceManager.AuthService.ToggleUserAvailabilityAsync();
-            return Ok(result);
-        }
 
 
 

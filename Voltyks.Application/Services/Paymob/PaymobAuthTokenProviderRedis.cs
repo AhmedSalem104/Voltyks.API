@@ -98,7 +98,6 @@ namespace Voltyks.Application.Services.Paymob
                 return token;
             }
         }
-
         public async Task InvalidateAsync()
         {
             await _redis.RemoveAsync(TokenKey);

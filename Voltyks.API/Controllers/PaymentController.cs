@@ -16,7 +16,6 @@ using Voltyks.Persistence.Entities;
 
 namespace Voltyks.API.Controllers
 {
-
     [ApiController]
     [Route("api/payment")]
     [Authorize]
@@ -25,8 +24,6 @@ namespace Voltyks.API.Controllers
         private readonly IPaymobService _svc;
         public PaymentController(IPaymobService svc) => _svc = svc;
 
-        // ========= 1) Card =========
-        // Request body: CardCheckoutRequest (زي الموجود في السيرفيس)
         [HttpPost("checkout/card")]
         public async Task<ActionResult<ApiResponse<CardCheckoutResponse>>> CheckoutCard([FromBody] CardCheckoutRequest req)
         {
@@ -43,18 +40,6 @@ namespace Voltyks.API.Controllers
             return res.Status ? Ok(res) : BadRequest(res);
         }
 
-        // ========= Webhook (لازم يفضل متاح) =========
-        // ده لازم يبقى AllowAnonymous عشان Paymob يقدر يناديه
-        //[HttpPost("webhook")]
-        //[AllowAnonymous]
-        //public async Task<IActionResult> Webhook()
-        //{
-        //    using var reader = new StreamReader(Request.Body);
-        //    var raw = await reader.ReadToEndAsync();
-        //    var res = await _svc.HandleWebhookAsync(Request, raw);
-        //    return res.Status ? Ok(res) : BadRequest(res);
-        //}
-
         [HttpPost("getOrderStatus")]
         [ProducesResponseType(typeof(ApiResponse<OrderStatusDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<OrderStatusDto>), StatusCodes.Status502BadGateway)]
@@ -67,6 +52,19 @@ namespace Voltyks.API.Controllers
 
             return Ok(res);
         }
+
+
+        // ========= Webhook (لازم يفضل متاح) =========
+        // ده لازم يبقى AllowAnonymous عشان Paymob يقدر يناديه
+        //[HttpPost("webhook")]
+        //[AllowAnonymous]
+        //public async Task<IActionResult> Webhook()
+        //{
+        //    using var reader = new StreamReader(Request.Body);
+        //    var raw = await reader.ReadToEndAsync();
+        //    var res = await _svc.HandleWebhookAsync(Request, raw);
+        //    return res.Status ? Ok(res) : BadRequest(res);
+        //}
 
 
 

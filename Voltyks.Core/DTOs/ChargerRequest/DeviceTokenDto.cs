@@ -12,7 +12,6 @@ namespace Voltyks.Core.DTOs.ChargerRequest
     {
         [Required]
         public string? DeviceToken { get; set; }
-        //public string? RoleContext { get; set; }  // "VehicleOwner" or "ChargerOwner"
 
 
     }

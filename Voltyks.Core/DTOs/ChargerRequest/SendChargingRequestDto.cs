@@ -15,8 +15,6 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         public double Longitude { get; set; }     
 
 
-        // public string? DeviceToken { get; set; } // ✅ أضف دي
-
     }
 
 }

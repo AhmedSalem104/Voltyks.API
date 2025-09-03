@@ -9,8 +9,6 @@ namespace Voltyks.API.Controllers
     [ApiController]
     public class ModelController(IServiceManager _serviceManager) : ControllerBase
     {
-      
-
         [HttpGet("GetModelsByBrandId")]
         public async Task<IActionResult> GetModelsByBrandId(int brandId)
         {
@@ -26,8 +24,4 @@ namespace Voltyks.API.Controllers
         }
 
     }
-
-
-
-
 }

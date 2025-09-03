@@ -46,9 +46,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             var Prices = await _unitOfWork.GetRepository<PriceOption, int>().GetAllAsync();
             var data = _mapper.Map<IEnumerable<PriceByCapacityDto>>(Prices);
             return new ApiResponse<IEnumerable<PriceByCapacityDto>>(data);
-        }
-
-    
+        } 
         public async Task<ApiResponse<string>> AddChargerAsync(AddChargerDto dto)
         {
             var userIdClaim = _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
@@ -180,8 +178,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return new ApiResponse<IEnumerable<ChargerDto>>(result);
         }
-
-
         public async Task<ApiResponse<List<NearChargerDto>>> GetNearChargersAsync(NearChargerSearchDto searchDto)
         {
             var currentUserId = GetCurrentUserId();
@@ -276,7 +272,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             return result;
         }
-
         private string? GetCurrentUserId()
         {
             return _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -307,7 +302,6 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             double estimatedCost = EstimatePrice(sessionDurationHr, charger.PriceOption.Value);
             dto.PriceEstimated = $"{estimatedCost} EGP";
         }
-
         private double CalculateDistanceInKm(double lat1, double lon1, double lat2, double lon2)
         {
             double R = 6371; // نصف قطر الأرض بالكيلومتر

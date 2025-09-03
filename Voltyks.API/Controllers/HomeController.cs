@@ -7,13 +7,6 @@ namespace Voltyks.API.Controllers
     [Route("/")]
     public class HomeController : ControllerBase
     {
-        //[HttpGet]
-        //public IActionResult GetRoot()
-        //{
-        //    return Ok(new { message = "Welcome to Voltyks API" });
-        //}
-
-      
-
+ 
     }
 }

@@ -21,5 +21,4 @@ namespace Voltyks.API.Controllers
             return result.Status ? Ok(result) : StatusCode(500, result);
         }
     }
-
 }

@@ -23,19 +23,6 @@ namespace Voltyks.Infrastructure
             _context = context;
         }
 
-        //public async Task<IEnumerable<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>>? filter = null, bool trackChanges = false)
-        //{
-        //    IQueryable<TEntity> query = _context.Set<TEntity>();
-
-        //    if (!trackChanges)
-        //        query = query.AsNoTracking();
-
-        //    if (filter is not null)
-        //        query = query.Where(filter);
-
-        //    return await query.ToListAsync();
-        //}
-
         public async Task<IEnumerable<TEntity>> GetAllAsync(Expression<Func<TEntity, bool>>? filter = null, bool trackChanges = false)
         {
             IQueryable<TEntity> query = _context.Set<TEntity>();
@@ -48,13 +35,10 @@ namespace Voltyks.Infrastructure
 
             return await query.ToListAsync();
         }
-
-
         public async Task<TEntity?> GetAsync(TKey id)
         {
             return await _context.Set<TEntity>().FindAsync(id);
         }
-
         public async Task<IEnumerable<TEntity>> GetAllWithIncludeAsync(
         Expression<Func<TEntity, bool>>? filter = null,
         bool trackChanges = false,
@@ -82,19 +66,14 @@ namespace Voltyks.Infrastructure
 
             return await query.FirstOrDefaultAsync(predicate);
         }
-
-
         public async Task AddAsync(TEntity entity)
         {
             await _context.Set<TEntity>().AddAsync(entity);
         }
-
-
         public void Update(TEntity entity)
         {
             _context.Entry(entity).State = EntityState.Modified;
         }
-
         public void Delete(TEntity entity)
         {
             var existingEntity = _context.Set<TEntity>().Find(entity.Id);
@@ -103,8 +82,6 @@ namespace Voltyks.Infrastructure
                 _context.Set<TEntity>().Remove(existingEntity);
             }
         }
-
-  
         public async Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate)
         {
             return await _context.Set<TEntity>().AnyAsync(predicate);

@@ -16,34 +16,27 @@ namespace Voltyks.Application.Services.Redis
         {
             _redis = redis;
         }
-
         public async Task SetAsync(string key, string value, TimeSpan? expiry = null)
         {
             var db = _redis.GetDatabase();
             await db.StringSetAsync(key, value, expiry);
         }
-
         public async Task<string?> GetAsync(string key)
         {
             var db = _redis.GetDatabase();
             var result = await db.StringGetAsync(key);
             return result.IsNullOrEmpty ? null : result.ToString();
         }
-
         public async Task RemoveAsync(string key)
         {
             var db = _redis.GetDatabase();
             await db.KeyDeleteAsync(key);
         }
-
-        // ✅ Atomic increment
         public async Task<long> IncrementAsync(string key)
         {
             var db = _redis.GetDatabase();
             return await db.StringIncrementAsync(key);
         }
-
-        // ✅ Set expiry (TTL) on key
         public async Task ExpireAsync(string key, TimeSpan ttl)
         {
             var db = _redis.GetDatabase();

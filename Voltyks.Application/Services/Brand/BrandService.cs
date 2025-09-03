@@ -15,12 +15,10 @@ namespace Voltyks.Application.Services
     public class BrandService : IBrandService
     {
         private readonly IUnitOfWork _unitOfWork;
-
         public BrandService(IUnitOfWork unitOfWork)
         {
             _unitOfWork = unitOfWork;
         }
-
         public async Task<ApiResponse<IEnumerable<BrandReadDto>>> GetAllAsync()
         {
             try

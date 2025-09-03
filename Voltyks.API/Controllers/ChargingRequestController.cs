@@ -19,7 +19,6 @@ namespace Voltyks.API.Controllers
             _service = service;
         }
 
-
         [HttpPost("registerDeviceToken")]
         [Authorize]
         public async Task<IActionResult> RegisterDeviceToken([FromBody] DeviceTokenDto token)
@@ -27,7 +26,6 @@ namespace Voltyks.API.Controllers
             var result = await _service.ChargingRequestService.RegisterDeviceTokenAsync(token);
             return Ok(result);
         }
-
 
         [HttpPost("sendChargingRequest")]
         [Authorize]
@@ -45,7 +43,6 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
 
-
         [HttpPut("RejectRequest")]
         [Authorize]
         public async Task<IActionResult> RejectRequest([FromBody] TransRequest dto)
@@ -53,7 +50,6 @@ namespace Voltyks.API.Controllers
             var result = await _service.ChargingRequestService.RejectRequestAsync(dto);
             return Ok(result);
         }
-
 
         [HttpPut("ConfirmRequest")]
         [Authorize]
@@ -69,7 +65,6 @@ namespace Voltyks.API.Controllers
             var result = await _service.ChargingRequestService.AbortRequestAsync(dto);
             return Ok(result);
         }
-
 
         [HttpPost("GetRequestDetailsById")]
         [Authorize]

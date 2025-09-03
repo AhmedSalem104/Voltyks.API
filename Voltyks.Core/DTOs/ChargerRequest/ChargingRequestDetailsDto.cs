@@ -13,8 +13,6 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         // Request Info
         public string Status { get; set; }
         public DateTime RequestedAt { get; set; }
-        //public DateTime? RespondedAt { get; set; }
-        //public DateTime? ConfirmedAt { get; set; }
 
         // Car Owner Info
         public string CarOwnerId { get; set; }
@@ -41,10 +39,6 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         // Vehicle Location
         public string VehicleArea { get; set; }
         public string VehicleStreet { get; set; }
-
-        // Ratings
-        //public double Rating { get; set; }
-        //public int RatingCount { get; set; }
 
         // Extras
         public double EstimatedArrival { get; set; }

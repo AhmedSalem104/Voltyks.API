@@ -31,8 +31,7 @@ namespace Voltyks.Application.Services.Firebase
             _httpClient = new HttpClient();
         }
 
-
-        
+ 
         public async Task SendNotificationAsync(string deviceToken, string title, string body , int chargingRequestID, string NotificationType)
         {
             try

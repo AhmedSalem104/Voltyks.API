@@ -83,8 +83,6 @@ namespace Voltyks.Application.Services.Auth
                 status: true
             );
         }
-
-
         public async Task<ApiResponse<UserLoginResultDto>> LoginAsync(LoginDTO model)
         {
             var user = await GetUserByUsernameOrPhoneAsync(model.EmailOrPhone);
@@ -345,6 +343,7 @@ namespace Voltyks.Application.Services.Auth
 
         }
 
+
         // ---------- Private Methods ----------
         private string GetCurrentUserId()
         {
@@ -564,8 +563,6 @@ namespace Voltyks.Application.Services.Auth
 
 
         }
-
-
         private bool IsAuthorized(string requestedUserId)
         {
             var currentUserId = GetCurrentUserId();

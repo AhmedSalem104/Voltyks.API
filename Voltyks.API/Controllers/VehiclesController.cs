@@ -6,14 +6,11 @@ using Voltyks.Core.DTOs.VehicleDTOs;
 
 namespace Voltyks.API.Controllers
 {
-
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class VehiclesController(IServiceManager _serviceManager) : ControllerBase
     {
-      
-
         [HttpPost("CreateVehicle")]
         public async Task<IActionResult> CreateVehicle([FromBody] CreateAndUpdateVehicleDto dto)
         {
@@ -42,8 +39,5 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
     }
-
-
-
     
 }

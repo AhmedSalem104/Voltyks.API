@@ -42,7 +42,6 @@ namespace Voltyks.Application.Services.ChargingRequest
             _vehicleService = vehicleService;
         }
 
-
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
         {
             try
@@ -82,7 +81,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-
         public async Task<ApiResponse<bool>> RegisterDeviceTokenAsync(DeviceTokenDto tokenDto)
         {
             var userId = GetCurrentUserId();
@@ -96,7 +94,6 @@ namespace Voltyks.Application.Services.ChargingRequest
             var ok = await SaveOrUpdateDeviceTokenAsync(token, userId);
             return new ApiResponse<bool>(ok, "Token registered", ok);
         }
-
         public async Task<ApiResponse<NotificationResultDto>> AcceptRequestAsync(TransRequest dto)
         {
             try
@@ -231,7 +228,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-
         public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
         {
             try
@@ -356,120 +352,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             {
                 return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
             }
-        }
-       
-        private string? GetCurrentUserIdRaw()
-        {
-            var user = _httpContext.HttpContext?.User;
-            if (user?.Identity?.IsAuthenticated != true) return null;
-
-            // عدّل أسماء الـ claims حسب اللي عندك فعلياً
-            return user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? user.FindFirst("sub")?.Value
-                ?? user.FindFirst("uid")?.Value
-                ?? user.FindFirst("user_id")?.Value
-                ?? user.FindFirst("id")?.Value;
-        }
-
-        //public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
-        //{
-        //    try
-        //    {
-        //        var request = await GetRequestWithDetailsAsync(dto.RequestId);
-
-        //        if (request == null)
-        //            return new ApiResponse<ChargingRequestDetailsDto>(null, "Charging request not found", false);
-
-        //        // 🧠 حساب المسافة بين السيارة والشاحن
-        //        string estimatedArrival = "N/A";
-        //        double distanceKm = 0;
-        //        if (dto.Latitude.HasValue && dto.Longitude.HasValue && request.Charger.Address?.Latitude != null && request.Charger.Address?.Longitude != null)
-        //        {
-        //            distanceKm = CalculateDistance(
-        //                dto.Latitude.Value,
-        //                dto.Longitude.Value,
-        //                request.Charger.Address.Latitude,
-        //                request.Charger.Address.Longitude
-        //            );
-
-        //            double estimatedMinutes = (distanceKm / 40.0) * 60.0;
-        //            estimatedArrival = $" {Math.Ceiling(estimatedMinutes)} min";
-        //        }
-
-        //        string estimatedPrice = request.Charger.PriceOption != null
-        //            ? $"{request.Charger.PriceOption.Value} EGP/hour"
-        //            : "N/A";
-
-
-
-        //        var vehicles = await _vehicleService.GetVehiclesByUserIdAsync();
-
-        //        // إذا كان المستخدم يمتلك سيارات متعددة، سنختار السيارة الأولى أو نضع منطق لاختيار السيارة المناسبة
-        //        var vehicle = vehicles?.Data.FirstOrDefault(); // اختيار السيارة الأولى
-
-
-
-
-
-        //        string vehicleArea = "";
-        //        string vehicleStreet = "";
-        //        if (dto.Latitude.HasValue && dto.Longitude.HasValue)
-        //        {
-        //            try
-        //            {
-        //                var (area, street) = await GetAddressFromLatLongNominatimAsync(
-        //                    dto.Latitude.Value, dto.Longitude.Value);
-        //                vehicleArea = string.IsNullOrWhiteSpace(area) ? "N/A" : area;
-        //                vehicleStreet = string.IsNullOrWhiteSpace(street) ? "N/A" : street;
-        //            }
-        //            catch
-        //            {
-        //                // تجاهل الخطأ وخلي القيم N/A
-        //            }
-        //        }
-        //        var response = new ChargingRequestDetailsDto
-        //        {
-        //            RequestId = request.Id,
-        //            Status = request.Status,
-        //            RequestedAt = request.RequestedAt,
-        //            CarOwnerId = request.CarOwner.Id,
-        //            KwNeeded = request.KwNeeded,
-        //            CurrentBatteryPercentage = request.CurrentBatteryPercentage,
-        //            CarOwnerName = new StringBuilder().Append(request.CarOwner.FirstName).Append(" ").Append(request.CarOwner.LastName).ToString(),
-
-        //            // إضافة معلومات السيارة باستخدام VehicleDto
-        //            VehicleBrand = vehicle?.BrandName ?? "Unknown", // اسم العلامة التجارية
-        //            VehicleModel = vehicle?.ModelName ?? "Unknown", // اسم الطراز
-        //            VehicleColor = vehicle?.Color ?? "Unknown", // اللون
-        //            VehiclePlate = vehicle?.Plate ?? "Unknown", // لو كان اسم السيارة عبارة عن رقم اللوحة
-        //            VehicleCapacity = vehicle.Capacity,
-        //            StationOwnerId = request.Charger.User.Id,
-        //            StationOwnerName = new StringBuilder().Append(request.Charger.User.FirstName).Append(" ").Append(request.Charger.User.LastName).ToString(),
-        //            ChargerId = request.ChargerId,
-        //            Protocol = request.Charger.Protocol?.Name ?? "Unknown",
-        //            CapacityKw = request.Charger.Capacity?.kw ?? 0,
-        //            PricePerHour = request.Charger.PriceOption != null
-        //        ? $"{request.Charger.PriceOption.Value} EGP" : "N/A",
-        //            AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
-        //            ChargerArea = request.Charger.Address?.Area ?? "N/A",
-        //            ChargerStreet = request.Charger.Address?.Street ?? "N/A",
-
-        //            VehicleArea = vehicleArea,
-        //            VehicleStreet = vehicleStreet,
-
-        //            EstimatedArrival = estimatedArrival,
-        //            EstimatedPrice = estimatedPrice,
-        //            DistanceInKm = Math.Round(distanceKm, 2)
-
-        //        };
-
-        //        return new ApiResponse<ChargingRequestDetailsDto>(response, "Charging request details fetched", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
-        //    }
-        //}
+        }    
         public async Task<(string Area, string Street)> GetAddressFromLatLongNominatimAsync(double latitude, double longitude)
         {
             // Nominatim API (مجاني)
@@ -522,7 +405,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return (area, street);
             }
         }
-
 
         private async Task<ChargingRequestEntity?> GetAndUpdateRequestAsync(TransRequest dto, string newStatus)
         {
@@ -611,9 +493,18 @@ namespace Voltyks.Application.Services.ChargingRequest
         }
 
 
+        private string? GetCurrentUserIdRaw()
+        {
+            var user = _httpContext.HttpContext?.User;
+            if (user?.Identity?.IsAuthenticated != true) return null;
 
-
-
+            // عدّل أسماء الـ claims حسب اللي عندك فعلياً
+            return user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? user.FindFirst("sub")?.Value
+                ?? user.FindFirst("uid")?.Value
+                ?? user.FindFirst("user_id")?.Value
+                ?? user.FindFirst("id")?.Value;
+        }
         // SendChargingRequestAsync ===> Helper Private Mehtods
         private async Task<Charger?> GetChargerWithIncludes(int chargerId)
         {
@@ -654,8 +545,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 .GetAllAsync(t => t.UserId == userId);
             return tokens.Select(t => t.Token).ToList();
         }
-  
-
         // RegisterDeviceTokenAsync ===> Helper Private Mehtods 
         private string? GetCurrentUserId()
         {
@@ -714,70 +603,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return true;
             }
         }
-
-        // لو عايز المستخدم يكون ليه اكتر من Token
-
-        //private async Task<bool> SaveOrUpdateDeviceTokenAsync(string token, string userId)
-        //{
-        //    var repo = _unitOfWork.GetRepository<DeviceToken, int>();
-
-        //    var existing = await repo.GetFirstOrDefaultAsync(t => t.Token == token /* trackChanges=false by default */);
-
-        //    if (existing != null)
-        //    {
-        //        // إديمبوتنت: لو التعيين كما هو، اكتفي بتحديث الطابع الزمني
-        //        if (existing.UserId != userId)
-        //            existing.UserId = userId;
-
-        //        existing.RegisteredAt = DateTime.UtcNow;
-
-        //        // لو عندك أعمدة حالة، أعد التفعيل
-        //        // existing.IsActive = true;
-        //        // existing.IsRevoked = false;
-        //        // existing.LastSeenAt = DateTime.UtcNow; // لو موجود
-
-        //        // Update عبر الـ Repo (هيعلم Modified)
-        //        repo.Update(existing);
-        //    }
-        //    else
-        //    {
-        //        await repo.AddAsync(new DeviceToken
-        //        {
-        //            Token = token,
-        //            UserId = userId,
-        //            RoleContext = "Owner",
-        //            RegisteredAt = DateTime.UtcNow,
-        //            // IsActive = true,
-        //            // IsRevoked = false,
-        //            // LastSeenAt = DateTime.UtcNow
-        //            // Platform = tokenDto.Platform, DeviceId = tokenDto.DeviceId ... (لو متاح)
-        //        });
-        //    }
-
-        //    try
-        //    {
-        //        await _unitOfWork.SaveChangesAsync();
-        //        return true;
-        //    }
-        //    catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
-        //    {
-        //        // في حالة وجود Unique Index وحدوث سباق
-        //        var again = await repo.GetFirstOrDefaultAsync(t => t.Token == token);
-        //        if (again == null) throw;
-
-        //        if (again.UserId != userId)
-        //            again.UserId = userId;
-
-        //        again.RegisteredAt = DateTime.UtcNow;
-        //        // again.IsActive = true;
-        //        // again.IsRevoked = false;
-        //        // again.LastSeenAt = DateTime.UtcNow;
-
-        //        repo.Update(again);
-        //        await _unitOfWork.SaveChangesAsync();
-        //        return true;
-        //    }
-        //}
         private static bool IsUniqueConstraintViolation(DbUpdateException ex)
         {
             if (ex?.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
@@ -788,9 +613,6 @@ namespace Voltyks.Application.Services.ChargingRequest
 
             return false;
         }
-
-
-
         private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
         {
             double R = 6371; // Radius of earth in KM
@@ -807,7 +629,6 @@ namespace Voltyks.Application.Services.ChargingRequest
             return distance;
         }
         private double DegreesToRadians(double deg) => deg * (Math.PI / 180);
-
 
         // GetRequestDetailsAsync ===> Helper Private Mehtods
         private async Task<ChargingRequestEntity?> GetRequestWithDetailsAsync(int requestId)

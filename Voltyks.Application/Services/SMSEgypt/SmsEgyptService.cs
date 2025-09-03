@@ -98,8 +98,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.OtpVerifiedSuccessfully, true);
         }
-
-
         public async Task<ApiResponse<string>> ForgetPasswordAsync(ForgetPasswordDto dto)
         {
             // 1️⃣ جيب المستخدم سواء أدخل رقم أو إيميل
@@ -198,7 +196,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             return new ApiResponse<string>(SuccessfulMessage.PasswordResetSuccessfully, true);
         }
-
         public string GenerateOtp()
         {
             return new Random().Next(1000, 9999).ToString();
@@ -281,7 +278,6 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             throw new ArgumentException("Invalid input. Accepted formats: 010xxxxxxxx, +2010xxxxxxxx, or valid email address.");
         }
-
         private async Task<bool> IsBlockedAsync(string phoneNumber)
         {
             string blockKey = $"otp_block:{phoneNumber}";
