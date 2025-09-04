@@ -17,8 +17,8 @@ namespace Voltyks.Application.Interfaces.Paymob
     {
 
 
-        Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutRequest req);
-        Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutRequest req);
+        Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req);
+        Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutServiceDto req);
         Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody);
         Task<ApiResponse<OrderStatusDto>> GetOrderStatusFromPaymobAsync(long paymobOrderId);
 

@@ -61,7 +61,7 @@ namespace Voltyks.Application.Services.Paymob
         }
 
        
-        public async Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutRequest req)
+        public async Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req)
         {
             // (1) Auth-token (مطلوب لاحقًا)
             var _ = await _tokenProvider.GetAsync(); // مجرد ضمان، الاستخدام الفعلي بيتم داخل الخطوات التالية
@@ -97,7 +97,7 @@ namespace Voltyks.Application.Services.Paymob
                 return new ApiResponse<CardCheckoutResponse> { Status = true, Message = "Card checkout ready", Data = payload };
             }
         }
-        public async Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutRequest req)
+        public async Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutServiceDto req)
         {
             // (1) Auth-token
             var _ = await _tokenProvider.GetAsync();

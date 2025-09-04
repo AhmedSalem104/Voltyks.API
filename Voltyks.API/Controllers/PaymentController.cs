@@ -24,21 +24,40 @@ namespace Voltyks.API.Controllers
         private readonly IPaymobService _svc;
         public PaymentController(IPaymobService svc) => _svc = svc;
 
+    
+
         [HttpPost("checkout/card")]
         public async Task<ActionResult<ApiResponse<CardCheckoutResponse>>> CheckoutCard([FromBody] CardCheckoutRequest req)
         {
-            var res = await _svc.CheckoutCardAsync(req);
+            var serviceDto = new CardCheckoutServiceDto
+            {
+                AmountCents = req.AmountCents,
+                Billing = req.Billing,
+                MerchantOrderId = Guid.NewGuid().ToString(),
+                Currency = "EGP"
+            };
+
+            var res = await _svc.CheckoutCardAsync(serviceDto);
             return res.Status ? Ok(res) : BadRequest(res);
         }
 
-        // ========= 2) Wallet =========
-        // Request body: WalletCheckoutRequest (زي الموجود في السيرفيس)
         [HttpPost("checkout/wallet")]
         public async Task<ActionResult<ApiResponse<WalletCheckoutResponse>>> CheckoutWallet([FromBody] WalletCheckoutRequest req)
         {
-            var res = await _svc.CheckoutWalletAsync(req);
+            var serviceDto = new WalletCheckoutServiceDto
+            {
+                AmountCents = req.AmountCents,
+                WalletPhone = req.WalletPhone,
+
+                // إضافات
+                MerchantOrderId = Guid.NewGuid().ToString(),
+                Currency = "EGP"
+            };
+
+            var res = await _svc.CheckoutWalletAsync(serviceDto);
             return res.Status ? Ok(res) : BadRequest(res);
         }
+
 
         [HttpPost("getOrderStatus")]
         [ProducesResponseType(typeof(ApiResponse<OrderStatusDto>), StatusCodes.Status200OK)]
