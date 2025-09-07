@@ -124,36 +124,83 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-        public async Task<ApiResponse<NotificationResultDto>> RejectRequestAsync(TransRequest dto)
+        public async Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(List<TransRequest> dtos)
         {
             try
             {
-                var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Rejected);
-                if (request == null)
-                    return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
+                if (dtos == null || dtos.Count == 0)
+                    return new ApiResponse<List<NotificationResultDto>>(null, "No requests provided", false);
 
-                var recipientUserId = request.CarOwner?.Id; // VehicleOwner
-                var title = "Charging Request Rejected ❌";
-                var body = $"Your request to charge at {request.Charger?.User?.FullName}'s station was rejected.";
-                var notificationType = "ChargerOwner_RejectRequest";
+                var results = new List<NotificationResultDto>();
 
-                var result = await SendAndPersistNotificationAsync(
-                    receiverUserId: recipientUserId!,
-                    requestId: request.Id,
-                    title: title,
-                    body: body,
-                    notificationType: notificationType,
-                    userTypeId: 2 // VehicleOwner
-                );
-                return new ApiResponse<NotificationResultDto>(result, "Charging request rejected", true);
+                foreach (var dto in dtos)
+                {
+                    // نفس دالتك القديمة للطلب الواحد
+                    var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Rejected);
+                    if (request == null)
+                        continue;
 
-              
+                    // ملاحظة: receiverUserId عندك string، فهنمشي على نفس النوع
+                    var recipientUserId = request.CarOwner?.Id; // VehicleOwner
+                    if (string.IsNullOrWhiteSpace(recipientUserId))
+                        continue;
+
+                    var title = "Charging Request Rejected ❌";
+                    var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
+                    var body = $"Your request to charge at {stationOwnerName}'s station was rejected.";
+                    var notificationType = "ChargerOwner_RejectRequest";
+
+                    var sent = await SendAndPersistNotificationAsync(
+                        receiverUserId: recipientUserId,
+                        requestId: request.Id,
+                        title: title,
+                        body: body,
+                        notificationType: notificationType,
+                        userTypeId: 2 // VehicleOwner
+                    );
+
+                    if (sent != null)
+                        results.Add(sent);
+                }
+
+                return new ApiResponse<List<NotificationResultDto>>(results, "Charging requests processed", true);
             }
             catch (Exception ex)
             {
-                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
+                return new ApiResponse<List<NotificationResultDto>>(null, ex.Message, false);
             }
         }
+
+        //public async Task<ApiResponse<NotificationResultDto>> RejectRequestAsync(TransRequest dto)
+        //{
+        //    try
+        //    {
+        //        var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Rejected);
+        //        if (request == null)
+        //            return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
+
+        //        var recipientUserId = request.CarOwner?.Id; // VehicleOwner
+        //        var title = "Charging Request Rejected ❌";
+        //        var body = $"Your request to charge at {request.Charger?.User?.FullName}'s station was rejected.";
+        //        var notificationType = "ChargerOwner_RejectRequest";
+
+        //        var result = await SendAndPersistNotificationAsync(
+        //            receiverUserId: recipientUserId!,
+        //            requestId: request.Id,
+        //            title: title,
+        //            body: body,
+        //            notificationType: notificationType,
+        //            userTypeId: 2 // VehicleOwner
+        //        );
+        //        return new ApiResponse<NotificationResultDto>(result, "Charging request rejected", true);
+
+
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
+        //    }
+        //}
         public async Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto)
         {
             try

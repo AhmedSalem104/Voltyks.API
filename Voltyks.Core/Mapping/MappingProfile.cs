@@ -32,12 +32,16 @@ namespace Voltyks.Core.Mapping
                 .ForMember(dest => dest.ModelId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.ModelName, opt => opt.MapFrom(src => src.Name));
 
-            // ===== Vehicle =====
             CreateMap<Vehicle, VehicleDto>()
-                .ForMember(dest => dest.BrandName, opt => opt.MapFrom(src => src.Brand.Name))
-                .ForMember(dest => dest.ModelName, opt => opt.MapFrom(src => src.Model.Name));
+                   .ForMember(dest => dest.BrandName, opt => opt.MapFrom(src => src.Brand != null ? src.Brand.Name : null))
+                   .ForMember(dest => dest.ModelName, opt => opt.MapFrom(src => src.Model != null ? src.Model.Name : null))
+                   .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => src.Model != null ? src.Model.Capacity : 0))
+                   .ReverseMap()
+               .ForPath(dest => dest.Brand, opt => opt.Ignore())
+               .ForPath(dest => dest.Model, opt => opt.Ignore());
 
-            CreateMap<VehicleDto, Vehicle>().ReverseMap();
+
+
             CreateMap<CreateAndUpdateVehicleDto, Vehicle>().ReverseMap();
             CreateMap<UpdateVehicleDto, Vehicle>().ReverseMap();
 

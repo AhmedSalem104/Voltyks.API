@@ -1,28 +1,25 @@
-﻿using System;
-using System.Net.Http.Json;
+﻿using Voltyks.Core.DTOs.Paymob.Generic_Result_DTOs;
+using Voltyks.Persistence.Entities.Main.Paymob;
+using Voltyks.Core.DTOs.Paymob.Core_API_DTOs;
+using Voltyks.Application.Interfaces.Paymob;
+using Voltyks.Core.DTOs.Paymob.AddtionDTOs;
+using Voltyks.Core.DTOs.Paymob.Input_DTOs;
+using Voltyks.Infrastructure.UnitOfWork;
+using Voltyks.Core.DTOs.Paymob.Options;
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Voltyks.Application.Interfaces.Paymob;
-using Voltyks.Core.DTOs.Paymob.Core_API_DTOs;
-using Voltyks.Core.DTOs.Paymob.Generic_Result_DTOs;
-using Voltyks.Core.DTOs.Paymob.Input_DTOs;
-using Voltyks.Core.DTOs.Paymob.Options;
-using Voltyks.Persistence.Entities.Main.Paymob;
-using Voltyks.Infrastructure.UnitOfWork;
-using Voltyks.Infrastructure;
 using Microsoft.AspNetCore.Http;
-using System.Text.Json;
-using Voltyks.Core.DTOs;
-using Voltyks.Core.DTOs.Paymob.AddtionDTOs;
-using System.Net;
-using System.Collections.Concurrent;
-using System.Net.Http;
-using System.Security.Claims;
-using Voltyks.Core.DTOs.ChargerRequest;
 using System.Net.Http.Headers;
-using Twilio.Jwt.AccessToken;
+using System.Security.Claims;
+using Voltyks.Infrastructure;
+using System.Net.Http.Json;
+using Voltyks.Core.DTOs;
+using System.Text.Json;
+using System.Text;
+using System.Net;
+
 
 namespace Voltyks.Application.Services.Paymob
 {
@@ -34,20 +31,14 @@ namespace Voltyks.Application.Services.Paymob
         private readonly ILogger<PaymobService> _log;
         private readonly IPaymobAuthTokenProvider _tokenProvider;
         private readonly IHttpContextAccessor _httpContext;
-
         private IGenericRepository<PaymentOrder, int> OrdersRepo => _uow.GetRepository<PaymentOrder, int>();
         private IGenericRepository<PaymentTransaction, int> TxRepo => _uow.GetRepository<PaymentTransaction, int>();
-        private IGenericRepository<WebhookLog, int> WebhookRepo => _uow.GetRepository<WebhookLog, int>();
-        private IGenericRepository<PaymentAction, int> ActionRepo => _uow.GetRepository<PaymentAction, int>();
-
 
         // داخل الـService اللي فيه _uow
         private IGenericRepository<WebhookLog, int> WebhookLogs
             => _uow.GetRepository<WebhookLog, int>();
-
         private IGenericRepository<PaymentOrder, int> PaymentOrders
             => _uow.GetRepository<PaymentOrder, int>();
-
         private IGenericRepository<PaymentTransaction, int> PaymentTransactions
             => _uow.GetRepository<PaymentTransaction, int>();
         public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext)
@@ -59,8 +50,7 @@ namespace Voltyks.Application.Services.Paymob
             _tokenProvider = tokenProvider;
             _httpContext = httpContext;
         }
-
-       
+    
         public async Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req)
         {
             // (1) Auth-token (مطلوب لاحقًا)
@@ -488,7 +478,6 @@ namespace Voltyks.Application.Services.Paymob
         }
 
 
-
         // ===== Idempotency: نعتبر “معالج” لو في WebhookLog بـ TRANSACTION_PROCESSED لنفس PaymobTransactionId
         private async Task<bool> ExistsProcessedTxAsync(long paymobTransactionId)
         {
@@ -547,7 +536,6 @@ namespace Voltyks.Application.Services.Paymob
             PaymentTransactions.Update(tx);
             await _uow.SaveChangesAsync();
         }
-
 
 
         // ================== Helpers / Infra ==================
@@ -823,9 +811,7 @@ namespace Voltyks.Application.Services.Paymob
             if (bool.TryParse(v, out var b)) return b;
             return v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
-
     }
-
 }
 
 
