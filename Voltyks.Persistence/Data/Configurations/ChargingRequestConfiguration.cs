@@ -16,12 +16,23 @@ namespace Voltyks.Persistence.Data.Configurations
             builder.HasOne(r => r.CarOwner)
                    .WithMany(u => u.ChargingRequests)
                    .HasForeignKey(r => r.UserId)
-                   .OnDelete(DeleteBehavior.Cascade);
+                   .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(r => r.Charger)
                    .WithMany(c => c.ChargingRequests)
                    .HasForeignKey(r => r.ChargerId)
-                   .OnDelete(DeleteBehavior.Cascade);
+                   .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasIndex(r => new { r.Status, r.RequestedAt });
+
+            builder.HasIndex(r => new { r.Status, r.RequestedAt })
+                   .HasDatabaseName("IX_ChargingRequests_Status_RequestedAt");  
+
+            builder.Property(r => r.Status)
+                   .HasColumnType("nvarchar(450)")  
+                   .IsRequired();  
+
+
         }
     }
 

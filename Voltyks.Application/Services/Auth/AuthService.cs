@@ -15,18 +15,19 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Configuration;
 using System.Text.RegularExpressions;
 using Voltyks.Persistence.Entities;
-using System.Numerics;
 using Voltyks.Core.DTOs;
 using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Interfaces.Redis;
 using AutoMapper;
-
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Entities.Main;
 using Voltyks.Core.DTOs.VehicleDTOs;
 using Voltyks.Core.DTOs.Charger;
-using System.Net.Http;
 using Voltyks.Persistence.Data;
+using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
+
+
+
 
 
 namespace Voltyks.Application.Services.Auth
@@ -53,8 +54,8 @@ namespace Voltyks.Application.Services.Auth
 
             var vehicles = await GetUserVehiclesAsync(userId);
             var chargers = await GetUserChargersAsync(userId);
-
-            var result = BuildUserDetailsDto(user, vehicles, chargers);
+            var Requests = await GetChargerRequestsAsync(userId);
+            var result =  BuildUserDetailsDto(user, vehicles, chargers , Requests);
             return new ApiResponse<UserDetailsDto>(result, SuccessfulMessage.UserDataRetrievedSuccessfully, true);
         }
         public async Task<ApiResponse<bool>> ToggleUserAvailabilityAsync()
@@ -606,11 +607,46 @@ namespace Voltyks.Application.Services.Auth
              )).ToList();
 
         }
-        private UserDetailsDto BuildUserDetailsDto(AppUser user, List<Vehicle> vehicles, List<Charger> chargers)
+        //private async Task<List<ChargingRequestEntity>> GetChargerRequestsAsync(string userId)
+        //{
+        //    var chargerRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+        //    return (await chargerRepo.GetAllWithIncludeAsync(
+        //        c => c.UserId == userId, // تصفية حسب UserId
+        //        false,
+        //        c => c.Charger // إدراج العلاقة مع Charger
+        //    )).ToList();
+        //}
+        private async Task<List<ChargingRequestEntity>> GetChargerRequestsAsync(string userId)
+        {
+            var chargerRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+
+            // جلب الطلبات الخاصة بالمستخدم فقط مع تحديد بعض الخصائص الهامة لتجنب الدورة الكائنية
+            var userRequests = await chargerRepo.GetAllWithIncludeAsync(
+                c => c.UserId == userId,  // تصفية حسب الـ userId
+                false,
+                c => c.Charger // فقط الحصول على الـ Charger الأساسي
+            );
+
+            // بدلاً من جلب جميع الـ ChargingRequests في كل طلب، قم فقط بتحديد الخصائص الضرورية
+            var simplifiedRequests = userRequests.Select(req => new ChargingRequestEntity
+            {
+                Id = req.Id,
+                UserId = req.UserId,
+                Status = req.Status,
+                RequestedAt = req.RequestedAt,
+                ChargerId = req.ChargerId
+            }).ToList();
+
+            return simplifiedRequests;
+        }
+
+        private UserDetailsDto BuildUserDetailsDto(AppUser user, List<Vehicle> vehicles, List<Charger> chargers ,List<ChargingRequestEntity> chargingRequests)
         {
             var result = _mapper.Map<UserDetailsDto>(user);
             result.Vehicles = _mapper.Map<List<VehicleDto>>(vehicles);
             result.Chargers = _mapper.Map<List<ChargerDto>>(chargers);
+            result.ChargingRequests = _mapper.Map<List<ChargingRequestEntity>>(chargingRequests);
+
             return result;
         }
 

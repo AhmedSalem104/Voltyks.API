@@ -1,25 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data.Entity.Infrastructure;
-using System.Data.SqlClient;
+﻿using System.Data.SqlClient;
 using System.Linq;
 using System.Net.Http.Headers;
-using System.Runtime.InteropServices;
 using System.Security.Claims;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
-using Twilio.TwiML.Voice;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Core.DTOs;
-using Voltyks.Core.DTOs.Charger;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.Enums;
 using Voltyks.Infrastructure.UnitOfWork;
-using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using   ChargingRequestEntity =  Voltyks.Persistence.Entities.Main.ChargingRequest;
 
@@ -115,6 +107,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: 2 // VehicleOwner
                 );
+                await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request accepted", true);
 
@@ -161,6 +155,9 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     if (sent != null)
                         results.Add(sent);
+                    await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+
+
                 }
 
                 return new ApiResponse<List<NotificationResultDto>>(results, "Charging requests processed", true);
@@ -229,6 +226,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: 1 // ChargerOwner
                 );
+                await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+
                 return new ApiResponse<NotificationResultDto>(result, "Charging request confirmed", true);
 
               
@@ -266,6 +265,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: 1 // ChargerOwner
                 );
+                await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+
                 return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
 
                
@@ -452,7 +453,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return (area, street);
             }
         }
-
         private async Task<ChargingRequestEntity?> GetAndUpdateRequestAsync(TransRequest dto, string newStatus)
         {
             var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
@@ -494,6 +494,8 @@ namespace Voltyks.Application.Services.ChargingRequest
 
             await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
             await _unitOfWork.SaveChangesAsync(); // مهم
+                                                 
+            //await TryAutoDeleteRequestAndChildrenAsync(relatedRequestId);
 
             return notification;
         }
@@ -694,7 +696,107 @@ namespace Voltyks.Application.Services.ChargingRequest
                 )).FirstOrDefault();
         }
 
-     
+        //private async Task<bool> TryAutoDeleteRequestAndChildrenAsync(int requestId)
+        //{
+        //    // 1) هات الطلبات (للتأكد من الشرط)
+        //    var reqRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+        //    var requestsToDelete = (await reqRepo.GetAllAsync(
+        //            r => r.RequestedAt != null,  // نتحقق إذا كان التاريخ موجودًا
+        //            trackChanges: true))
+        //        .AsEnumerable()  // إيقاف الترجمة إلى SQL
+        //        .Where(r => (DateTime.UtcNow - r.RequestedAt).TotalMinutes >= 5 && r.Status.ToLower() != "pending") // تنفيذ الحساب في الذاكرة
+        //        .ToList();
+
+        //    if (!requestsToDelete.Any()) return false;
+
+        //    // 2) احفظ الـ IDs المرتبطة قبل حذف الطلب
+        //    var notifRepo = _unitOfWork.GetRepository<Notification, int>();
+        //    var relatedNotifIds = (await notifRepo.GetAllAsync(n => n.RelatedRequestId == requestId))
+        //                          .Select(n => n.Id)
+        //                          .ToList();
+
+        //    // 3) احذف الطلبات التي لا تنطبق عليها الشروط
+        //    foreach (var req in requestsToDelete)
+        //    {
+        //        reqRepo.Delete(req); // حذف الطلب
+        //    }
+
+        //    await _unitOfWork.SaveChangesAsync(); // حفظ التغييرات في قاعدة البيانات
+
+        //    // 4) احذف الإشعارات المرتبطة بالطلبات المحذوفة
+        //    if (relatedNotifIds.Count > 0)
+        //    {
+        //        var orphans = await notifRepo.GetAllAsync(n => relatedNotifIds.Contains(n.Id), trackChanges: true);
+        //        foreach (var orphan in orphans)
+        //        {
+        //            notifRepo.Delete(orphan); // حذف الإشعارات التي تم العثور عليها
+        //        }
+
+        //        await _unitOfWork.SaveChangesAsync(); // حفظ التغييرات بعد حذف الإشعارات
+        //    }
+
+        //    return true;
+        //}
+        private async Task<bool> DeleteUserRequestsAndNotificationsAsync(string userId)
+        {
+            // 1) الحصول على الـ repository الخاص بـ ChargingRequestEntity
+            var reqRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+
+            // 2) استرجاع جميع الطلبات الخاصة بالمستخدم الحالي
+            var userRequests = await reqRepo.GetAllWithIncludeAsync(
+                c => c.UserId == userId,  // تصفية حسب الـ userId
+                false,
+                c => c.Charger  // يمكنك إضافة أي علاقات إضافية إذا لزم الأمر
+            );
+
+            // 3) تصفية الطلبات حسب الشرطين: مر عليها أكثر من 5 دقائق والحالة ليست "pending"
+            var requestsToDelete = userRequests
+                .Where(c => (DateTime.UtcNow - c.RequestedAt).TotalMinutes >= 5
+                            || c.Status.ToLower() != "pending")
+                .ToList();
+
+            // إذا لم توجد طلبات تنطبق عليها الشروط، إرجاع false
+            if (!requestsToDelete.Any())
+                return false;
+
+            // 4) حذف الإشعارات المرتبطة بكل طلب
+            var notifRepo = _unitOfWork.GetRepository<Notification, int>();
+
+            // احصل على IDs الإشعارات المرتبطة بالطلب
+            // الحصول على IDs الإشعارات المرتبطة بالطلبات
+         
+            var relatedNotifIds = (await notifRepo.GetAllAsync(n =>
+                requestsToDelete.Select(r => r.Id).ToList().Contains((int)n.RelatedRequestId)))
+                .Select(n => n.Id)
+                .ToList();
+
+
+            // حذف الإشعارات المرتبطة بالطلبات المحذوفة
+            if (relatedNotifIds.Any())
+            {
+                var orphans = await notifRepo.GetAllAsync(n => relatedNotifIds.Contains(n.Id), trackChanges: true);
+                foreach (var orphan in orphans)
+                {
+                    notifRepo.Delete(orphan); // حذف الإشعارات التي تم العثور عليها
+                }
+
+                await _unitOfWork.SaveChangesAsync(); // حفظ التغييرات بعد حذف الإشعارات
+            }
+
+            // 5) حذف الطلبات التي تم تصفيتها
+            foreach (var request in requestsToDelete)
+            {
+                reqRepo.Delete(request); // حذف الطلب
+            }
+
+            // حفظ التغييرات في قاعدة البيانات بعد حذف الطلبات
+            await _unitOfWork.SaveChangesAsync();
+
+            // إرجاع true إذا تم الحذف بنجاح
+            return true;
+        }
+
+
     }
 
 

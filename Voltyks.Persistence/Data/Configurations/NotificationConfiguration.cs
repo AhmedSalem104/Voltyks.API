@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
 using Voltyks.Persistence.Entities.Main;
+using System.Reflection.Emit;
 
 namespace Voltyks.Persistence.Data.Configurations
 {
@@ -21,7 +22,12 @@ namespace Voltyks.Persistence.Data.Configurations
             builder.HasOne(n => n.RelatedRequest)
                    .WithMany()
                    .HasForeignKey(n => n.RelatedRequestId)
-                   .OnDelete(DeleteBehavior.Restrict);
+                   .OnDelete(DeleteBehavior.SetNull) // المهم
+                   .IsRequired(false);
+
+            builder.HasIndex(n => n.RelatedRequestId);
+            builder.HasIndex(n => n.UserId);
+
         }
     }
 

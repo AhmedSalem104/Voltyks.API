@@ -1,6 +1,7 @@
 ﻿
 using Voltyks.Core.DTOs.Charger;
 using Voltyks.Core.DTOs.VehicleDTOs;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Core.DTOs.AuthDTOs
 {
@@ -14,6 +15,8 @@ namespace Voltyks.Core.DTOs.AuthDTOs
 
         public List<VehicleDto> Vehicles { get; set; }
         public List<ChargerDto> Chargers { get; set; }
+        public List<ChargingRequest> ChargingRequests { get; set; }
+
     }
 
     public class PriceOptionDto
