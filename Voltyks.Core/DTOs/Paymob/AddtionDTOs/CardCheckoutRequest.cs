@@ -16,8 +16,9 @@ namespace Voltyks.Core.DTOs.Paymob.AddtionDTOs
         [Range(1, long.MaxValue, ErrorMessage = "amountCents must be > 0")]
         public long AmountCents { get; set; }
 
+
         [Required] // دي لازمة
-        public BillingData Billing { get; set; } = default!;
+        public BillingDataInitDto Billing { get; set; } = default!;
     }
 
 }

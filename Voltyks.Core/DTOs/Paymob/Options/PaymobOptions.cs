@@ -16,7 +16,22 @@ namespace Voltyks.Core.DTOs.Paymob.Options
         public IntegrationIds Integration { get; set; } = new();
 
 
-       
+
+        // 👇 جديد
+        public string? PublicKey { get; set; }
+        public IntentionOptions Intention { get; set; } = new();
+
+        public class IntegrationOptions
+        {
+            public int Card { get; set; }
+            public int Wallet { get; set; }
+        }
+        public class IntentionOptions
+        {
+            public string? Url { get; set; }   // URL كامل (اختياري)
+            public string? Path { get; set; }  // Path يُركّب على ApiBase لو Url فاضي
+        }
+
 
     }
 }

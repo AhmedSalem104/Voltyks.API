@@ -477,8 +477,139 @@ namespace Voltyks.Application.Services.Paymob
             }
         }
 
+        public async Task<ApiResponse<IntentionClientSecretDto>> ExchangePaymentKeyForClientSecretAsync(string paymentKey, string? publicKeyOverride = null, CancellationToken ct = default)
+        {
+            var token = await GenerateBearerTokenAsync();
 
-        // ===== Idempotency: نعتبر “معالج” لو في WebhookLog بـ TRANSACTION_PROCESSED لنفس PaymobTransactionId
+            if (string.IsNullOrWhiteSpace(paymentKey))
+                return new ApiResponse<IntentionClientSecretDto> { Status = false, Message = "paymentKey is required" };
+
+            var publicKey = string.IsNullOrWhiteSpace(publicKeyOverride) ? _opt.PublicKey : publicKeyOverride;
+            if (string.IsNullOrWhiteSpace(publicKey))
+                return new ApiResponse<IntentionClientSecretDto> { Status = false, Message = "publicKey is required (config or request)" };
+
+            var url = !string.IsNullOrWhiteSpace(_opt.Intention?.Url)
+                ? _opt.Intention!.Url!
+                : $"{_opt.ApiBase?.TrimEnd('/')}{_opt.Intention?.Path}";
+
+            if (string.IsNullOrWhiteSpace(url))
+                return new ApiResponse<IntentionClientSecretDto> { Status = false, Message = "Intention endpoint URL is not configured" };
+
+            var body = new
+            {
+                payment_key = paymentKey,
+                public_key = publicKey
+            };
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+
+            // حساب HMAC وتعيينه في الهيدر
+            var hmacSignature = CalculateHmac(body, _opt.HmacSecret);
+            Console.WriteLine($"HMAC Signature: {hmacSignature}"); // قم بطباعة التوقيع لمقارنة
+
+            req.Headers.Add("X-HMAC-Signature", hmacSignature);
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            req.Headers.Accept.ParseAdd("application/json");
+            req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+
+            var res = await _http.SendAsync(req, ct);
+            var raw = await res.Content.ReadAsStringAsync(ct);
+
+            if (!res.IsSuccessStatusCode)
+            {
+                _log.LogWarning("Intention API error: {Status} - {Body}", (int)res.StatusCode, raw);
+                return new ApiResponse<IntentionClientSecretDto>
+                {
+                    Status = false,
+                    Message = $"Intention API error: {(int)res.StatusCode}",
+                    Errors = new List<string> { raw }
+                };
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(raw);
+                var root = doc.RootElement;
+                var clientSecret = root.GetProperty("client_secret").GetString();
+
+                return new ApiResponse<IntentionClientSecretDto>
+                {
+                    Status = true,
+                    Message = "Token generated successfully",
+                    Data = new IntentionClientSecretDto(clientSecret!)
+                };
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Failed to parse Intention response: {Body}", raw);
+                return new ApiResponse<IntentionClientSecretDto>
+                {
+                    Status = false,
+                    Message = "Failed to parse Intention response",
+                    Errors = new List<string> { ex.Message, raw }
+                };
+            }
+        }
+        public async Task<string> GenerateBearerTokenAsync()
+        {
+            var url = "https://accept.paymob.com/api/auth/tokens";
+            var body = new
+            {
+                api_key = _opt.ApiKey // تأكد من أن api_key في الإعدادات صالح
+            };
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+            };
+
+            var res = await _http.SendAsync(req);
+            var raw = await res.Content.ReadAsStringAsync();
+
+            if (res.IsSuccessStatusCode)
+            {
+                using var doc = JsonDocument.Parse(raw);
+                var root = doc.RootElement;
+                return root.GetProperty("token").GetString(); // إرجاع التوكن
+            }
+            else
+            {
+                // طباعة الخطأ إذا فشل الحصول على التوكن
+                _log.LogError("Failed to get Bearer Token: {Error}", raw);
+                throw new Exception($"Failed to get Bearer Token: {raw}");
+            }
+        }
+        public string CalculateHmac(object body, string secret)
+        {
+
+         
+
+            var bodyString = JsonSerializer.Serialize(body);
+            Console.WriteLine("Body String: " + bodyString); // طباعة الـ body الذي سيتم حساب التوقيع عليه
+
+            using var hmac = new System.Security.Cryptography.HMACSHA512(Encoding.UTF8.GetBytes(secret));  // حساب الـ HMAC باستخدام الـ secret
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(bodyString)); // حساب التوقيع
+
+            var hmacSignature = BitConverter.ToString(hash).Replace("-", "").ToLower(); // تحويل الـ hash إلى String
+            Console.WriteLine("HMAC Signature: " + hmacSignature); // طباعة الـ HMAC Signature
+
+            return hmacSignature;  // إرجاع التوقيع المحسوب
+
+        }
+        public void CompareHmacSignature(string calculatedSignature, string receivedSignature)
+        {
+            if (calculatedSignature == receivedSignature)
+            {
+                Console.WriteLine("The signatures match!");
+            }
+            else
+            {
+                Console.WriteLine("The signatures do not match!");
+            }
+        }
+
+
+
         private async Task<bool> ExistsProcessedTxAsync(long paymobTransactionId)
         {
             return await WebhookLogs.AnyAsync(w =>
@@ -741,6 +872,15 @@ namespace Voltyks.Application.Services.Paymob
         private (bool IsValid, string Error, object Value) NormalizeAndValidateBilling(BillingData b)
         {
             if (b == null) return (false, "billing_data is required", new { });
+
+            bool missing =
+                string.IsNullOrWhiteSpace(b.first_name) ||
+                string.IsNullOrWhiteSpace(b.last_name) ||
+                string.IsNullOrWhiteSpace(b.email) ||
+                string.IsNullOrWhiteSpace(b.phone_number);
+
+            if (missing) return (false, "first_name, last_name, email, phone_number are required", new { });
+
             string S(string? x) => string.IsNullOrWhiteSpace(x) ? "NA" : x.Trim();
 
             var obj = new
@@ -760,6 +900,7 @@ namespace Voltyks.Application.Services.Paymob
             };
             return (true, "", obj);
         }
+
         private async Task AddTransactionAsync(string merchantOrderId, long? paymobOrderId, long amountCents, string currency, string integrationType, string status = "Initiated", bool isSuccess = false)
         {
             var tx = new PaymentTransaction

@@ -32,9 +32,24 @@ namespace Voltyks.API.Controllers
             var serviceDto = new CardCheckoutServiceDto
             {
                 AmountCents = req.AmountCents,
-                Billing = req.Billing,
                 MerchantOrderId = Guid.NewGuid().ToString(),
-                Currency = "EGP"
+                Currency = "EGP",
+                Billing = new BillingData
+                (
+                    req.Billing.first_name,
+                    req.Billing.last_name,
+                    req.Billing.email,
+                    req.Billing.phone_number,
+                    "NA",  // apartment
+                    "NA",  // floor
+                    "NA",  // building
+                    "NA",  // street
+                    "NA",  // city
+                    "NA",  // state
+                    "EG",  // country
+                    "NA"   // postal_code
+
+                )
             };
 
             var res = await _svc.CheckoutCardAsync(serviceDto);
@@ -85,6 +100,14 @@ namespace Voltyks.API.Controllers
             return res.Status ? Ok(res) : BadRequest(res);
         }
 
+    
+        [HttpPost("intention")]
+        public async Task<ActionResult<ApiResponse<IntentionClientSecretDto>>> Intention(
+            [FromBody] IntentionExchangeRequest req, CancellationToken ct)
+        {
+            var res = await _svc.ExchangePaymentKeyForClientSecretAsync(req.PaymentKey, null, ct);
+            return res.Status ? Ok(res) : BadRequest(res);
+        }
 
 
 

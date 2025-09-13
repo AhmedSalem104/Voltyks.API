@@ -22,6 +22,9 @@ namespace Voltyks.Application.Interfaces.Paymob
         Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody);
         Task<ApiResponse<OrderStatusDto>> GetOrderStatusFromPaymobAsync(long paymobOrderId);
 
+        Task<ApiResponse<IntentionClientSecretDto>> ExchangePaymentKeyForClientSecretAsync(
+      string paymentKey, string? publicKeyOverride = null, CancellationToken ct = default);
+
     }
 
 
