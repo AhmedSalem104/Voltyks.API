@@ -2,6 +2,7 @@
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.DTOs.BrandsDTOs;
 using Voltyks.Core.DTOs.Charger;
+using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.DTOs.ModelDTOs;
 using Voltyks.Core.DTOs.VehicleDTOs;
 using Voltyks.Persistence.Entities.Identity;
@@ -90,6 +91,36 @@ namespace Voltyks.Core.Mapping
                 .ForMember(dest => dest.Latitude, opt => opt.MapFrom(src => src.Address.Latitude))
                 .ForMember(dest => dest.Longitude, opt => opt.MapFrom(src => src.Address.Longitude))
                 .ForMember(dest => dest.DistanceInKm, opt => opt.Ignore()); // نحسبها يدوي
+
+
+
+            // ChargingRequestEntity -> ChargingRequestDetailsDto
+            CreateMap<ChargingRequest, ChargingRequestDetailsDto>()
+                .ForMember(d => d.RequestId, o => o.MapFrom(s => s.Id))
+                .ForMember(d => d.Status, o => o.MapFrom(s => s.Status))
+                .ForMember(d => d.RequestedAt, o => o.MapFrom(s => s.RequestedAt))
+                .ForMember(d => d.CarOwnerId, o => o.MapFrom(s => s.CarOwner.Id))
+                .ForMember(d => d.CarOwnerName, o => o.MapFrom(s => $"{s.CarOwner.FirstName} {s.CarOwner.LastName}"))
+                .ForMember(d => d.StationOwnerId, o => o.MapFrom(s => s.Charger.User.Id))
+                .ForMember(d => d.StationOwnerName, o => o.MapFrom(s => $"{s.Charger.User.FirstName} {s.Charger.User.LastName}"))
+                .ForMember(d => d.ChargerId, o => o.MapFrom(s => s.ChargerId))
+                .ForMember(d => d.Protocol, o => o.MapFrom(s => s.Charger.Protocol != null ? s.Charger.Protocol.Name : "Unknown"))
+                .ForMember(d => d.CapacityKw, o => o.MapFrom(s => s.Charger.Capacity != null ? s.Charger.Capacity.kw : 0))
+                .ForMember(d => d.PricePerHour, o => o.MapFrom(s => s.Charger.PriceOption != null ? $"{s.Charger.PriceOption.Value} EGP" : "N/A"))
+                .ForMember(d => d.AdapterAvailability, o => o.MapFrom(s => s.Charger.Adaptor == true ? "Available" : "Not Available"))
+                .ForMember(d => d.ChargerArea, o => o.MapFrom(s => s.Charger.Address != null ? s.Charger.Address.Area : "N/A"))
+                .ForMember(d => d.ChargerStreet, o => o.MapFrom(s => s.Charger.Address != null ? s.Charger.Address.Street : "N/A"))
+                // تجاهل الحقول اللي هتتحسب في السيرفس
+                .ForMember(d => d.VehicleBrand, o => o.Ignore())
+                .ForMember(d => d.VehicleModel, o => o.Ignore())
+                .ForMember(d => d.VehicleColor, o => o.Ignore())
+                .ForMember(d => d.VehiclePlate, o => o.Ignore())
+                .ForMember(d => d.VehicleCapacity, o => o.Ignore())
+                .ForMember(d => d.VehicleArea, o => o.Ignore())
+                .ForMember(d => d.VehicleStreet, o => o.Ignore())
+                .ForMember(d => d.EstimatedArrival, o => o.Ignore())
+                .ForMember(d => d.EstimatedPrice, o => o.Ignore())
+                .ForMember(d => d.DistanceInKm, o => o.Ignore());
         }
     }
 

@@ -25,6 +25,10 @@ using Voltyks.Core.DTOs.VehicleDTOs;
 using Voltyks.Core.DTOs.Charger;
 using Voltyks.Persistence.Data;
 using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
+using Voltyks.Application.Interfaces;
+using Voltyks.Core.DTOs.ChargerRequest;
+using Newtonsoft.Json.Linq;
+using System.Net.Http.Headers;
 
 
 
@@ -40,6 +44,8 @@ namespace Voltyks.Application.Services.Auth
         , IMapper _mapper
         , IUnitOfWork _unitOfWork
         , VoltyksDbContext context
+        , IVehicleService _vehicleService
+
         ) : IAuthService
     {
 
@@ -54,8 +60,8 @@ namespace Voltyks.Application.Services.Auth
 
             var vehicles = await GetUserVehiclesAsync(userId);
             var chargers = await GetUserChargersAsync(userId);
-            var Requests = await GetChargerRequestsAsync(userId);
-            var result =  BuildUserDetailsDto(user, vehicles, chargers , Requests);
+            //var Requests = await GetChargerRequestsAsync(userId);
+            var result =  BuildUserDetailsDto(user, vehicles, chargers);
             return new ApiResponse<UserDetailsDto>(result, SuccessfulMessage.UserDataRetrievedSuccessfully, true);
         }
         public async Task<ApiResponse<bool>> ToggleUserAvailabilityAsync()
@@ -346,6 +352,87 @@ namespace Voltyks.Application.Services.Auth
 
 
         // ---------- Private Methods ----------
+
+        public async Task<ApiResponse<List<ChargingRequestDetailsDto>>> GetChargerRequestsAsync()
+        {
+
+            var userId = GetCurrentUserId();
+
+            if (string.IsNullOrEmpty(userId))
+                return new ApiResponse<List<ChargingRequestDetailsDto>>(
+                    null, "Unauthorized", false);
+
+            var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+
+            var requests = (await repo.GetAllWithIncludeAsync(
+                c => c.UserId == userId,
+                false,
+                c => c.CarOwner,
+                c => c.Charger,
+                c => c.Charger.User,
+                c => c.Charger.Address,
+                c => c.Charger.Protocol,
+                c => c.Charger.Capacity,
+                c => c.Charger.PriceOption
+            )).ToList();
+
+            var list = _mapper.Map<List<ChargingRequestDetailsDto>>(requests);
+
+            for (int i = 0; i < list.Count; i++)
+            {
+                var req = requests[i];
+                var dto = list[i];
+
+                // حساب المسافة والوقت التقريبي
+                if (req.Latitude != 0 && req.Longitude != 0
+                    && req.Charger?.Address?.Latitude != 0
+                    && req.Charger?.Address?.Longitude != 0)
+                {
+                    dto.DistanceInKm = CalculateDistance(
+                        req.Latitude,
+                        req.Longitude,
+                        req.Charger.Address.Latitude,
+                        req.Charger.Address.Longitude
+                    );
+
+                    // افتراض سرعة 40 كم/س → وقت الوصول بالدقائق
+                    dto.EstimatedArrival = Math.Ceiling((dto.DistanceInKm / 40.0) * 60.0);
+                }
+
+                // تقدير السعر
+                if (req.Charger?.PriceOption != null && req.Charger.Capacity?.kw > 0)
+                {
+                    dto.EstimatedPrice = req.Charger.PriceOption.Value
+                                         * (decimal)req.KwNeeded
+                                         / (decimal)req.Charger.Capacity.kw;
+                }
+
+                // بيانات السيارة (أول سيارة للمستخدم صاحب الطلب)
+                var vehicles = await _vehicleService.GetVehiclesByUserIdAsync(req.CarOwner.Id);
+                var vehicle = vehicles?.Data?.FirstOrDefault();
+                if (vehicle != null)
+                {
+                    dto.VehicleBrand = vehicle.BrandName;
+                    dto.VehicleModel = vehicle.ModelName;
+                    dto.VehicleColor = vehicle.Color;
+                    dto.VehiclePlate = vehicle.Plate;
+                    dto.VehicleCapacity = vehicle.Capacity;
+                }
+
+                // العنوان (اختياري)
+                dto.VehicleArea = "N/A";
+                dto.VehicleStreet = "N/A";
+            }
+
+            return new ApiResponse<List<ChargingRequestDetailsDto>>(
+                list,
+                SuccessfulMessage.DataRetrievedSuccessfully,
+                true
+            );
+        }
+
+
+
         private string GetCurrentUserId()
         {
             return httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -616,38 +703,172 @@ namespace Voltyks.Application.Services.Auth
         //        c => c.Charger // إدراج العلاقة مع Charger
         //    )).ToList();
         //}
-        private async Task<List<ChargingRequestEntity>> GetChargerRequestsAsync(string userId)
+        //private async Task<List<ChargingRequestEntity>> GetChargerRequestsAsync(string userId)
+        //{
+        //    var chargerRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+
+        //    var userRequests = await chargerRepo.GetAllWithIncludeAsync(
+        //        c => c.UserId == userId,  
+        //        false,
+        //        c => c.Charger 
+        //    );
+
+        //    var simplifiedRequests = userRequests.Select(req => new ChargingRequestEntity
+        //    {
+        //        Id = req.Id,
+        //        UserId = req.UserId,
+        //        Status = req.Status,
+        //        RequestedAt = req.RequestedAt,
+        //        ChargerId = req.ChargerId
+        //    }).ToList();
+
+        //    return simplifiedRequests;
+        //}
+        //public async Task<List<ChargingRequestDetailsDto>> GetChargerRequestsAsync(string userId)
+        //{
+        //    var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+
+        //    var requests = (await repo.GetAllWithIncludeAsync(
+        //                 c => c.UserId == userId,
+        //                 false,
+        //                 c => c.CarOwner,
+        //                 c => c.Charger,
+        //                 c => c.Charger.User,
+        //                 c => c.Charger.Address,
+        //                 c => c.Charger.Protocol,
+        //                 c => c.Charger.Capacity,
+        //                 c => c.Charger.PriceOption
+        //             )).ToList();   // 👈 هنا
+
+
+        //    var list = _mapper.Map<List<ChargingRequestDetailsDto>>(requests);
+
+        //    // اكمل البيانات المحسوبة
+        //    for (int i = 0; i < list.Count; i++)
+        //    {
+        //        var req = requests[i];
+        //        var dto = list[i];
+
+        //        // حساب المسافة والوقت
+        //        if (req.Latitude != 0 && req.Longitude != 0
+        //                  && req.Charger?.Address?.Latitude != 0
+        //                 && req.Charger?.Address?.Longitude != 0)
+        //        {
+        //            dto.DistanceInKm = CalculateDistance(
+        //                req.Latitude,
+        //                req.Longitude,
+        //                req.Charger.Address.Latitude,
+        //                req.Charger.Address.Longitude
+        //            );
+
+        //            dto.EstimatedArrival = Math.Ceiling((dto.DistanceInKm / 40.0) * 60.0);
+        //        }
+
+
+        //        // السعر
+        //        if (req.Charger?.PriceOption != null && req.Charger.Capacity?.kw > 0)
+        //        {
+        //            dto.EstimatedPrice = req.Charger.PriceOption.Value
+        //                                 * (decimal)req.KwNeeded
+        //                                 / (decimal)req.Charger.Capacity.kw;
+        //        }
+
+        //        // بيانات السيارة
+        //        var vehicles = await _vehicleService.GetVehiclesByUserIdAsync(req.CarOwner.Id);
+        //        var vehicle = vehicles?.Data?.FirstOrDefault();
+        //        if (vehicle != null)
+        //        {
+        //            dto.VehicleBrand = vehicle.BrandName;
+        //            dto.VehicleModel = vehicle.ModelName;
+        //            dto.VehicleColor = vehicle.Color;
+        //            dto.VehiclePlate = vehicle.Plate;
+        //            dto.VehicleCapacity = vehicle.Capacity;
+        //        }
+
+        //        // عنوان السيارة (اختياري)
+        //        dto.VehicleArea = "N/A";
+        //        dto.VehicleStreet = "N/A";
+        //    }
+
+        //    return list;
+        //}
+        private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
         {
-            var chargerRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+            double R = 6371; // Radius of earth in KM
+            var dLat = DegreesToRadians(lat2 - lat1);
+            var dLon = DegreesToRadians(lon2 - lon1);
 
-            // جلب الطلبات الخاصة بالمستخدم فقط مع تحديد بعض الخصائص الهامة لتجنب الدورة الكائنية
-            var userRequests = await chargerRepo.GetAllWithIncludeAsync(
-                c => c.UserId == userId,  // تصفية حسب الـ userId
-                false,
-                c => c.Charger // فقط الحصول على الـ Charger الأساسي
-            );
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                    Math.Cos(DegreesToRadians(lat1)) * Math.Cos(DegreesToRadians(lat2)) *
+                    Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
 
-            // بدلاً من جلب جميع الـ ChargingRequests في كل طلب، قم فقط بتحديد الخصائص الضرورية
-            var simplifiedRequests = userRequests.Select(req => new ChargingRequestEntity
-            {
-                Id = req.Id,
-                UserId = req.UserId,
-                Status = req.Status,
-                RequestedAt = req.RequestedAt,
-                ChargerId = req.ChargerId
-            }).ToList();
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            var distance = R * c;
 
-            return simplifiedRequests;
+            return distance;
         }
+        private double DegreesToRadians(double deg) => deg * (Math.PI / 180);
 
-        private UserDetailsDto BuildUserDetailsDto(AppUser user, List<Vehicle> vehicles, List<Charger> chargers ,List<ChargingRequestEntity> chargingRequests)
+        private UserDetailsDto BuildUserDetailsDto(AppUser user,List<Vehicle> vehicles,List<Charger> chargers)
         {
             var result = _mapper.Map<UserDetailsDto>(user);
+
             result.Vehicles = _mapper.Map<List<VehicleDto>>(vehicles);
             result.Chargers = _mapper.Map<List<ChargerDto>>(chargers);
-            result.ChargingRequests = _mapper.Map<List<ChargingRequestEntity>>(chargingRequests);
 
             return result;
+        }
+        public async Task<(string Area, string Street)> GetAddressFromLatLongNominatimAsync(double latitude, double longitude)
+        {
+            // Nominatim API (مجاني)
+            string url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={latitude}&lon={longitude}&addressdetails=1&accept-language=ar";
+
+            using (var client = new HttpClient())
+            {
+                // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
+                client.DefaultRequestHeaders.UserAgent.Clear();
+                client.DefaultRequestHeaders.UserAgent.Add(
+                    new ProductInfoHeaderValue("YourAppName", "1.0"));
+                client.DefaultRequestHeaders.UserAgent.Add(
+                    new ProductInfoHeaderValue("(contact@yourdomain.com)"));
+
+                var resp = await client.GetAsync(url);
+                if (!resp.IsSuccessStatusCode)
+                    return ("N/A", "N/A");
+
+                var body = await resp.Content.ReadAsStringAsync();
+                var json = JObject.Parse(body);
+                var address = json["address"] as JObject;
+                if (address == null)
+                    return ("N/A", "N/A");
+
+                // نحاول نطلع الشارع
+                // Nominatim ممكن يرجع street تحت مفاتيح مختلفة (road, pedestrian, footway...)
+                string street =
+                    (string)address["road"] ??
+                    (string)address["pedestrian"] ??
+                    (string)address["footway"] ??
+                    (string)address["path"] ??
+                    (string)address["residential"] ??
+                    (string)address["neighbourhood"] ??
+                    "N/A";
+
+                // نحاول نطلع المنطقة/الحَي/المدينة
+                // بنستخدم fallback ذكي حسب المتاح
+                string area =
+                    (string)address["suburb"] ??
+                    (string)address["neighbourhood"] ??
+                    (string)address["city_district"] ??
+                    (string)address["city"] ??
+                    (string)address["town"] ??
+                    (string)address["village"] ??
+                    (string)address["county"] ??
+                    (string)address["state_district"] ??
+                    (string)address["state"] ??
+                    "N/A";
+
+                return (area, street);
+            }
         }
 
 

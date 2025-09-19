@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using Voltyks.Application;
 using Voltyks.Persistence.Entities;
 using System.Security.Claims;
+using Voltyks.Core.DTOs.ChargerRequest;
 
 
 
@@ -184,6 +185,13 @@ namespace Voltyks.Presentation
 
             var result = await serviceManager.SmsEgyptService.VerifyOtpAsync(dto);
             return result.Status ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpGet("getUsersRequests")]
+        public async Task<ActionResult<ApiResponse<List<ChargingRequestDetailsDto>>>> GetUserRequests()
+        {
+            var resp = await serviceManager.AuthService.GetChargerRequestsAsync();
+            return Ok(resp);
         }
 
 

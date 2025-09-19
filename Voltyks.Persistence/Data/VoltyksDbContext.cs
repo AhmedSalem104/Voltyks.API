@@ -37,6 +37,9 @@ namespace Voltyks.Persistence.Data
         public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
         public DbSet<WebhookLog> WebhookLogs => Set<WebhookLog>();
         public DbSet<PaymentAction> PaymentActions => Set<PaymentAction>();
+        public DbSet<UserSavedCard> UserSavedCards => Set<UserSavedCard>();
+
+        
 
 
     }

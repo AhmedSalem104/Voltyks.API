@@ -19,6 +19,10 @@ using Voltyks.Core.DTOs;
 using System.Text.Json;
 using System.Text;
 using System.Net;
+using Voltyks.Core.DTOs.Paymob.CardsDTOs;
+using Twilio.TwiML.Messaging;
+using Voltyks.Core.DTOs.Paymob.intention;
+using System.Text.Json.Serialization;
 
 
 namespace Voltyks.Application.Services.Paymob
@@ -31,6 +35,8 @@ namespace Voltyks.Application.Services.Paymob
         private readonly ILogger<PaymobService> _log;
         private readonly IPaymobAuthTokenProvider _tokenProvider;
         private readonly IHttpContextAccessor _httpContext;
+        private readonly IHttpClientFactory _httpFactory;
+
         private IGenericRepository<PaymentOrder, int> OrdersRepo => _uow.GetRepository<PaymentOrder, int>();
         private IGenericRepository<PaymentTransaction, int> TxRepo => _uow.GetRepository<PaymentTransaction, int>();
 
@@ -41,7 +47,10 @@ namespace Voltyks.Application.Services.Paymob
             => _uow.GetRepository<PaymentOrder, int>();
         private IGenericRepository<PaymentTransaction, int> PaymentTransactions
             => _uow.GetRepository<PaymentTransaction, int>();
-        public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext)
+        private IGenericRepository<UserSavedCard, int> SavedCards
+    => _uow.GetRepository<UserSavedCard, int>();
+
+        public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext, IHttpClientFactory httpFactory)
         {
             _http = http;
             _opt = opt.Value;
@@ -49,8 +58,10 @@ namespace Voltyks.Application.Services.Paymob
             _log = log;
             _tokenProvider = tokenProvider;
             _httpContext = httpContext;
+            _httpFactory = httpFactory;
+
         }
-    
+
         public async Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req)
         {
             // (1) Auth-token (مطلوب لاحقًا)
@@ -73,7 +84,7 @@ namespace Voltyks.Application.Services.Paymob
 
                 // (4) Payment Key (معتمد على الـ integration card)
                 var order = upsert.Data;
-                var paymentKey = await GetOrCreatePaymentKeyAsync(order, req.AmountCents, currency, req.Billing, _opt.Integration.Card, 3600);
+                var paymentKey = await GetOrCreatePaymentKeyAsync(order, req.AmountCents, currency, req.Billing, _opt.Integration.Card, 3600, tokenize: req.SaveCard);
 
                 // (5) iframe-url
                 var iframeUrl = BuildCardIframeUrl(paymentKey).Data!;
@@ -110,7 +121,7 @@ namespace Voltyks.Application.Services.Paymob
                     first_name: "NA", last_name: "NA", email: "na@example.com", phone_number: req.WalletPhone,
                     apartment: "NA", floor: "NA", building: "NA", street: "NA", city: "Cairo", state: "NA", country: "EG", postal_code: "NA"
                 );
-                var paymentKey = await GetOrCreatePaymentKeyAsync(upsert.Data, req.AmountCents, currency, billing, _opt.Integration.Wallet, 3600);
+                var paymentKey = await GetOrCreatePaymentKeyAsync(upsert.Data, req.AmountCents, currency, billing, _opt.Integration.Wallet, 3600, tokenize: req.SaveCard);
 
                 // (5) Wallet-Pay
                 var payRes = await PayWithWalletAsync(new WalletPaymentDto(paymentKey, req.WalletPhone));
@@ -290,21 +301,373 @@ namespace Voltyks.Application.Services.Paymob
                 return DateTime.MinValue;
             }
         }
-        public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
-        {
+        //public async Task<ApiResponse<CreateIntentResponse>> CreateIntentionAsync(CreateIntentRequest r, CancellationToken ct = default)
+        //{
+        //    try
+        //    {
+        //        // (1) تحقق من أو إنشاء Order في قاعدة البيانات
+        //        var orderId = r.MerchantOrderId;  // يمكن استخدام الـ MerchantOrderId المرسل من الـ frontend
+        //        var currency = "EGP";  // تحديد العملة هنا
+        //        var amount = r.Amount;
 
+        //        // (2) تحقق أو أضف Order جديد في قاعدة البيانات
+        //        var upsertOrder = await UpsertOrderAsync(orderId, amount, currency);
+        //        if (!upsertOrder.Status || upsertOrder.Data == null)
+        //        {
+        //            return new ApiResponse<CreateIntentResponse> { Status = false, Message = upsertOrder.Message ?? "Unauthorized" };
+        //        }
+
+        //        // (3) إرسال الطلب إلى Paymob API
+        //        var paymentMethods = new List<int> { _opt.Integration.Card };  // طريقة الدفع (بطاقة أو محفظة)
+        //        var specialReference = Guid.NewGuid().ToString();  // معرف فريد لكل معاملة
+        //        var notificationUrl = $"http://voltyks-app.runasp.net/notification/{orderId}";
+        //        //var redirectionUrl = $"https://yourdomain.com/redirect/{orderId}";
+
+        //        // تشكيل الـ body مع البيانات الأساسية
+        //        var body = new
+        //        {
+        //            amount = amount,
+        //            currency = currency,
+        //            payment_methods = paymentMethods.ToArray(),
+        //            billing_data = new
+        //            {
+        //                first_name = r.BillingData.First_Name,
+        //                last_name = r.BillingData.Last_Name,
+        //                email = r.BillingData.Email,
+        //                phone_number = r.BillingData.Phone_Number
+        //            },
+        //            special_reference = specialReference,
+        //            notification_url = notificationUrl
+        //            //redirection_url = redirectionUrl
+        //        };
+
+        //        // URL للـ API
+        //        var url = _opt.Intention?.Url ?? "https://accept.paymob.com/v1/intention/";
+        //        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        //        req.Headers.Accept.ParseAdd("application/json");
+        //        req.Headers.TryAddWithoutValidation("Authorization", $"Token {_opt.SecretKey}");
+
+        //        var payload = System.Text.Json.JsonSerializer.Serialize(body);
+        //        req.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        //        // إرسال الطلب إلى Paymob
+        //        using var res = await _http.SendAsync(req, ct);
+        //        var raw = await res.Content.ReadAsStringAsync(ct);
+
+        //        if (!res.IsSuccessStatusCode)
+        //            throw new InvalidOperationException($"Paymob intention error {(int)res.StatusCode}: {raw}");
+
+        //        // (4) تحليل الرد
+        //        using var doc = JsonDocument.Parse(raw);
+        //        var root = doc.RootElement;
+
+        //        var clientSecret = root.GetProperty("client_secret").GetString()!;
+        //        var intentionId = root.GetProperty("id").GetString()!;
+        //        var intentionOrderId = root.GetProperty("intention_order_id").GetInt32();
+        //        string? redirUrl = root.TryGetProperty("redirection_url", out var rurl) ? rurl.GetString() : null;
+        //        string? status = root.TryGetProperty("status", out var st) ? st.GetString() : null;
+
+        //        string? paymentKey = null;
+        //        if (root.TryGetProperty("payment_keys", out var pks) && pks.ValueKind == JsonValueKind.Array && pks.GetArrayLength() > 0)
+        //            paymentKey = pks[0].GetProperty("key").GetString();
+
+        //        // (5) إضافة المعاملة إلى قاعدة البيانات
+        //        await AddTransactionAsync(orderId, intentionOrderId, amount, currency, "Intention", "Pending", false);
+
+        //        // تجهيز النتيجة
+        //        var result = new CreateIntentResponse(clientSecret, _opt.PublicKey, intentionId, intentionOrderId, redirUrl, status, paymentKey);
+
+        //        return new ApiResponse<CreateIntentResponse>
+        //        {
+        //            Status = true,
+        //            Message = "Intention created successfully.",
+        //            Data = result
+        //        };
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        // في حالة حدوث خطأ
+        //        return new ApiResponse<CreateIntentResponse>
+        //        {
+        //            Status = false,
+        //            Message = "Failed to create Intention.",
+        //            Errors = new List<string> { ex.Message }
+        //        };
+        //    }
+        //}
+
+        public async Task<ApiResponse<CreateIntentResponse>> CreateIntentionAsync(CreateIntentRequest r, CancellationToken ct = default)
+        {
+            // 1) Basic validation
+            if (r is null || r.Amount <= 0 || r.BillingData is null)
+                return new ApiResponse<CreateIntentResponse>("Invalid request", false, new List<string> { "Request body or Amount/BillingData invalid." });
+
+            try
+            {
+                // 2) Prepare order and currency
+                var orderId = string.IsNullOrWhiteSpace(r.MerchantOrderId) ? Guid.NewGuid().ToString("N") : r.MerchantOrderId;
+                const string currency = "EGP";
+
+                var upsert = await UpsertOrderAsync(orderId, r.Amount, currency);
+                if (!upsert.Status || upsert.Data is null)
+                    return new ApiResponse<CreateIntentResponse>(upsert.Message ?? "Unauthorized", false);
+
+                // 3) Pick method + integrationId (from appsettings)
+                var selectedMethod = string.Equals(r.PaymentMethod, "Wallet", StringComparison.OrdinalIgnoreCase)
+                    ? "Wallet"
+                    : "Card";
+
+                int integrationId = selectedMethod == "Wallet"
+                    ? _opt.Integration.Wallet
+                    : _opt.Integration.Card;
+
+                if (integrationId <= 0)
+                    return new ApiResponse<CreateIntentResponse>($"No valid integration_id configured for {selectedMethod}.", false);
+
+                // --- Added: normalize base URL and check secret key (no logic change to your flow) ---
+                var baseUrl = string.IsNullOrWhiteSpace(_opt.Intention.Url) ? null : _opt.Intention.Url.TrimEnd('/') + "/";
+                if (string.IsNullOrWhiteSpace(baseUrl))
+                    return new ApiResponse<CreateIntentResponse>("Paymob Intention URL is missing.", false);
+
+                var secretKey = _opt.SecretKey;
+                if (string.IsNullOrWhiteSpace(secretKey))
+                    return new ApiResponse<CreateIntentResponse>("Paymob Secret Key is missing.", false);
+                // -------------------------------------------------------------------------------
+
+                // 4) Compose request body for Paymob (requires payment_methods: [id])
+                var specialReference = Guid.NewGuid().ToString("N");
+                var notificationUrl = string.IsNullOrWhiteSpace(r.NotificationUrl)
+                    ? $"http://voltyks-app.runasp.net/notification/{orderId}" // يُفضّل HTTPS في الإنتاج
+                    : r.NotificationUrl;
+
+                var body = new
+                {
+                    amount = r.Amount,      // تأكد من وحدة المبلغ حسب إعداد حسابك
+                    currency,
+                    // 👇 change: send as strings to avoid any parsing ambiguity on Paymob side
+                    //integration_id = new[] { integrationId.ToString() }, // << المطلوب من Paymob
+                    //payment_methods = new[] { selectedMethod }, // << المطلوب من Paymob
+                    payment_methods = new[] { integrationId }, // << المطلوب من Paymob
+
+                    billing_data = new
+                    {
+                        first_name = r.BillingData.First_Name,
+                        last_name = r.BillingData.Last_Name,
+                        email = r.BillingData.Email,
+                        phone_number = r.BillingData.Phone_Number
+                    },
+                    special_reference = specialReference,
+                    notification_url = notificationUrl,
+                    redirection_url = (selectedMethod == "Card" && !string.IsNullOrWhiteSpace(r.RedirectionUrl)) ? r.RedirectionUrl : null
+                };
+
+
+                // 5) Call Paymob Intention API
+                var http = _httpFactory.CreateClient();
+                using var req = new HttpRequestMessage(HttpMethod.Post, baseUrl);
+                req.Headers.Accept.ParseAdd("application/json");
+                req.Headers.TryAddWithoutValidation("Authorization", $"Token {secretKey}");
+                req.Content = new StringContent(
+                    JsonSerializer.Serialize(
+                        body,
+                        new JsonSerializerOptions
+                        {
+                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                        }),
+                    Encoding.UTF8, "application/json"
+                );
+
+
+                using var res = await http.SendAsync(req, ct);
+                var raw = await res.Content.ReadAsStringAsync(ct);
+                if (!res.IsSuccessStatusCode)
+                {
+                    // رجّع تفاصيل تفيدك في التشخيص لو حصل 400 تاني
+                    var debug = new
+                    {
+                        httpStatus = (int)res.StatusCode,
+                        selectedMethod,
+                        integrationId,
+                        orderId,
+                        baseUrl,
+                        keyFingerprint = !string.IsNullOrWhiteSpace(secretKey) && secretKey.Length >= 8
+                            ? $"{secretKey[..4]}...{secretKey[^4..]}"
+                            : "<missing>",
+                        paymobRaw = raw
+                    };
+                    return new ApiResponse<CreateIntentResponse>($"Paymob intention error {(int)res.StatusCode}", false, new List<string> { JsonSerializer.Serialize(debug) });
+                }
+
+                // 6) Parse Paymob response
+                var pm = JsonSerializer.Deserialize<PaymobIntentionResponse>(
+                    raw,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+
+                if (pm is null || string.IsNullOrWhiteSpace(pm.ClientSecret) || string.IsNullOrWhiteSpace(pm.Id))
+                    return new ApiResponse<CreateIntentResponse>("Unexpected Paymob response.", false, new List<string> { raw });
+
+                // 7) Record transaction locally (Pending)
+                await AddTransactionAsync(orderId, pm.IntentionOrderId, r.Amount, currency, "Intention", "Pending", false);
+
+                // 8) Extract payment keys (if any)
+                var keys = pm.PaymentKeys?
+                    .Select(k => k.Key)
+                    .Where(k => !string.IsNullOrWhiteSpace(k))
+                    .ToList();
+
+                // 9) Build response DTO
+                var result = new CreateIntentResponse(
+                    pm.ClientSecret,
+                    _opt.PublicKey,
+                    pm.Id,                 // IntentionId
+                    pm.IntentionOrderId,
+                    pm.RedirectionUrl,
+                    pm.Status,
+                    keys
+                );
+
+                return new ApiResponse<CreateIntentResponse>(result, "Intention created successfully.", true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<CreateIntentResponse>("Failed to create Intention.", false, new List<string> { ex.Message });
+            }
+        }
+        //public async Task<ApiResponse<CreateIntentResponse>> CreateIntentionAsync(CreateIntentRequest r, CancellationToken ct = default)
+        //{
+        //    // 1) Basic validation
+        //    if (r is null || r.Amount <= 0 || r.BillingData is null)
+        //        return new ApiResponse<CreateIntentResponse>("Invalid request", false, new List<string> { "Request body or Amount/BillingData invalid." });
+
+        //    try
+        //    {
+        //        // 2) Prepare order and currency
+        //        var orderId = string.IsNullOrWhiteSpace(r.MerchantOrderId) ? Guid.NewGuid().ToString("N") : r.MerchantOrderId;
+        //        const string currency = "EGP";
+
+        //        var upsert = await UpsertOrderAsync(orderId, r.Amount, currency);
+        //        if (!upsert.Status || upsert.Data is null)
+        //            return new ApiResponse<CreateIntentResponse>(upsert.Message ?? "Unauthorized", false);
+
+        //        // 3) Pick method + integrationId (from appsettings)
+        //        var selectedMethod = string.Equals(r.PaymentMethod, "Wallet", StringComparison.OrdinalIgnoreCase)
+        //            ? "Wallet"
+        //            : "Card";
+
+        //        int integrationId = selectedMethod == "Wallet"
+        //            ? _opt.Integration.Wallet
+        //            : _opt.Integration.Card;
+
+        //        if (integrationId <= 0)
+        //            return new ApiResponse<CreateIntentResponse>($"No valid integration_id configured for {selectedMethod}.", false);
+
+        //        // 4) Compose request body for Paymob (requires payment_methods: [id])
+        //        var specialReference = Guid.NewGuid().ToString("N");
+        //        var notificationUrl = string.IsNullOrWhiteSpace(r.NotificationUrl)
+        //            ? $"http://voltyks-app.runasp.net/notification/{orderId}" // يُفضّل HTTPS في الإنتاج
+        //            : r.NotificationUrl;
+
+        //        var body = new
+        //        {
+        //            amount = r.Amount,      // تأكد من وحدة المبلغ حسب إعداد حسابك
+        //            currency,
+        //            payment_methods = new[] { integrationId }, // << المطلوب من Paymob
+        //            billing_data = new
+        //            {
+        //                first_name = r.BillingData.First_Name,
+        //                last_name = r.BillingData.Last_Name,
+        //                email = r.BillingData.Email,
+        //                phone_number = r.BillingData.Phone_Number
+        //            },
+        //            special_reference = specialReference,
+        //            notification_url = notificationUrl,
+        //            redirection_url = (selectedMethod == "Card" && !string.IsNullOrWhiteSpace(r.RedirectionUrl)) ? r.RedirectionUrl : null
+        //        };
+
+        //        // 5) Call Paymob Intention API
+        //        var http = _httpFactory.CreateClient();
+        //        using var req = new HttpRequestMessage(HttpMethod.Post, _opt.Intention.Url);
+        //        req.Headers.Accept.ParseAdd("application/json");
+        //        req.Headers.TryAddWithoutValidation("Authorization", $"Token {_opt.SecretKey}");
+        //        req.Content = new StringContent(
+        //            JsonSerializer.Serialize(
+        //                body,
+        //                new JsonSerializerOptions
+        //                {
+        //                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        //                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        //                }),
+        //            Encoding.UTF8, "application/json"
+        //        );
+
+        //        using var res = await http.SendAsync(req, ct);
+        //        var raw = await res.Content.ReadAsStringAsync(ct);
+        //        if (!res.IsSuccessStatusCode)
+        //        {
+        //            // رجّع تفاصيل تفيدك في التشخيص لو حصل 400 تاني
+        //            var debug = new
+        //            {
+        //                httpStatus = (int)res.StatusCode,
+        //                selectedMethod,
+        //                integrationId,
+        //                orderId,
+        //                paymobRaw = raw
+        //            };
+        //            return new ApiResponse<CreateIntentResponse>($"Paymob intention error {(int)res.StatusCode}", false, new List<string> { JsonSerializer.Serialize(debug) });
+        //        }
+
+        //        // 6) Parse Paymob response
+        //        var pm = JsonSerializer.Deserialize<PaymobIntentionResponse>(
+        //            raw,
+        //            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+        //        );
+
+        //        if (pm is null || string.IsNullOrWhiteSpace(pm.ClientSecret) || string.IsNullOrWhiteSpace(pm.Id))
+        //            return new ApiResponse<CreateIntentResponse>("Unexpected Paymob response.", false, new List<string> { raw });
+
+        //        // 7) Record transaction locally (Pending)
+        //        await AddTransactionAsync(orderId, pm.IntentionOrderId, r.Amount, currency, "Intention", "Pending", false);
+
+        //        // 8) Extract payment keys (if any)
+        //        var keys = pm.PaymentKeys?
+        //            .Select(k => k.Key)
+        //            .Where(k => !string.IsNullOrWhiteSpace(k))
+        //            .ToList();
+
+        //        // 9) Build response DTO
+        //        var result = new CreateIntentResponse(
+        //            pm.ClientSecret,
+        //            _opt.PublicKey,
+        //            pm.Id,                 // IntentionId
+        //            pm.IntentionOrderId,
+        //            pm.RedirectionUrl,
+        //            pm.Status,
+        //            keys
+        //        );
+
+        //        return new ApiResponse<CreateIntentResponse>(result, "Intention created successfully.", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<CreateIntentResponse>("Failed to create Intention.", false, new List<string> { ex.Message });
+        //    }
+        //}
+        public async Task<ApiResponse<bool>> HandlePaymentNotificationAsync(HttpRequest req, string rawBody)
+        {
             // [A] Log سريع قبل أي Parsing
             _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
                 req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
 
-            // --------- 0) تجميع الحقول كما هي عندك ----------
+            // --------- 0) تجميع الحقول كما هي ----------
             var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
 
             if (req.Headers.TryGetValue("hmac", out var h1)) fields["hmac"] = h1.ToString();
             else if (req.Headers.TryGetValue("hmac_signature", out var h2)) fields["hmac"] = h2.ToString();
             else if (req.Headers.TryGetValue("X-HMAC-Signature", out var h3)) fields["hmac"] = h3.ToString();
-            // [B] محاولات إضافية لأسماء HMAC بديلة (تشخيص فقط)
+            // أسماء بديلة للتشخيص
             if (!fields.ContainsKey("hmac"))
             {
                 if (req.Headers.TryGetValue("secure-hash", out var h4)) fields["hmac"] = h4.ToString();
@@ -339,8 +702,12 @@ namespace Voltyks.Application.Services.Paymob
                         }
                     }
                     Walk("", doc.RootElement);
-                    if (!fields.ContainsKey("hmac") && doc.RootElement.TryGetProperty("hmac", out var hJson) && hJson.ValueKind == JsonValueKind.String)
+                    if (!fields.ContainsKey("hmac") &&
+                        doc.RootElement.TryGetProperty("hmac", out var hJson) &&
+                        hJson.ValueKind == JsonValueKind.String)
+                    {
                         fields["hmac"] = hJson.GetString();
+                    }
                 }
             }
             catch { /* ignore parsing errors */ }
@@ -353,7 +720,7 @@ namespace Voltyks.Application.Services.Paymob
             }
             catch { }
 
-            // --------- 2) لازم HMAC ----------
+            // --------- 2) التأكد من وجود HMAC ----------
             if (!fields.ContainsKey("hmac") || string.IsNullOrWhiteSpace(fields["hmac"]))
             {
                 await WebhookLogs.AddAsync(new WebhookLog
@@ -370,19 +737,23 @@ namespace Voltyks.Application.Services.Paymob
                 return new ApiResponse<bool> { Status = true, Message = "No HMAC (debug ack)", Data = true };
             }
 
-            // --------- 3) Mask PAN ----------
+            // --------- 3) التحقق من HMAC ----------
+            bool valid;
+            try { valid = VerifyHmacSha512(fields, rawBody); } catch { valid = false; }
+
+            // --------- 4) Mask الـ PAN (إذا كان موجود) ----------
             if (fields.TryGetValue("source_data.pan", out var pan) && !string.IsNullOrEmpty(pan) && pan.Length > 4)
                 fields["source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
 
-            // --------- 4) HMAC Verify ----------
-            bool valid;
-            try { valid = VerifyHmacSha512(fields); } catch { valid = false; }
+            // --------- 5) Log الاستلام/الفشل ----------
+            string? merchantOrderIdForLog = null;
+            if (fields.TryGetValue("merchant_order_id", out var mo)) merchantOrderIdForLog = mo;
 
             await WebhookLogs.AddAsync(new WebhookLog
             {
                 RawPayload = rawBody,
                 EventType = valid ? "Received" : "Failure",
-                MerchantOrderId = fields.GetValueOrDefault("merchant_order_id"),
+                MerchantOrderId = merchantOrderIdForLog,
                 PaymobOrderId = TryParseLong(fields, "order.id"),
                 PaymobTransactionId = TryParseLong(fields, "id"),
                 IsHmacValid = valid,
@@ -404,22 +775,28 @@ namespace Voltyks.Application.Services.Paymob
                 };
             }
 
-            // --------- 5) Routing by type ----------
-            var eventType = fields.GetValueOrDefault("type")?.Trim()?.ToUpperInvariant();
-            if (string.IsNullOrWhiteSpace(eventType)) eventType = "TRANSACTION";
+            // --------- 6) تحديد نوع الحدث ----------
+            string? eventType = null;
+            if (!fields.TryGetValue("type", out eventType) || string.IsNullOrWhiteSpace(eventType))
+                eventType = "TRANSACTION";
+            eventType = eventType.Trim().ToUpperInvariant();
 
+            if (fields.ContainsKey("token") || fields.ContainsKey("saved_card_token") || fields.ContainsKey("card_token"))
+                eventType = "CARD_TOKEN";
+
+            //  --------- 7) التعامل مع أنواع الأحداث المختلفة ----------
             switch (eventType)
             {
                 case "TRANSACTION":
                     {
                         var paymobTxId = TryParseLong(fields, "id");
 
-                        // Idempotency
+                        // Idempotency (لتجنب التكرار)
                         if (paymobTxId > 0 && await ExistsProcessedTxAsync(paymobTxId))
                             return new ApiResponse<bool> { Status = true, Message = "Duplicate event ignored (idempotent)", Data = true };
 
                         var paymobOrderId = TryParseLong(fields, "order.id");
-                        var merchantOrderId = fields.GetValueOrDefault("merchant_order_id");
+                        string? merchantOrderId = merchantOrderIdForLog;
 
                         bool isRefunded = TryParseBool(fields, "is_refunded");
                         bool isVoided = TryParseBool(fields, "is_voided");
@@ -428,7 +805,7 @@ namespace Voltyks.Application.Services.Paymob
                         bool pending = TryParseBool(fields, "pending");
 
                         long amountCents = TryParseLong(fields, "amount_cents");
-                        string currency = fields.TryGetValue("currency", out var cur) ? (cur ?? _opt.Currency) : _opt.Currency;
+                        string currency = (fields.TryGetValue("currency", out var cur) ? (cur ?? _opt.Currency) : _opt.Currency);
 
                         string localStatus =
                             isRefunded ? "Refunded" :
@@ -465,18 +842,461 @@ namespace Voltyks.Application.Services.Paymob
 
                 case "TOKEN":
                     {
-                        await MarkGenericAsync("TOKEN", fields.GetValueOrDefault("owner") ?? "unknown", true);
+                        var owner = (fields.TryGetValue("owner", out var ow) ? ow : "unknown") ?? "unknown";
+                        await MarkGenericAsync("TOKEN", owner, true);
                         return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
+                    }
+
+                case "CARD_TOKEN":
+                    {
+                        // استخراج الـ token
+                        var cardToken = (fields.TryGetValue("token", out var t1) ? t1 : null) ?? (fields.TryGetValue("saved_card_token", out var t2) ? t2 : null);
+
+                        // هنا ننفذ أي عملية مطلوبة بعد تخزين التوكن
+                        await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken ?? "unknown", true);
+
+                        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
                     }
 
                 default:
                     {
-                        await MarkGenericAsync(eventType, fields.GetValueOrDefault("id") ?? Guid.NewGuid().ToString("N"), true);
+                        var id = (fields.TryGetValue("id", out var anyId) ? anyId : Guid.NewGuid().ToString("N")) ?? Guid.NewGuid().ToString("N");
+                        await MarkGenericAsync(eventType, id, true);
                         return new ApiResponse<bool> { Status = true, Message = $"Webhook processed ({eventType})", Data = true };
                     }
             }
         }
+       
 
+
+
+        public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
+        {
+            // [A] Log سريع قبل أي Parsing
+            _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
+                req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
+
+            // --------- 0) تجميع الحقول كما هي ----------
+            var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
+
+            if (req.Headers.TryGetValue("hmac", out var h1)) fields["hmac"] = h1.ToString();
+            else if (req.Headers.TryGetValue("hmac_signature", out var h2)) fields["hmac"] = h2.ToString();
+            else if (req.Headers.TryGetValue("X-HMAC-Signature", out var h3)) fields["hmac"] = h3.ToString();
+            // أسماء بديلة للتشخيص
+            if (!fields.ContainsKey("hmac"))
+            {
+                if (req.Headers.TryGetValue("secure-hash", out var h4)) fields["hmac"] = h4.ToString();
+                else if (req.Headers.TryGetValue("X-Signature", out var h5)) fields["hmac"] = h5.ToString();
+            }
+
+            try
+            {
+                if (req.HasFormContentType)
+                {
+                    var form = await req.ReadFormAsync();
+                    foreach (var kv in form) fields[kv.Key] = kv.Value.ToString();
+                    if (!fields.ContainsKey("hmac") && form.TryGetValue("hmac", out var fh)) fields["hmac"] = fh.ToString();
+                }
+                else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
+                {
+                    using var doc = JsonDocument.Parse(rawBody);
+                    void Walk(string prefix, JsonElement el)
+                    {
+                        switch (el.ValueKind)
+                        {
+                            case JsonValueKind.Object:
+                                foreach (var p in el.EnumerateObject())
+                                    Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
+                                break;
+                            case JsonValueKind.Array:
+                                fields[prefix] = el.ToString();
+                                break;
+                            default:
+                                fields[prefix] = el.ToString();
+                                break;
+                        }
+                    }
+                    Walk("", doc.RootElement);
+                    if (!fields.ContainsKey("hmac") &&
+                        doc.RootElement.TryGetProperty("hmac", out var hJson) &&
+                        hJson.ValueKind == JsonValueKind.String)
+                    {
+                        fields["hmac"] = hJson.GetString();
+                    }
+                }
+            }
+            catch { /* ignore parsing errors */ }
+
+            // --------- 1) Logging (اختياري) ----------
+            try
+            {
+                _log?.LogInformation("====== PAYMOB WEBHOOK FIELDS ======\n{pairs}\n==================================",
+                    string.Join("\n", fields.Select(kv => $"{kv.Key} = {kv.Value}")));
+            }
+            catch { }
+
+            // --------- 2) لازم HMAC ----------
+            if (!fields.ContainsKey("hmac") || string.IsNullOrWhiteSpace(fields["hmac"]))
+            {
+                await WebhookLogs.AddAsync(new WebhookLog
+                {
+                    RawPayload = rawBody,
+                    EventType = "NoHmac-Debug",
+                    HeadersJson = req.Headers.ToString(),
+                    HttpStatus = 200,
+                    ReceivedAt = DateTime.UtcNow,
+                    IsHmacValid = false
+                });
+                await _uow.SaveChangesAsync();
+
+                return new ApiResponse<bool> { Status = true, Message = "No HMAC (debug ack)", Data = true };
+            }
+
+            // --------- 3) HMAC Verify (قبل أي mask) ----------
+       
+            bool valid;
+            try { valid = VerifyHmacSha512(fields, rawBody); } catch { valid = false; }
+
+            // --------- 3.1) Mask PAN بعد HMAC لأجل اللوجينج فقط ----------
+            if (fields.TryGetValue("source_data.pan", out var pan) && !string.IsNullOrEmpty(pan) && pan.Length > 4)
+                fields["source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
+
+            // --------- 4) Log الاستلام/الفشل ----------
+            string? merchantOrderIdForLog = null;
+            if (fields.TryGetValue("merchant_order_id", out var mo)) merchantOrderIdForLog = mo;
+
+            await WebhookLogs.AddAsync(new WebhookLog
+            {
+                RawPayload = rawBody,
+                EventType = valid ? "Received" : "Failure",
+                MerchantOrderId = merchantOrderIdForLog,
+                PaymobOrderId = TryParseLong(fields, "order.id"),
+                PaymobTransactionId = TryParseLong(fields, "id"),
+                IsHmacValid = valid,
+                HttpStatus = valid ? 200 : 400,
+                HeadersJson = req.Headers.ToString(),
+                ReceivedAt = DateTime.UtcNow,
+                IsValid = valid
+            });
+            await _uow.SaveChangesAsync();
+
+            if (!valid)
+            {
+                return new ApiResponse<bool>
+                {
+                    Status = false,
+                    Message = "Invalid HMAC",
+                    Data = false,
+                    Errors = new List<string> { "Signature mismatch" }
+                };
+            }
+
+            // --------- 5) Routing by type ----------
+            string? eventType = null;
+            if (!fields.TryGetValue("type", out eventType) || string.IsNullOrWhiteSpace(eventType))
+                eventType = "TRANSACTION";
+            eventType = eventType.Trim().ToUpperInvariant();
+
+
+
+            if (fields.ContainsKey("token") || fields.ContainsKey("saved_card_token") || fields.ContainsKey("card_token"))
+                eventType = "CARD_TOKEN";
+
+
+
+            switch (eventType)
+            {
+                case "TRANSACTION":
+                    {
+                        var paymobTxId = TryParseLong(fields, "id");
+
+                        // Idempotency
+                        if (paymobTxId > 0 && await ExistsProcessedTxAsync(paymobTxId))
+                            return new ApiResponse<bool> { Status = true, Message = "Duplicate event ignored (idempotent)", Data = true };
+
+                        var paymobOrderId = TryParseLong(fields, "order.id");
+                        string? merchantOrderId = merchantOrderIdForLog;
+
+                        bool isRefunded = TryParseBool(fields, "is_refunded");
+                        bool isVoided = TryParseBool(fields, "is_voided");
+                        bool isCapture = TryParseBool(fields, "is_capture");
+                        bool success = TryParseBool(fields, "success");
+                        bool pending = TryParseBool(fields, "pending");
+
+                        long amountCents = TryParseLong(fields, "amount_cents");
+                        string currency = (fields.TryGetValue("currency", out var cur) ? (cur ?? _opt.Currency) : _opt.Currency);
+
+                        string localStatus =
+                            isRefunded ? "Refunded" :
+                            isVoided ? "Voided" :
+                            isCapture ? "Captured" :
+                            pending ? "Pending" :
+                            success ? "Paid" : "Failed";
+
+                        // تحديث الـTransaction (لو موجودة)
+                        if (paymobTxId > 0)
+                        {
+                            await UpdateTransactionByPaymobIdAsync(paymobTxId, tx =>
+                            {
+                                tx.PaymobOrderId = (tx.PaymobOrderId is null || tx.PaymobOrderId == 0) ? paymobOrderId : tx.PaymobOrderId;
+                                tx.MerchantOrderId = tx.MerchantOrderId ?? merchantOrderId;
+                                if (amountCents > 0) tx.AmountCents = amountCents;
+                                tx.Currency = currency;
+                                tx.IsSuccess = success;
+                                tx.Status = localStatus;
+                                tx.HmacVerified = true;
+                            });
+                        }
+
+                        // تحديث حالة الـOrder
+                        if (!string.IsNullOrWhiteSpace(merchantOrderId))
+                            await UpdateOrderStatusAsync(merchantOrderId!, localStatus);
+
+                        // علّم الحدث كمُعالج (Idempotency mark)
+                        if (paymobTxId > 0)
+                            await MarkProcessedTxAsync(paymobTxId, "TRANSACTION_PROCESSED");
+
+                        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (transaction)", Data = true };
+                    }
+
+                case "TOKEN":
+                    {
+                        var owner = (fields.TryGetValue("owner", out var ow) ? ow : "unknown") ?? "unknown";
+                        await MarkGenericAsync("TOKEN", owner, true);
+                        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
+                    }
+
+                case "CARD_TOKEN":
+                    {
+                        // 1) token
+                        var cardToken =
+                            (fields.TryGetValue("token", out var t1) ? t1 : null) ??
+                            (fields.TryGetValue("saved_card_token", out var t2) ? t2 : null) ??
+                            (fields.TryGetValue("card_token", out var t3) ? t3 : null);
+
+                        // 2) last4
+                        string? last4 = null;
+                        if (fields.TryGetValue("last4", out var l4) && !string.IsNullOrWhiteSpace(l4))
+                            last4 = l4;
+                        else if (fields.TryGetValue("source_data.pan", out var masked) && !string.IsNullOrWhiteSpace(masked) && masked.Length >= 4)
+                            last4 = masked[^4..];
+
+                        // 3) brand/scheme
+                        string? brand = null;
+                        if (fields.TryGetValue("source_data.type", out var b1) && !string.IsNullOrWhiteSpace(b1)) brand = b1;
+                        else if (fields.TryGetValue("brand", out var b2) && !string.IsNullOrWhiteSpace(b2)) brand = b2;
+                        else if (fields.TryGetValue("scheme", out var b3) && !string.IsNullOrWhiteSpace(b3)) brand = b3;
+
+                        // 4) expiry (اختياري)
+                        int? expMonth = null, expYear = null;
+                        if (fields.TryGetValue("expiry_month", out var mStr) && int.TryParse(mStr, out var mVal)) expMonth = mVal;
+                        if (fields.TryGetValue("expiry_year", out var yStr) && int.TryParse(yStr, out var yVal)) expYear = yVal;
+
+                        // 5) اربط التوكن بالمستخدم
+                        var userId = await ResolveUserIdFromTokenContextAsync(fields);
+
+                        if (!string.IsNullOrWhiteSpace(cardToken) && !string.IsNullOrWhiteSpace(userId))
+                        {
+                            // Idempotent insert
+                            var exists = await SavedCards.AnyAsync(c => c.UserId == userId && c.Token == cardToken);
+                            if (!exists)
+                            {
+                                await SavedCards.AddAsync(new UserSavedCard
+                                {
+                                    UserId = userId!,
+                                    Token = cardToken!,
+                                    Last4 = last4,
+                                    Brand = brand,
+                                    ExpiryMonth = expMonth,
+                                    ExpiryYear = expYear,
+                                    CreatedAt = DateTime.UtcNow
+                                });
+                                await _uow.SaveChangesAsync();
+                            }
+                        }
+
+                        await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken ?? "unknown", true);
+                        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
+                    }
+
+                // Fallback: أنواع قريبة بس مختلفة الاسم — لو فيها token اعتبرها CARD_TOKEN
+                case "SAVED_CARD":
+                case "CARD":
+                case "PAYMENT_TOKEN":
+                    {
+                        if (fields.ContainsKey("token") || fields.ContainsKey("saved_card_token") || fields.ContainsKey("card_token"))
+                        {
+                            goto case "CARD_TOKEN";
+                        }
+                        goto default;
+                    }
+
+                default:
+                    {
+                        var id = (fields.TryGetValue("id", out var anyId) ? anyId : Guid.NewGuid().ToString("N")) ?? Guid.NewGuid().ToString("N");
+                        await MarkGenericAsync(eventType, id, true);
+                        return new ApiResponse<bool> { Status = true, Message = $"Webhook processed ({eventType})", Data = true };
+                    }
+            }
+        }
+        private static string JsonToFixedString(System.Text.Json.JsonElement el) => el.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.String => el.GetString() ?? "",
+            System.Text.Json.JsonValueKind.Number => el.TryGetInt64(out var n)
+                ? n.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : (el.TryGetDouble(out var d)
+                    ? d.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : (el.ToString() ?? "")),
+            System.Text.Json.JsonValueKind.True => "true",
+            System.Text.Json.JsonValueKind.False => "false",
+            System.Text.Json.JsonValueKind.Null => "",
+            _ => el.ToString() ?? ""
+        };
+        private static bool TryGetByDotPath(System.Text.Json.JsonElement root, string path, out string value)
+        {
+            value = "";
+            try
+            {
+                var cur = root;
+                foreach (var part in path.Split('.'))
+                {
+                    if (cur.ValueKind != System.Text.Json.JsonValueKind.Object || !cur.TryGetProperty(part, out cur))
+                        return false;
+                }
+                value = JsonToFixedString(cur);
+                return true;
+            }
+            catch { return false; }
+        }
+        private static string BuildTransactionConcat(System.Text.Json.JsonElement obj)
+        {
+            // ترتيب Paymob الحرفي
+            string[] keys =
+            {
+        "amount_cents","created_at","currency","error_occured","has_parent_transaction","id","integration_id",
+        "is_3d_secure","is_auth","is_capture","is_refunded","is_standalone_payment","is_voided","order.id",
+        "owner","pending","source_data.pan","source_data.sub_type","source_data.type","success"
+    };
+
+            var sb = new System.Text.StringBuilder(256);
+            foreach (var k in keys)
+                sb.Append(TryGetByDotPath(obj, k, out var v) ? v : "");
+            return sb.ToString();
+        }
+        private static string BuildTokenConcat(System.Text.Json.JsonElement obj)
+        {
+            // TOKEN/CARD_TOKEN: قيم obj مرتّبة أبجديًا (بدون hmac)
+            var names = obj.EnumerateObject()
+                           .Select(p => p.Name)
+                           .Where(n => !string.Equals(n, "hmac", StringComparison.OrdinalIgnoreCase))
+                           .OrderBy(n => n, StringComparer.Ordinal);
+
+            var sb = new System.Text.StringBuilder(128);
+            foreach (var name in names)
+                if (obj.TryGetProperty(name, out var v))
+                    sb.Append(JsonToFixedString(v));
+            return sb.ToString();
+        }
+        private static byte[] KeyFromHexOrUtf8(string secret)
+        {
+            bool looksHex = !string.IsNullOrWhiteSpace(secret)
+                            && secret.Length % 2 == 0
+                            && secret.All(c =>
+                            {
+                                var x = (char)(c | 32);
+                                return (x >= '0' && x <= '9') || (x >= 'a' && x <= 'f');
+                            });
+
+            if (!looksHex) return System.Text.Encoding.UTF8.GetBytes(secret);
+
+            var bytes = new byte[secret.Length / 2];
+            for (int i = 0; i < bytes.Length; i++)
+                bytes[i] = Convert.ToByte(secret.Substring(i * 2, 2), 16);
+            return bytes;
+        }
+        private bool VerifyHmacSha512(IDictionary<string, string?> fields, string rawJson)
+        {
+            // 1) التقاط hmac من كل المفاتيح الشائعة
+            string? receivedHmac = null;
+            string[] keys =
+            {
+        "hmac", "hmac_signature", "x-hmac-signature", "X-HMAC-Signature",
+        "secure-hash", "X-Signature"
+    };
+
+            foreach (var k in keys)
+                if (fields.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v))
+                { receivedHmac = v; break; }
+
+            //Fallback: من JSON نفسه لو Paymob حاططها هناك
+            if (string.IsNullOrWhiteSpace(receivedHmac)
+                && !string.IsNullOrWhiteSpace(rawJson)
+                && rawJson.TrimStart().StartsWith("{"))
+            {
+                using var d = JsonDocument.Parse(rawJson);
+                if (d.RootElement.TryGetProperty("hmac", out var hv) && hv.ValueKind == JsonValueKind.String)
+                    receivedHmac = hv.GetString();
+            }
+
+            if (string.IsNullOrWhiteSpace(receivedHmac))
+                return false;
+
+            receivedHmac = receivedHmac!.Trim().ToLowerInvariant();
+
+            // 2) جِيب السر كمفتاح HMAC (Hex أو UTF8)
+            var secret = _opt.HmacSecret ?? "";
+            var key = KeyFromHexOrUtf8(secret);
+
+            // 3) حدّد نوع الكولباك وابني الـ concatenated string
+            using var doc = JsonDocument.Parse(rawJson);
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("type", out var typeEl) || !root.TryGetProperty("obj", out var objEl))
+                return false;
+
+            var type = typeEl.GetString() ?? "";
+            string concatenated = string.Equals(type, "TRANSACTION", StringComparison.OrdinalIgnoreCase)
+                ? BuildTransactionConcat(objEl)
+                : BuildTokenConcat(objEl); // TOKEN / CARD_TOKEN / SAVED_CARD …
+
+            // 4) حساب HMAC والتحقق
+            using var hmac = new HMACSHA512(key);
+            var calc = BitConverter.ToString(hmac.ComputeHash(Encoding.UTF8.GetBytes(concatenated)))
+                           .Replace("-", "").ToLowerInvariant();
+
+            return calc == receivedHmac;
+        }
+
+
+
+
+
+        // ===== Helper: Resolve UserId من الـmerchant_order_id (Async) =====
+        private async Task<string?> ResolveUserIdFromTokenContextAsync(IDictionary<string, string?> fields)
+        {
+            string? moid = null;
+
+            if (fields.TryGetValue("merchant_order_id", out var m1) && !string.IsNullOrWhiteSpace(m1))
+                moid = m1;
+            else if (fields.TryGetValue("order.merchant_order_id", out var m2) && !string.IsNullOrWhiteSpace(m2))
+                moid = m2;
+
+
+            if (string.IsNullOrWhiteSpace(moid) && fields.TryGetValue("order.id", out var oidStr) && long.TryParse(oidStr, out var oid))
+                  {
+                var ord = await PaymentOrders.GetFirstOrDefaultAsync(o => o.PaymobOrderId == oid, trackChanges: false);
+               moid = ord?.MerchantOrderId;
+                  }
+
+            if (string.IsNullOrWhiteSpace(moid)) return null;
+
+            var order = await PaymentOrders.GetFirstOrDefaultAsync(
+                o => o.MerchantOrderId == moid, trackChanges: false
+            );
+
+            return order?.UserId;
+        }
         public async Task<ApiResponse<IntentionClientSecretDto>> ExchangePaymentKeyForClientSecretAsync(string paymentKey, string? publicKeyOverride = null, CancellationToken ct = default)
         {
             var token = await GenerateBearerTokenAsync();
@@ -607,9 +1427,204 @@ namespace Voltyks.Application.Services.Paymob
                 Console.WriteLine("The signatures do not match!");
             }
         }
+        public async Task<ApiResponse<TokenizationStartRes>> StartCardTokenizationAsync(long amountCents = 0)
+        {
+            // إصدار payment_key مخصوص لإدخال الكارت (SDK هيعمل Save Card)
+            var res = await CreateCardPaymentKeyAsync(new CardCheckoutServiceDto
+            {
+                AmountCents = Math.Max(0, amountCents),
+                Currency = "EGP",
+                MerchantOrderId = Guid.NewGuid().ToString("N"),
+                Billing = new BillingData(
+                    "NA", "NA", "na@example.com", "01000000000",
+                    "NA", "NA", "NA", "NA", "Cairo", "NA", "EG", "NA")
+            });
 
+            if (!res.Status || res.Data is null)
+                return new ApiResponse<TokenizationStartRes>(null, res.Message ?? "Failed", false, res.Errors);
 
+            return new ApiResponse<TokenizationStartRes>(
+                new TokenizationStartRes(res.Data.MerchantOrderId, res.Data.PaymentKey),
+                "Tokenization started", true
+            );
+        }
+        public async Task<ApiResponse<IEnumerable<SavedCardViewDto>>> ListSavedCardsAsync()
+        {
+            var userId = GetCurrentUserId();
+            if (userId is null)
+                return new ApiResponse<IEnumerable<SavedCardViewDto>>(null, "Unauthorized", false);
 
+            var cards = await SavedCards.GetAllAsync(c => c.UserId == userId, trackChanges: false);
+            var list = cards.Select(c => new SavedCardViewDto(c.Id, c.Brand, c.Last4, c.ExpiryMonth, c.ExpiryYear, c.IsDefault));
+            return new ApiResponse<IEnumerable<SavedCardViewDto>>(list, "OK", true);
+        }
+        public async Task<ApiResponse<bool>> SetDefaultCardAsync(int cardId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId is null) return new ApiResponse<bool>(false, "Unauthorized", false);
+
+            var all = await SavedCards.GetAllAsync(c => c.UserId == userId, trackChanges: true);
+            var target = all.FirstOrDefault(c => c.Id == cardId);
+            if (target is null) return new ApiResponse<bool>(false, "Card not found", false);
+
+            foreach (var c in all) c.IsDefault = (c.Id == cardId);
+            await _uow.SaveChangesAsync();
+            return new ApiResponse<bool>(true, "Default set", true);
+        }
+        public async Task<ApiResponse<bool>> DeleteCardAsync(int cardId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId is null) return new ApiResponse<bool>(false, "Unauthorized", false);
+
+            var card = await SavedCards.GetFirstOrDefaultAsync(c => c.Id == cardId && c.UserId == userId, trackChanges: true);
+            if (card is null) return new ApiResponse<bool>(false, "Card not found", false);
+
+            SavedCards.Delete(card);
+            await _uow.SaveChangesAsync();
+            return new ApiResponse<bool>(true, "Deleted", true);
+        }
+        public async Task<ApiResponse<object>> ChargeWithSavedCardServerAsync(ChargeWithSavedCardReq req)
+        {
+            var userId = GetCurrentUserId();
+            if (userId is null) return new ApiResponse<object>(null, "Unauthorized", false);
+
+            var card = await SavedCards.GetFirstOrDefaultAsync(c => c.Id == req.CardId && c.UserId == userId, trackChanges: false);
+            if (card is null) return new ApiResponse<object>(null, "Card not found", false);
+
+            // 1) إصدار payment_key للطلب
+            var k = await CreatePaymentKeyForSavedCardAsync(
+                new SavedCardChargeDto(req.AmountCents, req.Currency ?? "EGP", card.Token, req.MerchantOrderId)
+            );
+            if (!k.Status || k.Data is null) return new ApiResponse<object>(null, k.Message ?? "Failed", false, k.Errors);
+
+            // 2) الدفع من السيرفر باستخدام التوكن
+            var pay = await PayWithSavedTokenAsync(k.Data.PaymentKey, card.Token);
+            return new ApiResponse<object>(new
+            {
+                k.Data.MerchantOrderId,
+                k.Data.PaymobOrderId,
+                k.Data.PaymentKey,
+                pay_status = pay.Status,
+                pay_message = pay.Message,
+                pay_data = pay.Data
+            }, "Initiated", true, pay.Errors);
+        }
+        //public async Task<ApiResponse<SavedCardInitChargeRes>> InitChargeWithSavedCardAsync(SavedCardInitChargeReq req)
+        //{
+        //    var userId = GetCurrentUserId();
+        //    if (userId is null) return new ApiResponse<SavedCardInitChargeRes>(null, "Unauthorized", false);
+
+        //    var card = await SavedCards.GetFirstOrDefaultAsync(c => c.Id == req.CardId && c.UserId == userId, trackChanges: false);
+        //    if (card is null) return new ApiResponse<SavedCardInitChargeRes>(null, "Card not found", false);
+
+        //    var k = await CreatePaymentKeyForSavedCardAsync(
+        //        new SavedCardChargeDto(req.AmountCents, req.Currency ?? "EGP", card.Token, req.MerchantOrderId)
+        //    );
+        //    if (!k.Status || k.Data is null)
+        //        return new ApiResponse<SavedCardInitChargeRes>(null, k.Message ?? "Failed", false, k.Errors);
+
+        //    var dto = new SavedCardInitChargeRes(k.Data.MerchantOrderId, k.Data.PaymobOrderId, k.Data.PaymentKey, card.Token);
+        //    return new ApiResponse<SavedCardInitChargeRes>(dto, "Ready", true);
+        //}
+        public async Task<ApiResponse<PayActionRes>> PayWithSavedTokenAsync(string paymentKey, string savedCardToken)
+        {
+            if (string.IsNullOrWhiteSpace(paymentKey))
+                return new ApiResponse<PayActionRes>(null, "paymentKey is required", false);
+
+            if (string.IsNullOrWhiteSpace(savedCardToken))
+                return new ApiResponse<PayActionRes>(null, "savedCardToken is required", false);
+
+            var body = new
+            {
+                payment_token = paymentKey,
+                source = new { identifier = savedCardToken, subtype = "TOKEN" }
+            };
+
+            var url = $"{_opt.ApiBase}/acceptance/payments/pay";
+            var res = await HttpPostJsonWithRetryAsync(url, body);
+
+            object? payload = res.IsSuccessStatusCode
+                ? await res.Content.ReadFromJsonAsync<object>()
+                : await res.Content.ReadAsStringAsync();
+
+            var success = res.IsSuccessStatusCode;
+
+            return new ApiResponse<PayActionRes>(
+                new PayActionRes(success, payload),
+                success ? "Token payment initiated" : "Token payment failed",
+                success,
+                success ? null : new List<string> { payload?.ToString() ?? "Unknown error" }
+            );
+        }
+        public async Task<ApiResponse<SavedCardPaymentResponse>> CreatePaymentKeyForSavedCardAsync(SavedCardChargeDto dto)
+        {
+            var currency = ResolveCurrency(dto.Currency);
+            var merchantOrderId = EnsureMerchantOrderId(dto.MerchantOrderId);
+
+            using (await AcquireLockAsync(merchantOrderId))
+            {
+                var upsert = await UpsertOrderAsync(merchantOrderId, dto.AmountCents, currency);
+                if (!upsert.Status || upsert.Data is null)
+                    return new ApiResponse<SavedCardPaymentResponse>(null, upsert.Message ?? "Unauthorized", false);
+
+                var paymobOrderId = await GetOrCreatePaymobOrderIdAsync(merchantOrderId, dto.AmountCents, currency);
+                if (paymobOrderId <= 0)
+                    return new ApiResponse<SavedCardPaymentResponse>(null, "Failed to create Paymob order", false);
+
+                // Billing مختصر وثابت (ممكن تستبدله ببيانات المستخدم)
+                var billing = new BillingData(
+                    first_name: "NA", last_name: "NA", email: "na@example.com", phone_number: "01000000000",
+                    apartment: "NA", floor: "NA", building: "NA", street: "NA",
+                    city: "Cairo", state: "NA", country: "EG", postal_code: "NA"
+                );
+
+                var paymentKey = await GetOrCreatePaymentKeyAsync(upsert.Data, dto.AmountCents, currency, billing, _opt.Integration.Card, 3600);
+
+                // سجل Pending
+                var hasTx = (await TxRepo.GetAllAsync(t => t.MerchantOrderId == merchantOrderId, false)).Any();
+                if (!hasTx)
+                    await AddTransactionAsync(merchantOrderId, paymobOrderId, dto.AmountCents, currency, "CardToken", "Pending", false);
+
+                return new ApiResponse<SavedCardPaymentResponse>(
+                    new SavedCardPaymentResponse(merchantOrderId, paymobOrderId, paymentKey, null),
+                    "Payment key for saved card issued", true
+                );
+            }
+        }
+        public async Task<ApiResponse<CardPaymentKeyRes>> CreateCardPaymentKeyAsync(CardCheckoutServiceDto req)
+        {
+            var currency = ResolveCurrency(req.Currency);
+            var merchantOrderId = EnsureMerchantOrderId(req.MerchantOrderId);
+
+            using (await AcquireLockAsync(merchantOrderId))
+            {
+                // upsert order في DB
+                var upsert = await UpsertOrderAsync(merchantOrderId, req.AmountCents, currency);
+                if (!upsert.Status || upsert.Data is null)
+                    return new ApiResponse<CardPaymentKeyRes>(null, upsert.Message ?? "Unauthorized", false);
+
+                // إنشاء/الحصول على Paymob Order
+                var paymobOrderId = await GetOrCreatePaymobOrderIdAsync(merchantOrderId, req.AmountCents, currency);
+                if (paymobOrderId <= 0)
+                    return new ApiResponse<CardPaymentKeyRes>(null, "Failed to create Paymob order", false);
+
+                // إصدار Payment Key
+                var paymentKey = await GetOrCreatePaymentKeyAsync(upsert.Data, req.AmountCents, currency, req.Billing, _opt.Integration.Card, 3600);
+
+                // سجل Pending أول مرة
+                var hasTx = (await TxRepo.GetAllAsync(t => t.MerchantOrderId == merchantOrderId, false)).Any();
+                if (!hasTx)
+                    await AddTransactionAsync(merchantOrderId, paymobOrderId, req.AmountCents, currency, "Card", "Pending", false);
+
+                // مبدئيًا نرجّع iframeUrl تحسبًا لاستخدام الويب (اختياري للـSDK)
+                var iframe = BuildCardIframeUrl(paymentKey).Data!;
+
+                return new ApiResponse<CardPaymentKeyRes>(
+                    new CardPaymentKeyRes(merchantOrderId, paymobOrderId, paymentKey, iframe),
+                    "Payment key issued", true
+                );
+            }
+        }
         private async Task<bool> ExistsProcessedTxAsync(long paymobTransactionId)
         {
             return await WebhookLogs.AnyAsync(w =>
@@ -668,7 +1683,6 @@ namespace Voltyks.Application.Services.Paymob
             await _uow.SaveChangesAsync();
         }
 
-
         // ================== Helpers / Infra ==================
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _orderLocks = new();
         private async Task<IDisposable> AcquireLockAsync(string merchantOrderId)
@@ -711,6 +1725,7 @@ namespace Voltyks.Application.Services.Paymob
                 var upsertResponse = await UpsertOrderAsync(merchantOrderId, amountCents, currency);
                 if (!upsertResponse.Status || upsertResponse.Data is null)
                     return 0;
+
                 order = upsertResponse.Data;
             }
 
@@ -722,17 +1737,26 @@ namespace Voltyks.Application.Services.Paymob
             var body = new PaymobOrderReq()
             {
                 auth_token = auth,
-                //delivery_needed = false,
+                delivery_needed = false,
                 amount_cents = amountCents,
                 currency = currency,
                 merchant_order_id = merchantOrderId,
-                //items = Array.Empty<object>()
+                items = Array.Empty<object>()
             };
 
             var res = await HttpPostJsonWithRetryAsync($"{_opt.ApiBase}/ecommerce/orders", body);
-            //res.EnsureSuccessStatusCode();
+
+            // ✅ تعديل الخطأ: ما نتعاملش كأنه نجح لو الـ StatusCode فشل
+            if (!res.IsSuccessStatusCode)
+                return 0;
+
             var data = await res.Content.ReadFromJsonAsync<PaymobOrderRes>();
-            var paymobOrderId = data!.id;
+
+            // ✅ تعديل الخطأ: تأكيد وجود id صالح قبل الحفظ
+            if (data is null || data.id <= 0)
+                return 0;
+
+            var paymobOrderId = data.id;
 
             order.PaymobOrderId = paymobOrderId;
             order.Status = "OrderCreated";
@@ -746,7 +1770,7 @@ namespace Voltyks.Application.Services.Paymob
             => !string.IsNullOrWhiteSpace(o.LastPaymentKey)
                && o.PaymentKeyExpiresAt.HasValue
                && o.PaymentKeyExpiresAt.Value > DateTime.UtcNow.AddSeconds(30);
-        private async Task<string> GetOrCreatePaymentKeyAsync(PaymentOrder order, long amountCents, string currency, BillingData billing, int integrationId, int expirationSeconds = 3600)
+        private async Task<string> GetOrCreatePaymentKeyAsync(PaymentOrder order, long amountCents, string currency, BillingData billing, int integrationId, int expirationSeconds = 3600,bool tokenize = false)
         {
             if (IsKeyValid(order))
                 return order.LastPaymentKey!;
@@ -756,8 +1780,10 @@ namespace Voltyks.Application.Services.Paymob
             if (!norm.IsValid)
                 throw new InvalidOperationException($"Invalid billing_data: {norm.Error}");
 
-            var body = new PaymobPaymentKeyReq(auth, amountCents, expirationSeconds, order.PaymobOrderId!.Value, billing, currency, integrationId);
-
+            var body = new PaymobPaymentKeyReq(auth, amountCents, expirationSeconds, order.PaymobOrderId!.Value, norm.Value, currency, integrationId)
+            {
+                tokenize = tokenize ? true : null
+            };
             var res = await HttpPostJsonWithRetryAsync($"{_opt.ApiBase}/acceptance/payment_keys", body);
             //res.EnsureSuccessStatusCode();
             var data = await res.Content.ReadFromJsonAsync<PaymobPaymentKeyRes>();
@@ -806,30 +1832,7 @@ namespace Voltyks.Application.Services.Paymob
                 Data = result,
                 Errors = success ? null : new List<string> { payload?.ToString() ?? "Unknown error" }
             };
-        }
-        private bool VerifyHmacSha512(IDictionary<string, string?> fields)
-        {
-
-          
-
-            string[] orderedKeys = new[]
-            {
-            "amount_cents","created_at","currency","error_occured","has_parent_transaction","id","integration_id",
-            "is_3d_secure","is_auth","is_capture","is_refunded","is_standalone_payment","is_voided","order.id",
-            "owner","pending","source_data.pan","source_data.sub_type","source_data.type","success"
-        };
-
-            var sb = new StringBuilder();
-            foreach (var k in orderedKeys) sb.Append(fields.TryGetValue(k, out var v) ? v ?? "" : "");
-
-            var secret = _opt.HmacSecret ?? throw new InvalidOperationException("HMAC secret not set");
-            using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(secret));
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString()));
-            var hex = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
-
-            var received = (fields.TryGetValue("hmac", out var hv) ? hv : "")?.ToLowerInvariant() ?? "";
-            return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(hex), Encoding.UTF8.GetBytes(received));
-        }
+        }    
         private async Task<ApiResponse<PaymentOrder>> UpsertOrderAsync(string merchantOrderId, long amountCents, string currency)
         {
             var currentUserId = GetCurrentUserId();
@@ -900,7 +1903,6 @@ namespace Voltyks.Application.Services.Paymob
             };
             return (true, "", obj);
         }
-
         private async Task AddTransactionAsync(string merchantOrderId, long? paymobOrderId, long amountCents, string currency, string integrationType, string status = "Initiated", bool isSuccess = false)
         {
             var tx = new PaymentTransaction
@@ -952,6 +1954,8 @@ namespace Voltyks.Application.Services.Paymob
             if (bool.TryParse(v, out var b)) return b;
             return v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
+
+       
     }
 }
 

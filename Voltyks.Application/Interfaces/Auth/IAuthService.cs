@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Identity;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.AuthDTOs;
+using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Persistence.Entities.Identity;
 
 
@@ -24,6 +25,7 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId);
         Task<ApiResponse<bool>> ToggleUserAvailabilityAsync();
 
+        Task<ApiResponse<List<ChargingRequestDetailsDto>>> GetChargerRequestsAsync();
 
 
 

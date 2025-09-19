@@ -12,6 +12,8 @@ namespace Voltyks.Core.DTOs.Paymob.AddtionDTOs
         public long AmountCents { get; set; }
         public string? Currency { get; set; } = "EGP"; // قيمة افتراضية
         public string WalletPhone { get; set; } = string.Empty;
+        public bool SaveCard { get; set; } // اختياري، false افتراضيًا
+
     }
 
 }

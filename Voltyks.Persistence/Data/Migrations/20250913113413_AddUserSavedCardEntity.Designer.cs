@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Voltyks.Persistence.Data;
 
@@ -11,9 +12,11 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    partial class VoltyksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250913113413_AddUserSavedCardEntity")]
+    partial class AddUserSavedCardEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
