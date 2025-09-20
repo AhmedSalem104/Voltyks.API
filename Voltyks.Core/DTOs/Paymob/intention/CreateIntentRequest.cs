@@ -18,6 +18,9 @@ namespace Voltyks.Core.DTOs.Paymob.intention
         public string? NotificationUrl { get; set; }
         public string? RedirectionUrl { get; set; }
         public string? PaymentMethod { get; init; }  // "Card" or "Wallet"
+                                                     // NEW
+        public bool SaveCard { get; set; } = false;   // tokenize=true
+
 
 
         // Constructor to initialize the class
@@ -29,7 +32,8 @@ namespace Voltyks.Core.DTOs.Paymob.intention
             string? merchantOrderId = null,
             string? notificationUrl = null,
             string? redirectionUrl = null,
-            string? paymentMethod = null)
+            string? paymentMethod = null,
+             bool saveCard = false)
         {
             Amount = amount;
             Currency = currency;
@@ -39,6 +43,8 @@ namespace Voltyks.Core.DTOs.Paymob.intention
             NotificationUrl = notificationUrl;
             RedirectionUrl = redirectionUrl;
             PaymentMethod = paymentMethod;
+            SaveCard = saveCard;
+
         }
     }
 

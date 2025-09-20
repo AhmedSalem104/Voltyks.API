@@ -47,7 +47,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     return new ApiResponse<NotificationResultDto>(null, "Car owner not found", false);
 
                 // 1) أنشئ الطلب
-                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage , dto.Latitude,dto.Longitude);
+                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage , dto.Latitude,dto.Longitude , charger.UserId);
 
                 // 2) جهّز بيانات الإشعار
                 var recipientUserId = charger.UserId; // صاحب المحطة
@@ -568,7 +568,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     c => c.User))
                 .FirstOrDefault();
         }
-        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage ,double Latitude,double Longitude)
+        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage ,double Latitude,double Longitude ,string recipientUserId)
         {
             var request = new ChargingRequestEntity
             {
@@ -579,7 +579,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                 KwNeeded = KwNeeded,
                 CurrentBatteryPercentage = CurrentBatteryPercentage,
                 Latitude = Latitude,
-                Longitude = Longitude
+                Longitude = Longitude,
+                RecipientUserId = recipientUserId
                 
             };
 

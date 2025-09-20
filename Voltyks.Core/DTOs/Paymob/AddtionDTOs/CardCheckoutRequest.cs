@@ -21,6 +21,8 @@ namespace Voltyks.Core.DTOs.Paymob.AddtionDTOs
 
         [Required]
         public string PaymentMethod { get; set; } = "Card";
+        public bool SaveCard { get; set; } = true;   // tokenize=true
+
     }
 
 }

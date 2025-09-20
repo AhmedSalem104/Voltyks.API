@@ -30,10 +30,6 @@ using Voltyks.Core.DTOs.ChargerRequest;
 using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 
-
-
-
-
 namespace Voltyks.Application.Services.Auth
 {
     public class AuthService(UserManager<AppUser> userManager ,
@@ -349,10 +345,6 @@ namespace Voltyks.Application.Services.Auth
             return new ApiResponse<List<string>>(SuccessfulMessage.LoggedOutSuccessfully) { Status = true };
 
         }
-
-
-        // ---------- Private Methods ----------
-
         public async Task<ApiResponse<List<ChargingRequestDetailsDto>>> GetChargerRequestsAsync()
         {
 
@@ -365,7 +357,7 @@ namespace Voltyks.Application.Services.Auth
             var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
 
             var requests = (await repo.GetAllWithIncludeAsync(
-                c => c.UserId == userId,
+                c => c.RecipientUserId == userId,
                 false,
                 c => c.CarOwner,
                 c => c.Charger,
@@ -432,7 +424,7 @@ namespace Voltyks.Application.Services.Auth
         }
 
 
-
+        // ---------- Private Methods ----------
         private string GetCurrentUserId()
         {
             return httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -808,7 +800,6 @@ namespace Voltyks.Application.Services.Auth
             return distance;
         }
         private double DegreesToRadians(double deg) => deg * (Math.PI / 180);
-
         private UserDetailsDto BuildUserDetailsDto(AppUser user,List<Vehicle> vehicles,List<Charger> chargers)
         {
             var result = _mapper.Map<UserDetailsDto>(user);
@@ -870,7 +861,6 @@ namespace Voltyks.Application.Services.Auth
                 return (area, street);
             }
         }
-
 
     }
 }

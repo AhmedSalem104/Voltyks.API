@@ -45,7 +45,7 @@ namespace Voltyks.Application.Interfaces.Paymob
 
 
         // دالة لمعالجة Webhook
-        Task<ApiResponse<bool>> HandlePaymentNotificationAsync(HttpRequest req, string rawBody);
+        //Task<ApiResponse<bool>> HandlePaymentNotificationAsync(HttpRequest req, string rawBody);
 
 
 
