@@ -398,7 +398,21 @@ namespace Voltyks.Application.Services.Auth
                                          * (decimal)req.KwNeeded
                                          / (decimal)req.Charger.Capacity.kw;
                 }
-
+                // (6) عنوان موقع السيارة (اختياري)
+                string vehicleArea = "N/A";
+                string vehicleStreet = "N/A";
+                if (req.Latitude != null && req.Longitude != null)
+                {
+                    try
+                    {
+                        var (area, street) = await GetAddressFromLatLongNominatimAsync(req.Latitude, req.Longitude);
+                        if (!string.IsNullOrWhiteSpace(area)) vehicleArea = area;
+                        if (!string.IsNullOrWhiteSpace(street)) vehicleStreet = street;
+                        dto.VehicleArea = vehicleArea;
+                        dto.VehicleStreet = vehicleStreet;
+                    }
+                    catch { /* تجاهل وخلّيها N/A */ }
+                }
                 // بيانات السيارة (أول سيارة للمستخدم صاحب الطلب)
                 var vehicles = await _vehicleService.GetVehiclesByUserIdAsync(req.CarOwner.Id);
                 var vehicle = vehicles?.Data?.FirstOrDefault();
@@ -411,9 +425,7 @@ namespace Voltyks.Application.Services.Auth
                     dto.VehicleCapacity = vehicle.Capacity;
                 }
 
-                // العنوان (اختياري)
-                dto.VehicleArea = "N/A";
-                dto.VehicleStreet = "N/A";
+             
             }
 
             return new ApiResponse<List<ChargingRequestDetailsDto>>(
@@ -422,7 +434,6 @@ namespace Voltyks.Application.Services.Auth
                 true
             );
         }
-
 
         // ---------- Private Methods ----------
         private string GetCurrentUserId()

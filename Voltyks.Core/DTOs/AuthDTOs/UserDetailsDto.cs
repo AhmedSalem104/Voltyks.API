@@ -17,7 +17,7 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         public List<VehicleDto> Vehicles { get; set; }
         public List<ChargerDto> Chargers { get; set; }
         //public List<ChargingRequest> ChargingRequests { get; set; }
-        public List<ChargingRequestDetailsDto> ChargingRequests { get; set; } = new();
+        //public List<ChargingRequestDetailsDto> ChargingRequests { get; set; } = new();
 
     }
 

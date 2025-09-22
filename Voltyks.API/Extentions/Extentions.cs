@@ -29,6 +29,7 @@ using Voltyks.Application.Interfaces;
 using Voltyks.Application.Services.Paymob;
 using Voltyks.Core.DTOs.Paymob.Options;
 using Voltyks.Application.Interfaces.Paymob;
+using Voltyks.Application.Services.ChargingRequest.Interceptor;
 
 
 namespace Voltyks.API.Extentions
@@ -53,8 +54,7 @@ namespace Voltyks.API.Extentions
             services.AddHttpClient<PaymobService>();
             services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
             services.AddScoped<PaymobService>();
-
-
+         
             services.AddAuthentication()
             .AddGoogle("Google", options =>
             {
@@ -77,6 +77,15 @@ namespace Voltyks.API.Extentions
                     Credential = GoogleCredential.FromFile("Firebase/service-account-key.json")
                 });
             }
+
+            // Add Interceptor
+            services.AddSingleton<ChargingRequestCleanupInterceptor>();
+            services.AddDbContext<VoltyksDbContext>((sp, options) =>
+            {
+                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+                options.AddInterceptors(sp.GetRequiredService<ChargingRequestCleanupInterceptor>());
+            });
+
             return services;
 
         }
@@ -198,6 +207,9 @@ namespace Voltyks.API.Extentions
 
             services.AddHttpClient("paymob"); // تقدر تضيف BaseAddress لو تحب
             services.AddSingleton<IPaymobAuthTokenProvider, PaymobAuthTokenProviderRedis>();
+
+
+           
 
             services.AddScoped<IVehicleService, VehicleService>();
             services.AddScoped<IPaymobService, PaymobService>();

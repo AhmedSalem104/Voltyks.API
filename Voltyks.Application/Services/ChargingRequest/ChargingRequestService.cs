@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
+
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
@@ -107,7 +108,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: 2 // VehicleOwner
                 );
-                await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+
 
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request accepted", true);
@@ -155,7 +156,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     if (sent != null)
                         results.Add(sent);
-                    await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+    
 
 
                 }
@@ -226,7 +227,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: 1 // ChargerOwner
                 );
-                await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request confirmed", true);
 
@@ -265,7 +266,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: 1 // ChargerOwner
                 );
-                await DeleteUserRequestsAndNotificationsAsync(GetCurrentUserId());
+
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
 
@@ -745,7 +746,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
             // 2) استرجاع جميع الطلبات الخاصة بالمستخدم الحالي
             var userRequests = await reqRepo.GetAllWithIncludeAsync(
-                c => c.UserId == userId,  // تصفية حسب الـ userId
+                c => c.RecipientUserId == userId,  // تصفية حسب الـ userId
                 false,
                 c => c.Charger  // يمكنك إضافة أي علاقات إضافية إذا لزم الأمر
             );
