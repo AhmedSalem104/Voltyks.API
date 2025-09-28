@@ -8,7 +8,7 @@ namespace Voltyks.Core.DTOs.Paymob.intention
 {
     public class CreateIntentRequest
     {
-        public int Amount { get; set; }
+        public double Amount { get; set; }
         public string? Currency { get; set; }
         public BillingDataDto BillingData { get; set; }
         public List<ItemDto>? Items { get; set; }
@@ -25,7 +25,7 @@ namespace Voltyks.Core.DTOs.Paymob.intention
 
         // Constructor to initialize the class
         public CreateIntentRequest(
-            int amount,
+            double amount,
             string currency,
             BillingDataDto billingData,
             List<ItemDto>? items = null,

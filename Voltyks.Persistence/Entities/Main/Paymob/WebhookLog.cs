@@ -19,6 +19,8 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public string RawPayload { get; set; } = default!;
         public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
         public bool IsValid { get; set; }                               // ما إذا كانت البيانات صالحة
+        public long? MerchantId { get; set; }
+
 
     }
 }

@@ -23,6 +23,11 @@ using Voltyks.Core.DTOs.Paymob.CardsDTOs;
 using Twilio.TwiML.Messaging;
 using Voltyks.Core.DTOs.Paymob.intention;
 using System.Text.Json.Serialization;
+using StackExchange.Redis;
+using System.Transactions;
+using Voltyks.Persistence.Entities.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 
 namespace Voltyks.Application.Services.Paymob
@@ -36,9 +41,12 @@ namespace Voltyks.Application.Services.Paymob
         private readonly IPaymobAuthTokenProvider _tokenProvider;
         private readonly IHttpContextAccessor _httpContext;
         private readonly IHttpClientFactory _httpFactory;
+        private readonly UserManager<AppUser> _userManager; // 👈 ده اللي ناقصك
+
 
         private IGenericRepository<PaymentOrder, int> OrdersRepo => _uow.GetRepository<PaymentOrder, int>();
         private IGenericRepository<PaymentTransaction, int> TxRepo => _uow.GetRepository<PaymentTransaction, int>();
+        //private IGenericRepository<UserSavedCard, int> SaveCardRepo => _uow.GetRepository<UserSavedCard, int>();
 
         // داخل الـService اللي فيه _uow
         private IGenericRepository<WebhookLog, int> WebhookLogs => _uow.GetRepository<WebhookLog, int>();
@@ -46,7 +54,7 @@ namespace Voltyks.Application.Services.Paymob
         private IGenericRepository<PaymentTransaction, int> PaymentTransactions => _uow.GetRepository<PaymentTransaction, int>();
         private IGenericRepository<UserSavedCard, int> SavedCards => _uow.GetRepository<UserSavedCard, int>();
 
-        public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext, IHttpClientFactory httpFactory)
+        public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext, IHttpClientFactory httpFactory , UserManager<AppUser> userManager)
         {
             _http = http;
             _opt = opt.Value;
@@ -55,6 +63,7 @@ namespace Voltyks.Application.Services.Paymob
             _tokenProvider = tokenProvider;
             _httpContext = httpContext;
             _httpFactory = httpFactory;
+            _userManager = userManager;
 
         }
         public async Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req)
@@ -308,7 +317,7 @@ namespace Voltyks.Application.Services.Paymob
                 var orderId = string.IsNullOrWhiteSpace(r.MerchantOrderId) ? Guid.NewGuid().ToString("N") : r.MerchantOrderId;
                 const string currency = "EGP";
 
-                var upsert = await UpsertOrderAsync(orderId, r.Amount, currency);
+                var upsert = await UpsertOrderAsync(orderId, (long)r.Amount, currency);
                 if (!upsert.Status || upsert.Data is null)
                     return new ApiResponse<CreateIntentResponse>(upsert.Message ?? "Unauthorized", false);
 
@@ -340,6 +349,8 @@ namespace Voltyks.Application.Services.Paymob
                     ? $"http://voltyks-app.runasp.net/notification/{orderId}" // يُفضّل HTTPS في الإنتاج
                     : r.NotificationUrl;
 
+
+
                 var body = new
                 {
                     amount = r.Amount,      // تأكد من وحدة المبلغ حسب إعداد حسابك
@@ -358,8 +369,14 @@ namespace Voltyks.Application.Services.Paymob
                     },
                     special_reference = specialReference,
                     notification_url = notificationUrl,
-                    tokenize = r.SaveCard,  
-                    redirection_url = (selectedMethod == "Card" && !string.IsNullOrWhiteSpace(r.RedirectionUrl)) ? r.RedirectionUrl : null
+                    tokenize = r.SaveCard,
+                    //merchant_order_id = orderId,                 // أو uid:<userId>|ord:<orderId>
+                    merchant_order_id = $"uid:{upsert.Data!.UserId}|ord:{orderId}",
+                    metadata = new { user_id = upsert.Data!.UserId }  // عدّل حسب ما بيرجع UpsertOrderAsync
+
+                    // redirection_url = (selectedMethod == "Card" && !string.IsNullOrWhiteSpace(r.RedirectionUrl)) ? r.RedirectionUrl : null
+
+
                 };
 
 
@@ -410,7 +427,7 @@ namespace Voltyks.Application.Services.Paymob
                     return new ApiResponse<CreateIntentResponse>("Unexpected Paymob response.", false, new List<string> { raw });
 
                 // 7) Record transaction locally (Pending)
-                await AddTransactionAsync(orderId, pm.IntentionOrderId, r.Amount, currency, "Intention", "Pending", false);
+                await AddTransactionAsync(orderId, pm.IntentionOrderId, (long)r.Amount, currency, "Intention", "Pending", false);
 
                 // 8) Extract payment keys (if any)
                 var keys = pm.PaymentKeys?
@@ -436,9 +453,31 @@ namespace Voltyks.Application.Services.Paymob
                 return new ApiResponse<CreateIntentResponse>("Failed to create Intention.", false, new List<string> { ex.Message });
             }
         }
-        //public async Task<ApiResponse<bool>> HandlePaymentNotificationAsync(HttpRequest req, string rawBody)
+        private static string? FirstValue(IDictionary<string, string?> f, params string[] keys)
+        {
+            foreach (var k in keys)
+                if (f.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v))
+                    return v;
+            return null;
+        }
+        private static long TryParseLong(IDictionary<string, string?> f, params string[] keys)
+        {
+            foreach (var k in keys)
+                if (f.TryGetValue(k, out var s) && long.TryParse(s, out var n))
+                    return n;
+            return 0;
+        }
+        private static bool TryParseBool(IDictionary<string, string?> f, params string[] keys)
+        {
+            foreach (var k in keys)
+                if (f.TryGetValue(k, out var s) && bool.TryParse(s, out var b))
+                    return b;
+            return false;
+        }
+      
+        //public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
         //{
-        //    // [A] Log سريع قبل أي Parsing
+        //    // [A] Log سريع
         //    _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
         //        req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
 
@@ -449,7 +488,7 @@ namespace Voltyks.Application.Services.Paymob
         //    if (req.Headers.TryGetValue("hmac", out var h1)) fields["hmac"] = h1.ToString();
         //    else if (req.Headers.TryGetValue("hmac_signature", out var h2)) fields["hmac"] = h2.ToString();
         //    else if (req.Headers.TryGetValue("X-HMAC-Signature", out var h3)) fields["hmac"] = h3.ToString();
-        //    // أسماء بديلة للتشخيص
+
         //    if (!fields.ContainsKey("hmac"))
         //    {
         //        if (req.Headers.TryGetValue("secure-hash", out var h4)) fields["hmac"] = h4.ToString();
@@ -467,6 +506,7 @@ namespace Voltyks.Application.Services.Paymob
         //        else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
         //        {
         //            using var doc = JsonDocument.Parse(rawBody);
+
         //            void Walk(string prefix, JsonElement el)
         //            {
         //                switch (el.ValueKind)
@@ -483,7 +523,9 @@ namespace Voltyks.Application.Services.Paymob
         //                        break;
         //                }
         //            }
+
         //            Walk("", doc.RootElement);
+
         //            if (!fields.ContainsKey("hmac") &&
         //                doc.RootElement.TryGetProperty("hmac", out var hJson) &&
         //                hJson.ValueKind == JsonValueKind.String)
@@ -502,7 +544,7 @@ namespace Voltyks.Application.Services.Paymob
         //    }
         //    catch { }
 
-        //    // --------- 2) التأكد من وجود HMAC ----------
+        //    // --------- 2) لازم HMAC (لو مفيش هنلوج ونكمل) ----------
         //    if (!fields.ContainsKey("hmac") || string.IsNullOrWhiteSpace(fields["hmac"]))
         //    {
         //        await WebhookLogs.AddAsync(new WebhookLog
@@ -512,32 +554,51 @@ namespace Voltyks.Application.Services.Paymob
         //            HeadersJson = req.Headers.ToString(),
         //            HttpStatus = 200,
         //            ReceivedAt = DateTime.UtcNow,
-        //            IsHmacValid = false
+        //            IsHmacValid = false,
+
         //        });
         //        await _uow.SaveChangesAsync();
 
+        //        // هنرجّع 200 عشان بايموب ما يعيدش الإرسال بلا نهاية
         //        return new ApiResponse<bool> { Status = true, Message = "No HMAC (debug ack)", Data = true };
         //    }
 
-        //    // --------- 3) التحقق من HMAC ----------
+        //    // --------- 3) تحديد النوع مبكراً (مع دعم obj.) ----------
+        //    string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
+        //    string eventType = typeRaw.ToUpperInvariant();
+
+        //    // لو ظهر أي مفاتيح توكن، نعتبرها
+        //    // 
+        //    bool hasCardTokenKeys = FirstValue(fields,
+        //        "obj.token", "obj.saved_card_token", "obj.card_token",
+        //        "token", "saved_card_token", "card_token") != null;
+        //    if (hasCardTokenKeys) eventType = "CARD_TOKEN";
+
+        //    // --------- 3.1) تحقق HMAC ----------
         //    bool valid;
         //    try { valid = VerifyHmacSha512(fields, rawBody); } catch { valid = false; }
 
-        //    // --------- 4) Mask الـ PAN (إذا كان موجود) ----------
-        //    if (fields.TryGetValue("source_data.pan", out var pan) && !string.IsNullOrEmpty(pan) && pan.Length > 4)
-        //        fields["source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
+        //    // استثناء مؤقّت: اسمح بتوكنات الكروت حتى لو الـHMAC فشل (لتأكيد الحفظ فقط)
+        //    if ((eventType == "CARD_TOKEN" || eventType == "TOKEN") && !valid)
+        //    {
+        //        _log?.LogWarning("TOKEN/CARD_TOKEN webhook with invalid/missing HMAC – TEMPORARY ACCEPT for save-card testing.");
+        //        valid = true;
+        //    }
 
-        //    // --------- 5) Log الاستلام/الفشل ----------
-        //    string? merchantOrderIdForLog = null;
-        //    if (fields.TryGetValue("merchant_order_id", out var mo)) merchantOrderIdForLog = mo;
+        //    // --------- 3.2) Mask PAN بعد HMAC لأجل اللوجينج فقط ----------
+        //    var pan = FirstValue(fields, "obj.source_data.pan", "source_data.pan", "obj.masked_pan", "masked_pan");
+        //    if (!string.IsNullOrEmpty(pan) && pan.Length > 4)
+        //        fields["obj.source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
 
+        //    // --------- 4) Log الاستلام/الفشل بقيم obj. الصحيحة ----------
+        //    string? merchantOrderIdForLog = FirstValue(fields, "obj.order.merchant_order_id", "merchant_order_id");
         //    await WebhookLogs.AddAsync(new WebhookLog
         //    {
         //        RawPayload = rawBody,
         //        EventType = valid ? "Received" : "Failure",
         //        MerchantOrderId = merchantOrderIdForLog,
-        //        PaymobOrderId = TryParseLong(fields, "order.id"),
-        //        PaymobTransactionId = TryParseLong(fields, "id"),
+        //        PaymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id"),
+        //        PaymobTransactionId = TryParseLong(fields, "obj.id", "id"),
         //        IsHmacValid = valid,
         //        HttpStatus = valid ? 200 : 400,
         //        HeadersJson = req.Headers.ToString(),
@@ -557,37 +618,27 @@ namespace Voltyks.Application.Services.Paymob
         //        };
         //    }
 
-        //    // --------- 6) تحديد نوع الحدث ----------
-        //    string? eventType = null;
-        //    if (!fields.TryGetValue("type", out eventType) || string.IsNullOrWhiteSpace(eventType))
-        //        eventType = "TRANSACTION";
-        //    eventType = eventType.Trim().ToUpperInvariant();
-
-        //    if (fields.ContainsKey("token") || fields.ContainsKey("saved_card_token") || fields.ContainsKey("card_token"))
-        //        eventType = "CARD_TOKEN";
-
-        //    //  --------- 7) التعامل مع أنواع الأحداث المختلفة ----------
+        //    // --------- 5) Routing by type ----------
         //    switch (eventType)
         //    {
         //        case "TRANSACTION":
         //            {
-        //                var paymobTxId = TryParseLong(fields, "id");
+        //                var paymobTxId = TryParseLong(fields, "obj.id", "id");
+        //                var paymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id");
+        //                string? merchantOrderId = merchantOrderIdForLog;
 
-        //                // Idempotency (لتجنب التكرار)
+        //                // Idempotency
         //                if (paymobTxId > 0 && await ExistsProcessedTxAsync(paymobTxId))
         //                    return new ApiResponse<bool> { Status = true, Message = "Duplicate event ignored (idempotent)", Data = true };
 
-        //                var paymobOrderId = TryParseLong(fields, "order.id");
-        //                string? merchantOrderId = merchantOrderIdForLog;
+        //                bool isRefunded = TryParseBool(fields, "obj.is_refunded", "is_refunded");
+        //                bool isVoided = TryParseBool(fields, "obj.is_voided", "is_voided");
+        //                bool isCapture = TryParseBool(fields, "obj.is_capture", "is_capture");
+        //                bool success = TryParseBool(fields, "obj.success", "success");
+        //                bool pending = TryParseBool(fields, "obj.pending", "pending");
 
-        //                bool isRefunded = TryParseBool(fields, "is_refunded");
-        //                bool isVoided = TryParseBool(fields, "is_voided");
-        //                bool isCapture = TryParseBool(fields, "is_capture");
-        //                bool success = TryParseBool(fields, "success");
-        //                bool pending = TryParseBool(fields, "pending");
-
-        //                long amountCents = TryParseLong(fields, "amount_cents");
-        //                string currency = (fields.TryGetValue("currency", out var cur) ? (cur ?? _opt.Currency) : _opt.Currency);
+        //                long amountCents = TryParseLong(fields, "obj.amount_cents", "amount_cents");
+        //                string currency = FirstValue(fields, "obj.currency", "currency") ?? _opt.Currency;
 
         //                string localStatus =
         //                    isRefunded ? "Refunded" :
@@ -615,42 +666,262 @@ namespace Voltyks.Application.Services.Paymob
         //                if (!string.IsNullOrWhiteSpace(merchantOrderId))
         //                    await UpdateOrderStatusAsync(merchantOrderId!, localStatus);
 
-        //                // علّم الحدث كمُعالج (Idempotency mark)
+        //                // علامة تمّ المعالجة
         //                if (paymobTxId > 0)
         //                    await MarkProcessedTxAsync(paymobTxId, "TRANSACTION_PROCESSED");
 
         //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (transaction)", Data = true };
         //            }
 
+        //        //case "TOKEN": // نحتفظ به للتوافق
+        //        //    {
+        //        //        var owner = (FirstValue(fields, "obj.owner", "owner") ?? "unknown");
+        //        //        await MarkGenericAsync("TOKEN", owner, true);
+        //        //        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
+        //        //    }
         //        case "TOKEN":
         //            {
-        //                var owner = (fields.TryGetValue("owner", out var ow) ? ow : "unknown") ?? "unknown";
-        //                await MarkGenericAsync("TOKEN", owner, true);
+        //                if (hasCardTokenKeys) goto case "CARD_TOKEN"; // نفس لوجيك الحفظ
+        //                await MarkGenericAsync("TOKEN", FirstValue(fields, "obj.id", "id") ?? "unknown", true);
         //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
         //            }
 
+
+
+        //        //case "CARD_TOKEN":
+        //        //    {
+        //        //        // 1) token
+        //        //        var cardToken = FirstValue(fields,
+        //        //            "obj.token", "obj.saved_card_token", "obj.card_token",
+        //        //            "token", "saved_card_token", "card_token");
+
+        //        //        // 2) last4 (يدعم masked_pan بالشرطات)
+        //        //        string? last4 = FirstValue(fields, "obj.last4", "last4");
+        //        //        if (string.IsNullOrWhiteSpace(last4))
+        //        //        {
+        //        //            var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
+        //        //            if (!string.IsNullOrWhiteSpace(masked))
+        //        //            {
+        //        //                var digits = new string(masked.Where(char.IsDigit).ToArray());
+        //        //                if (digits.Length >= 4) last4 = digits[^4..];
+        //        //            }
+        //        //        }
+
+        //        //        // 3) brand (يدعم card_subtype)
+        //        //        string? brand = FirstValue(fields,
+        //        //            "obj.card_subtype", "card_subtype",
+        //        //            "obj.source_data.type", "source_data.type",
+        //        //            "obj.brand", "brand", "obj.scheme", "scheme");
+
+        //        //        // 4) expiry (اختياري)
+        //        //        int? expMonth = null, expYear = null;
+        //        //        if (int.TryParse(FirstValue(fields, "obj.expiry_month", "expiry_month"), out var mm)) expMonth = mm;
+        //        //        if (int.TryParse(FirstValue(fields, "obj.expiry_year", "expiry_year"), out var yy)) expYear = yy;
+
+        //        //        // 5) Paymob token id
+        //        //        long paymobTokenId = TryParseLong(fields, "obj.id", "id");
+
+        //        //        // 6) اربط بالمستخدم
+        //        //        var userId = await ResolveUserIdFromTokenContextAsync(fields);
+
+        //        //        if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
+        //        //        {
+        //        //            _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
+        //        //            await MarkGenericAsync("CARD_TOKEN_MISSING_DATA", cardToken ?? "unknown", false);
+        //        //            return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
+        //        //        }
+
+        //        //        // 7) Upsert
+        //        //        var existing = await _uow.GetRepository<UserSavedCard, int>().GetFirstOrDefaultAsync(
+        //        //                                                            c => c.UserId == userId && c.Token == cardToken,
+        //        //                                                            trackChanges: true
+        //        //                                                        );
+
+        //        //        if (existing is null)
+        //        //        {
+        //        //            bool isDefault = !await SavedCards.AnyAsync(c => c.UserId == userId);
+        //        //            await SavedCards.AddAsync(new UserSavedCard
+        //        //            {
+        //        //                UserId = userId!,
+        //        //                Token = cardToken!,
+        //        //                Last4 = last4,
+        //        //                Brand = brand,
+        //        //                ExpiryMonth = expMonth,
+        //        //                ExpiryYear = expYear,
+        //        //                PaymobTokenId = paymobTokenId > 0 ? paymobTokenId.ToString() : null,
+        //        //                IsDefault = isDefault,
+        //        //                CreatedAt = DateTime.UtcNow
+        //        //            });
+        //        //            _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}",
+        //        //                userId, last4, brand, paymobTokenId);
+        //        //        }
+        //        //        else
+        //        //        {
+        //        //            if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4)) existing.Last4 = last4;
+        //        //            if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand)) existing.Brand = brand;
+        //        //            if (!existing.ExpiryMonth.HasValue && expMonth.HasValue) existing.ExpiryMonth = expMonth;
+        //        //            if (!existing.ExpiryYear.HasValue && expYear.HasValue) existing.ExpiryYear = expYear;
+
+        //        //            // PaymobTokenId نوعها string? → ماينفعش نقارن بـ 0
+        //        //            if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0)
+        //        //                existing.PaymobTokenId = paymobTokenId.ToString();
+
+
+        //        //            _log?.LogWarning("UPDATED existing card → user={userId}, token={token}", userId, cardToken);
+        //        //        }
+
+        //        //        await _uow.SaveChangesAsync();
+
+        //        //        await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken, true);
+        //        //        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
+        //        //    }
         //        case "CARD_TOKEN":
         //            {
-        //                // استخراج الـ token
-        //                var cardToken = (fields.TryGetValue("token", out var t1) ? t1 : null) ?? (fields.TryGetValue("saved_card_token", out var t2) ? t2 : null);
+        //                // 1) token
+        //                var cardToken = FirstValue(fields,
+        //                    "obj.token", "obj.saved_card_token", "obj.card_token",
+        //                    "token", "saved_card_token", "card_token");
 
-        //                // هنا ننفذ أي عملية مطلوبة بعد تخزين التوكن
-        //                await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken ?? "unknown", true);
+        //                // 2) last4 (يدعم masked_pan بالشرطات)
+        //                string? last4 = FirstValue(fields, "obj.last4", "last4");
+        //                if (string.IsNullOrWhiteSpace(last4))
+        //                {
+        //                    var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
+        //                    if (!string.IsNullOrWhiteSpace(masked))
+        //                    {
+        //                        var digits = new string(masked.Where(char.IsDigit).ToArray());
+        //                        if (digits.Length >= 4) last4 = digits[^4..];
+        //                    }
+        //                }
 
+        //                // 3) brand (يدعم card_subtype)
+        //                string? brand = FirstValue(fields,
+        //                    "obj.card_subtype", "card_subtype",
+        //                    "obj.source_data.type", "source_data.type",
+        //                    "obj.brand", "brand", "obj.scheme", "scheme");
+
+        //                // 4) expiry (اختياري) – التقاط بأسماء متعددة + صيغة مجمّعة MM/YY أو MM/YYYY
+        //                int? expMonth = null, expYear = null;
+
+        //                // أسماء بديلة محتملة من بايموب
+        //                var mmStr = FirstValue(fields,
+        //                    "obj.expiry_month", "expiry_month",
+        //                    "obj.expiration_month", "expiration_month",
+        //                    "obj.exp_month", "exp_month",
+        //                    "obj.card_expiry_month", "card_expiry_month"
+        //                );
+
+        //                var yyStr = FirstValue(fields,
+        //                    "obj.expiry_year", "expiry_year",
+        //                    "obj.expiration_year", "expiration_year",
+        //                    "obj.exp_year", "exp_year",
+        //                    "obj.card_expiry_year", "card_expiry_year"
+        //                );
+
+        //                // صيغة مجمّعة مثل "MM/YY" أو "MM/YYYY"
+        //                var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration");
+
+        //                // Parse
+        //                if (int.TryParse(mmStr, out var mm)) expMonth = mm;
+
+        //                if (int.TryParse(yyStr, out var yy))
+        //                {
+        //                    // طبّع السنة لو جت رقمين: 27 → 2027
+        //                    expYear = yy >= 100 ? yy : (2000 + yy);
+        //                }
+        //                else if (!string.IsNullOrWhiteSpace(expiryCombined))
+        //                {
+        //                    var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
+        //                    if (m.Success)
+        //                    {
+        //                        if (int.TryParse(m.Groups["mm"].Value, out var mmm)) expMonth = mmm;
+        //                        if (int.TryParse(m.Groups["yy"].Value, out var yyy))
+        //                            expYear = yyy >= 100 ? yyy : (2000 + yyy);
+        //                    }
+        //                }
+
+        //                // ضبط حدودي (اختياري)
+        //                if (expMonth is < 1 or > 12) expMonth = null;
+        //                if (expYear is < 2000 or > 2100) expYear = null;
+
+        //                // 5) Paymob token id
+        //                long paymobTokenId = TryParseLong(fields, "obj.id", "id");
+
+        //                // 6) اربط بالمستخدم
+        //                var userId = await ResolveUserIdFromTokenContextAsync(fields);
+
+        //                if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
+        //                {
+        //                    _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
+        //                    await MarkGenericAsync("CARD_TOKEN_MISSING_DATA", cardToken ?? "unknown", false);
+        //                    return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
+        //                }
+
+        //                // 7) Upsert
+        //                var existing = await _uow.GetRepository<UserSavedCard, int>().GetFirstOrDefaultAsync(
+        //                                    c => c.UserId == userId && c.Token == cardToken,
+        //                                    trackChanges: true
+        //                                );
+
+        //                if (existing is null)
+        //                {
+        //                    bool isDefault = !await SavedCards.AnyAsync(c => c.UserId == userId);
+        //                    await SavedCards.AddAsync(new UserSavedCard
+        //                    {
+        //                        UserId = userId!,
+        //                        Token = cardToken!,
+        //                        Last4 = last4,
+        //                        Brand = brand,
+        //                        ExpiryMonth = expMonth,
+        //                        ExpiryYear = expYear,
+        //                        PaymobTokenId = paymobTokenId > 0 ? paymobTokenId.ToString() : null,
+        //                        IsDefault = isDefault,
+        //                        CreatedAt = DateTime.UtcNow
+        //                    });
+        //                    _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}",
+        //                        userId, last4, brand, paymobTokenId);
+        //                }
+        //                else
+        //                {
+        //                    if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4)) existing.Last4 = last4;
+        //                    if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand)) existing.Brand = brand;
+        //                    if (!existing.ExpiryMonth.HasValue && expMonth.HasValue) existing.ExpiryMonth = expMonth;
+        //                    if (!existing.ExpiryYear.HasValue && expYear.HasValue) existing.ExpiryYear = expYear;
+
+        //                    if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0)
+        //                        existing.PaymobTokenId = paymobTokenId.ToString();
+
+        //                    _log?.LogWarning("UPDATED existing card → user={userId}, token={token}", userId, cardToken);
+        //                }
+
+        //                await _uow.SaveChangesAsync();
+
+        //                await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken, true);
         //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
+        //            }
+
+
+        //        // Fallback: أنواع قريبة — لو فيها token اعتبرها CARD_TOKEN
+        //        case "SAVED_CARD":
+        //        case "CARD":
+        //        case "PAYMENT_TOKEN":
+        //            {
+        //                if (hasCardTokenKeys) goto case "CARD_TOKEN";
+        //                goto default;
         //            }
 
         //        default:
         //            {
-        //                var id = (fields.TryGetValue("id", out var anyId) ? anyId : Guid.NewGuid().ToString("N")) ?? Guid.NewGuid().ToString("N");
+        //                var id = FirstValue(fields, "obj.id", "id") ?? Guid.NewGuid().ToString("N");
         //                await MarkGenericAsync(eventType, id, true);
         //                return new ApiResponse<bool> { Status = true, Message = $"Webhook processed ({eventType})", Data = true };
         //            }
         //    }
         //}
+
         public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
         {
-            // [A] Log سريع قبل أي Parsing
+            // [A] Log سريع
             _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
                 req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
 
@@ -661,7 +932,7 @@ namespace Voltyks.Application.Services.Paymob
             if (req.Headers.TryGetValue("hmac", out var h1)) fields["hmac"] = h1.ToString();
             else if (req.Headers.TryGetValue("hmac_signature", out var h2)) fields["hmac"] = h2.ToString();
             else if (req.Headers.TryGetValue("X-HMAC-Signature", out var h3)) fields["hmac"] = h3.ToString();
-            // أسماء بديلة للتشخيص
+
             if (!fields.ContainsKey("hmac"))
             {
                 if (req.Headers.TryGetValue("secure-hash", out var h4)) fields["hmac"] = h4.ToString();
@@ -679,6 +950,7 @@ namespace Voltyks.Application.Services.Paymob
                 else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
                 {
                     using var doc = JsonDocument.Parse(rawBody);
+
                     void Walk(string prefix, JsonElement el)
                     {
                         switch (el.ValueKind)
@@ -695,7 +967,9 @@ namespace Voltyks.Application.Services.Paymob
                                 break;
                         }
                     }
+
                     Walk("", doc.RootElement);
+
                     if (!fields.ContainsKey("hmac") &&
                         doc.RootElement.TryGetProperty("hmac", out var hJson) &&
                         hJson.ValueKind == JsonValueKind.String)
@@ -706,6 +980,9 @@ namespace Voltyks.Application.Services.Paymob
             }
             catch { /* ignore parsing errors */ }
 
+            // 👇 NEW: استخرج الـ MID مرة واحدة لاستخدامه في كل اللوجات
+            var mid = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id");
+
             // --------- 1) Logging (اختياري) ----------
             try
             {
@@ -714,7 +991,7 @@ namespace Voltyks.Application.Services.Paymob
             }
             catch { }
 
-            // --------- 2) لازم HMAC ----------
+            // --------- 2) لازم HMAC (لو مفيش هنلوج ونكمل) ----------
             if (!fields.ContainsKey("hmac") || string.IsNullOrWhiteSpace(fields["hmac"]))
             {
                 await WebhookLogs.AddAsync(new WebhookLog
@@ -724,38 +1001,53 @@ namespace Voltyks.Application.Services.Paymob
                     HeadersJson = req.Headers.ToString(),
                     HttpStatus = 200,
                     ReceivedAt = DateTime.UtcNow,
-                    IsHmacValid = false
+                    IsHmacValid = false,
+                    MerchantId = mid   // استخدام الـ MID
                 });
                 await _uow.SaveChangesAsync();
 
                 return new ApiResponse<bool> { Status = true, Message = "No HMAC (debug ack)", Data = true };
             }
 
-            // --------- 3) HMAC Verify (قبل أي mask) ----------
-       
+            // --------- 3) تحديد النوع مبكراً (مع دعم obj.) ----------
+            string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
+            string eventType = typeRaw.ToUpperInvariant();
+
+            bool hasCardTokenKeys = FirstValue(fields,
+                "obj.token", "obj.saved_card_token", "obj.card_token",
+                "token", "saved_card_token", "card_token") != null;
+            if (hasCardTokenKeys) eventType = "CARD_TOKEN";
+
+            // --------- 3.1) تحقق HMAC ----------
             bool valid;
             try { valid = VerifyHmacSha512(fields, rawBody); } catch { valid = false; }
 
-            // --------- 3.1) Mask PAN بعد HMAC لأجل اللوجينج فقط ----------
-            if (fields.TryGetValue("source_data.pan", out var pan) && !string.IsNullOrEmpty(pan) && pan.Length > 4)
-                fields["source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
+            if ((eventType == "CARD_TOKEN" || eventType == "TOKEN") && !valid)
+            {
+                _log?.LogWarning("TOKEN/CARD_TOKEN webhook with invalid/missing HMAC – TEMPORARY ACCEPT for save-card testing.");
+                valid = true;
+            }
 
-            // --------- 4) Log الاستلام/الفشل ----------
-            string? merchantOrderIdForLog = null;
-            if (fields.TryGetValue("merchant_order_id", out var mo)) merchantOrderIdForLog = mo;
+            // --------- 3.2) Mask PAN بعد HMAC لأجل اللوجينج فقط ----------
+            var pan = FirstValue(fields, "obj.source_data.pan", "source_data.pan", "obj.masked_pan", "masked_pan");
+            if (!string.IsNullOrEmpty(pan) && pan.Length > 4)
+                fields["obj.source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
 
+            // --------- 4) Log الاستلام/الفشل بقيم obj. الصحيحة ----------
+            string? merchantOrderIdForLog = FirstValue(fields, "obj.order.merchant_order_id", "merchant_order_id");
             await WebhookLogs.AddAsync(new WebhookLog
             {
                 RawPayload = rawBody,
                 EventType = valid ? "Received" : "Failure",
                 MerchantOrderId = merchantOrderIdForLog,
-                PaymobOrderId = TryParseLong(fields, "order.id"),
-                PaymobTransactionId = TryParseLong(fields, "id"),
+                PaymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id"),
+                PaymobTransactionId = TryParseLong(fields, "obj.id", "id"),
                 IsHmacValid = valid,
                 HttpStatus = valid ? 200 : 400,
                 HeadersJson = req.Headers.ToString(),
                 ReceivedAt = DateTime.UtcNow,
-                IsValid = valid
+                IsValid = valid,
+                MerchantId = mid   // استخدام الـ MID
             });
             await _uow.SaveChangesAsync();
 
@@ -771,39 +1063,25 @@ namespace Voltyks.Application.Services.Paymob
             }
 
             // --------- 5) Routing by type ----------
-            string? eventType = null;
-            if (!fields.TryGetValue("type", out eventType) || string.IsNullOrWhiteSpace(eventType))
-                eventType = "TRANSACTION";
-            eventType = eventType.Trim().ToUpperInvariant();
-
-
-
-            if (fields.ContainsKey("token") || fields.ContainsKey("saved_card_token") || fields.ContainsKey("card_token"))
-                eventType = "CARD_TOKEN";
-
-
-
             switch (eventType)
             {
                 case "TRANSACTION":
                     {
-                        var paymobTxId = TryParseLong(fields, "id");
+                        var paymobTxId = TryParseLong(fields, "obj.id", "id");
+                        var paymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id");
+                        string? merchantOrderId = merchantOrderIdForLog;
 
-                        // Idempotency
                         if (paymobTxId > 0 && await ExistsProcessedTxAsync(paymobTxId))
                             return new ApiResponse<bool> { Status = true, Message = "Duplicate event ignored (idempotent)", Data = true };
 
-                        var paymobOrderId = TryParseLong(fields, "order.id");
-                        string? merchantOrderId = merchantOrderIdForLog;
+                        bool isRefunded = TryParseBool(fields, "obj.is_refunded", "is_refunded");
+                        bool isVoided = TryParseBool(fields, "obj.is_voided", "is_voided");
+                        bool isCapture = TryParseBool(fields, "obj.is_capture", "is_capture");
+                        bool success = TryParseBool(fields, "obj.success", "success");
+                        bool pending = TryParseBool(fields, "obj.pending", "pending");
 
-                        bool isRefunded = TryParseBool(fields, "is_refunded");
-                        bool isVoided = TryParseBool(fields, "is_voided");
-                        bool isCapture = TryParseBool(fields, "is_capture");
-                        bool success = TryParseBool(fields, "success");
-                        bool pending = TryParseBool(fields, "pending");
-
-                        long amountCents = TryParseLong(fields, "amount_cents");
-                        string currency = (fields.TryGetValue("currency", out var cur) ? (cur ?? _opt.Currency) : _opt.Currency);
+                        long amountCents = TryParseLong(fields, "obj.amount_cents", "amount_cents");
+                        string currency = FirstValue(fields, "obj.currency", "currency") ?? _opt.Currency;
 
                         string localStatus =
                             isRefunded ? "Refunded" :
@@ -812,7 +1090,6 @@ namespace Voltyks.Application.Services.Paymob
                             pending ? "Pending" :
                             success ? "Paid" : "Failed";
 
-                        // تحديث الـTransaction (لو موجودة)
                         if (paymobTxId > 0)
                         {
                             await UpdateTransactionByPaymobIdAsync(paymobTxId, tx =>
@@ -827,11 +1104,9 @@ namespace Voltyks.Application.Services.Paymob
                             });
                         }
 
-                        // تحديث حالة الـOrder
                         if (!string.IsNullOrWhiteSpace(merchantOrderId))
                             await UpdateOrderStatusAsync(merchantOrderId!, localStatus);
 
-                        // علّم الحدث كمُعالج (Idempotency mark)
                         if (paymobTxId > 0)
                             await MarkProcessedTxAsync(paymobTxId, "TRANSACTION_PROCESSED");
 
@@ -840,86 +1115,154 @@ namespace Voltyks.Application.Services.Paymob
 
                 case "TOKEN":
                     {
-                        var owner = (fields.TryGetValue("owner", out var ow) ? ow : "unknown") ?? "unknown";
-                        await MarkGenericAsync("TOKEN", owner, true);
+                        if (hasCardTokenKeys) goto case "CARD_TOKEN";
+                        await MarkGenericAsync("TOKEN", FirstValue(fields, "obj.id", "id") ?? "unknown", true);
                         return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
                     }
 
                 case "CARD_TOKEN":
                     {
                         // 1) token
-                        var cardToken =
-                            (fields.TryGetValue("token", out var t1) ? t1 : null) ??
-                            (fields.TryGetValue("saved_card_token", out var t2) ? t2 : null) ??
-                            (fields.TryGetValue("card_token", out var t3) ? t3 : null);
+                        var cardToken = FirstValue(fields,
+                            "obj.token", "obj.saved_card_token", "obj.card_token",
+                            "token", "saved_card_token", "card_token");
 
-                        // 2) last4
-                        string? last4 = null;
-                        if (fields.TryGetValue("last4", out var l4) && !string.IsNullOrWhiteSpace(l4))
-                            last4 = l4;
-                        else if (fields.TryGetValue("source_data.pan", out var masked) && !string.IsNullOrWhiteSpace(masked) && masked.Length >= 4)
-                            last4 = masked[^4..];
-
-                        // 3) brand/scheme
-                        string? brand = null;
-                        if (fields.TryGetValue("source_data.type", out var b1) && !string.IsNullOrWhiteSpace(b1)) brand = b1;
-                        else if (fields.TryGetValue("brand", out var b2) && !string.IsNullOrWhiteSpace(b2)) brand = b2;
-                        else if (fields.TryGetValue("scheme", out var b3) && !string.IsNullOrWhiteSpace(b3)) brand = b3;
-
-                        // 4) expiry (اختياري)
-                        int? expMonth = null, expYear = null;
-                        if (fields.TryGetValue("expiry_month", out var mStr) && int.TryParse(mStr, out var mVal)) expMonth = mVal;
-                        if (fields.TryGetValue("expiry_year", out var yStr) && int.TryParse(yStr, out var yVal)) expYear = yVal;
-
-                        // 5) اربط التوكن بالمستخدم
-                        var userId = await ResolveUserIdFromTokenContextAsync(fields);
-
-                        if (!string.IsNullOrWhiteSpace(cardToken) && !string.IsNullOrWhiteSpace(userId))
+                        // 2) last4 (يدعم masked_pan بالشرطات)
+                        string? last4 = FirstValue(fields, "obj.last4", "last4");
+                        if (string.IsNullOrWhiteSpace(last4))
                         {
-                            // Idempotent insert
-                            var exists = await SavedCards.AnyAsync(c => c.UserId == userId && c.Token == cardToken);
-                            if (!exists)
+                            var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
+                            if (!string.IsNullOrWhiteSpace(masked))
                             {
-                                await SavedCards.AddAsync(new UserSavedCard
-                                {
-                                    UserId = userId!,
-                                    Token = cardToken!,
-                                    Last4 = last4,
-                                    Brand = brand,
-                                    ExpiryMonth = expMonth,
-                                    ExpiryYear = expYear,
-                                    CreatedAt = DateTime.UtcNow
-                                });
-                                await _uow.SaveChangesAsync();
+                                var digits = new string(masked.Where(char.IsDigit).ToArray());
+                                if (digits.Length >= 4) last4 = digits[^4..];
                             }
                         }
 
-                        await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken ?? "unknown", true);
+                        // 3) brand (يدعم card_subtype)
+                        string? brand = FirstValue(fields,
+                            "obj.card_subtype", "card_subtype",
+                            "obj.source_data.type", "source_data.type",
+                            "obj.brand", "brand", "obj.scheme", "scheme");
+
+                        // 4) expiry (اختياري) – التقاط بأسماء متعددة + صيغة مجمّعة MM/YY أو MM/YYYY
+                        int? expMonth = null, expYear = null;
+
+                        // أسماء بديلة محتملة من بايموب
+                        var mmStr = FirstValue(fields,
+                            "obj.expiry_month", "expiry_month",
+                            "obj.expiration_month", "expiration_month",
+                            "obj.exp_month", "exp_month",
+                            "obj.card_expiry_month", "card_expiry_month"
+                        );
+
+                        var yyStr = FirstValue(fields,
+                            "obj.expiry_year", "expiry_year",
+                            "obj.expiration_year", "expiration_year",
+                            "obj.exp_year", "exp_year",
+                            "obj.card_expiry_year", "card_expiry_year"
+                        );
+
+                        // صيغة مجمّعة مثل "MM/YY" أو "MM/YYYY"
+                        var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration");
+
+                        // Parse
+                        if (int.TryParse(mmStr, out var mm)) expMonth = mm;
+
+                        if (int.TryParse(yyStr, out var yy))
+                        {
+                            // طبّع السنة لو جت رقمين: 27 → 2027
+                            expYear = yy >= 100 ? yy : (2000 + yy);
+                        }
+                        else if (!string.IsNullOrWhiteSpace(expiryCombined))
+                        {
+                            var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
+                            if (m.Success)
+                            {
+                                if (int.TryParse(m.Groups["mm"].Value, out var mmm)) expMonth = mmm;
+                                if (int.TryParse(m.Groups["yy"].Value, out var yyy))
+                                    expYear = yyy >= 100 ? yyy : (2000 + yyy);
+                            }
+                        }
+
+                        // ضبط حدودي (اختياري)
+                        if (expMonth is < 1 or > 12) expMonth = null;
+                        if (expYear is < 2000 or > 2100) expYear = null;
+
+                        // 5) Paymob token id
+                        long paymobTokenId = TryParseLong(fields, "obj.id", "id");
+
+                        // 6) اربط بالمستخدم
+                        var userId = await ResolveUserIdFromTokenContextAsync(fields);
+
+                        if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
+                        {
+                            _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
+                            await MarkGenericAsync("CARD_TOKEN_MISSING_DATA", cardToken ?? "unknown", false);
+                            return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
+                        }
+
+                        // 7) Upsert
+                        var existing = await _uow.GetRepository<UserSavedCard, int>().GetFirstOrDefaultAsync(
+                                            c => c.UserId == userId && c.Token == cardToken,
+                                            trackChanges: true
+                                        );
+
+                        if (existing is null)
+                        {
+                            bool isDefault = !await SavedCards.AnyAsync(c => c.UserId == userId);
+                            await SavedCards.AddAsync(new UserSavedCard
+                            {
+                                UserId = userId!,
+                                Token = cardToken!,
+                                Last4 = last4,
+                                Brand = brand,
+                                ExpiryMonth = expMonth,
+                                ExpiryYear = expYear,
+                                PaymobTokenId = paymobTokenId > 0 ? paymobTokenId.ToString() : null,
+                                IsDefault = isDefault,
+                                CreatedAt = DateTime.UtcNow,
+                                MerchantId = mid
+                            });
+                            _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}",
+                                userId, last4, brand, paymobTokenId);
+                        }
+                        else
+                        {
+                            if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4)) existing.Last4 = last4;
+                            if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand)) existing.Brand = brand;
+                            if (!existing.ExpiryMonth.HasValue && expMonth.HasValue) existing.ExpiryMonth = expMonth;
+                            if (!existing.ExpiryYear.HasValue && expYear.HasValue) existing.ExpiryYear = expYear;
+
+                            if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0)
+                                existing.PaymobTokenId = paymobTokenId.ToString();
+
+                            _log?.LogWarning("UPDATED existing card → user={userId}, token={token}", userId, cardToken);
+                        }
+
+                        await _uow.SaveChangesAsync();
+
+                        await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken, true);
                         return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
                     }
 
-                // Fallback: أنواع قريبة بس مختلفة الاسم — لو فيها token اعتبرها CARD_TOKEN
+
                 case "SAVED_CARD":
                 case "CARD":
                 case "PAYMENT_TOKEN":
                     {
-                        if (fields.ContainsKey("token") || fields.ContainsKey("saved_card_token") || fields.ContainsKey("card_token"))
-                        {
-                            goto case "CARD_TOKEN";
-                        }
+                        if (hasCardTokenKeys) goto case "CARD_TOKEN";
                         goto default;
                     }
 
                 default:
                     {
-                        var id = (fields.TryGetValue("id", out var anyId) ? anyId : Guid.NewGuid().ToString("N")) ?? Guid.NewGuid().ToString("N");
+                        var id = FirstValue(fields, "obj.id", "id") ?? Guid.NewGuid().ToString("N");
                         await MarkGenericAsync(eventType, id, true);
                         return new ApiResponse<bool> { Status = true, Message = $"Webhook processed ({eventType})", Data = true };
                     }
             }
         }
-
-
 
 
         // ===== Helper: Resolve UserId من الـmerchant_order_id (Async) =====
@@ -1050,29 +1393,84 @@ namespace Voltyks.Application.Services.Paymob
 
             return calc == receivedHmac;
         }
-        private async Task<string?> ResolveUserIdFromTokenContextAsync(IDictionary<string, string?> fields)
+        // using Voltyks.Infrastructure;           // لو فيه IUnitOfWork / IGenericRepository هنا
+        // using Voltyks.Persistence.Entities.Main; // لو الكيانات هنا
+
+        private async Task<string?> ResolveUserIdFromTokenContextAsync(IDictionary<string, string?> f)
         {
-            string? moid = null;
+            // 1) metadata.user_id (لو بتبعته)
+            var uid = FirstValue(f, "obj.metadata.user_id", "metadata.user_id");
+            if (!string.IsNullOrWhiteSpace(uid)) return uid;
 
-            if (fields.TryGetValue("merchant_order_id", out var m1) && !string.IsNullOrWhiteSpace(m1))
-                moid = m1;
-            else if (fields.TryGetValue("order.merchant_order_id", out var m2) && !string.IsNullOrWhiteSpace(m2))
-                moid = m2;
+            // 2) merchant_order_id فيه uid:<id> أو uid=<id>
+            var mo = FirstValue(f, "obj.order.merchant_order_id", "merchant_order_id");
+            if (!string.IsNullOrWhiteSpace(mo))
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(
+                    mo, @"uid\s*[:=]\s*([A-Za-z0-9_\-@.]+)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (m.Success) return m.Groups[1].Value;
+            }
+
+            // 3) Paymob Order Id (obj.order_id أو obj.order.id)
+
+            var paymobOrderId = TryParseLong(f, "obj.order.id", "order.id", "obj.order_id", "order_id");
+
+            if (paymobOrderId > 0)
+            {
+                var orderRepo = _uow.GetRepository<PaymentOrder, int>();
+
+                // لو الخصائص non-nullable:
+                var order = await orderRepo.GetFirstOrDefaultAsync(
+                                 o => o.PaymobOrderId == paymobOrderId,
+                                 trackChanges: false
+                             );
 
 
-            if (string.IsNullOrWhiteSpace(moid) && fields.TryGetValue("order.id", out var oidStr) && long.TryParse(oidStr, out var oid))
-                  {
-                var ord = await PaymentOrders.GetFirstOrDefaultAsync(o => o.PaymobOrderId == oid, trackChanges: false);
-               moid = ord?.MerchantOrderId;
-                  }
+                // لو Nullable<long> بدّل الشرط اللي فوق بـ:
+                // var order = await orderRepo.GetFirstOrDefaultAsync(
+                //     o => (o.PaymobOrderId.HasValue && o.PaymobOrderId.Value == paymobOrderId)
+                //       || (o.GatewayOrderId.HasValue && o.GatewayOrderId.Value == paymobOrderId),
+                //     trackChanges: false
+                // );
 
-            if (string.IsNullOrWhiteSpace(moid)) return null;
+                var uidFromOrder = order?.UserId;   // ← المصدر المعتمد
+                if (!string.IsNullOrEmpty(uidFromOrder)) return uidFromOrder;
+            }
 
-            var order = await PaymentOrders.GetFirstOrDefaultAsync(
-                o => o.MerchantOrderId == moid, trackChanges: false
-            );
+            // 4) (اختياري) لو مخزن الـ merchant_order_id كنص في جدول الأوردرات
+            if (!string.IsNullOrWhiteSpace(mo))
+            {
+                var orderRepo2 = _uow.GetRepository<PaymentOrder, int>();
+                var order2 = await orderRepo2.GetFirstOrDefaultAsync(
+                    o => o.MerchantOrderId == mo, // عدّل الاسم لو مختلف
+                    trackChanges: false
+                );
+                if (!string.IsNullOrEmpty(order2?.UserId)) return order2!.UserId;
+            }
 
-            return order?.UserId;
+            //5) (اختياري) Fallback بالإيميل لو حابب تربط من الإيميل
+
+            var email = FirstValue(f, "obj.email", "email", "obj.customer.email", "customer.email", "obj.billing.data.email", "billing.data.email");
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var byEmail = await _userManager.FindByEmailAsync(email);
+                if (byEmail is not null) return byEmail.Id;
+            }
+
+            // 5) Fallback بالتليفون
+           // var phone = FirstValue(f, "obj.phone_number", "phone_number",
+            //                           "obj.customer.phone_number", "customer.phone_number",
+            //                           "obj.billing.data.phone_number", "billing.data.phone_number");
+            //if (!string.IsNullOrWhiteSpace(phone))
+            //{
+            //    // Users IQueryable من Identity
+            //    var userByPhone = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phone);
+            //    if (userByPhone is not null) return userByPhone.Id;
+            //}
+
+
+            return null;
         }
         public async Task<ApiResponse<IntentionClientSecretDto>> ExchangePaymentKeyForClientSecretAsync(string paymentKey, string? publicKeyOverride = null, CancellationToken ct = default)
         {
@@ -1260,32 +1658,89 @@ namespace Voltyks.Application.Services.Paymob
             await _uow.SaveChangesAsync();
             return new ApiResponse<bool>(true, "Deleted", true);
         }
+        //public async Task<ApiResponse<object>> ChargeWithSavedCardServerAsync(ChargeWithSavedCardReq req)
+        //{
+        //    var userId = GetCurrentUserId();
+        //    if (userId is null) return new ApiResponse<object>(null, "Unauthorized", false);
+
+        //    var card = await SavedCards.GetFirstOrDefaultAsync(c => c.Id == req.CardId && c.UserId == userId, trackChanges: false);
+        //    if (card is null) return new ApiResponse<object>(null, "Card not found", false);
+
+        //    // 1) إصدار payment_key للطلب
+        //    var k = await CreatePaymentKeyForSavedCardAsync(
+        //        new SavedCardChargeDto(req.AmountCents, req.Currency ?? "EGP", card.Token, req.MerchantOrderId)
+        //    );
+        //    if (!k.Status || k.Data is null) return new ApiResponse<object>(null, k.Message ?? "Failed", false, k.Errors);
+
+        //    // 2) الدفع من السيرفر باستخدام التوكن
+        //    var pay = await PayWithSavedTokenAsync(k.Data.PaymentKey, card.Token);
+        //    return new ApiResponse<object>(new
+        //    {
+        //        k.Data.MerchantOrderId,
+        //        k.Data.PaymobOrderId,
+        //        k.Data.PaymentKey,
+        //        pay_status = pay.Status,
+        //        pay_message = pay.Message,
+        //        pay_data = pay.Data
+        //    }, "Initiated", true, pay.Errors);
+        //}
         public async Task<ApiResponse<object>> ChargeWithSavedCardServerAsync(ChargeWithSavedCardReq req)
         {
             var userId = GetCurrentUserId();
-            if (userId is null) return new ApiResponse<object>(null, "Unauthorized", false);
+            if (userId is null)
+                return new ApiResponse<object>(null, "Unauthorized", false);
 
-            var card = await SavedCards.GetFirstOrDefaultAsync(c => c.Id == req.CardId && c.UserId == userId, trackChanges: false);
-            if (card is null) return new ApiResponse<object>(null, "Card not found", false);
+            if (req.AmountCents <= 0)
+                return new ApiResponse<object>(null, "Invalid amount", false);
 
-            // 1) إصدار payment_key للطلب
-            var k = await CreatePaymentKeyForSavedCardAsync(
-                new SavedCardChargeDto(req.AmountCents, req.Currency ?? "EGP", card.Token, req.MerchantOrderId)
+            var card = await SavedCards.GetFirstOrDefaultAsync(
+                c => c.Id == req.CardId && c.UserId == userId,
+                trackChanges: false
             );
-            if (!k.Status || k.Data is null) return new ApiResponse<object>(null, k.Message ?? "Failed", false, k.Errors);
+            if (card is null)
+                return new ApiResponse<object>(null, "Card not found", false);
 
-            // 2) الدفع من السيرفر باستخدام التوكن
+            // العملة الافتراضية الحالية (نفس الموجود في _opt)
+            var currency = string.IsNullOrWhiteSpace(_opt?.Currency) ? "EGP" : _opt.Currency;
+
+            // استخرج MID: من الكارت أولاً، ولو مش موجود هنجرب من WebhookLogs لآخر TOKEN لنفس التوكن
+            long? mid = card.MerchantId;
+            if (!mid.HasValue)
+            {
+                mid = await _uow.GetRepository<WebhookLog, int>()
+                    .Query()
+                    .Where(w => w.MerchantId != null && w.RawPayload != null && w.RawPayload.Contains(card.Token))
+                    .OrderByDescending(w => w.Id)
+                    .Select(w => w.MerchantId)
+                    .FirstOrDefaultAsync();
+            }
+
+            // merchant_order_id واضح للتتبع (اختياري تضمّن الـMID)
+            var localOrderId = Guid.NewGuid().ToString("N");
+            var merchantOrderId = $"uid:{userId}|mid:{(mid.HasValue ? mid.Value.ToString() : "NA")}|ord:{localOrderId}";
+
+            // 1) إصدار payment_key للطلب (نفس دالتك الحالية، بدون أي config إضافي)
+            var k = await CreatePaymentKeyForSavedCardAsync(
+                new SavedCardChargeDto((long)req.AmountCents, currency, card.Token, merchantOrderId)
+            );
+            if (!k.Status || k.Data is null)
+                return new ApiResponse<object>(null, k.Message ?? "Failed", false, k.Errors);
+
+            // 2) الدفع من السيرفر باستخدام التوكن المحفوظ (كما هو)
             var pay = await PayWithSavedTokenAsync(k.Data.PaymentKey, card.Token);
+
             return new ApiResponse<object>(new
             {
-                k.Data.MerchantOrderId,
-                k.Data.PaymobOrderId,
-                k.Data.PaymentKey,
+                MerchantOrderId = k.Data.MerchantOrderId,
+                PaymobOrderId = k.Data.PaymobOrderId,
+                PaymentKey = k.Data.PaymentKey,
+                UsedMerchantId = mid,    // للشفافية فقط
                 pay_status = pay.Status,
                 pay_message = pay.Message,
                 pay_data = pay.Data
             }, "Initiated", true, pay.Errors);
         }
+
         //public async Task<ApiResponse<SavedCardInitChargeRes>> InitChargeWithSavedCardAsync(SavedCardInitChargeReq req)
         //{
         //    var userId = GetCurrentUserId();

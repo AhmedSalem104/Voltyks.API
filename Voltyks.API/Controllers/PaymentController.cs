@@ -81,15 +81,32 @@ namespace Voltyks.API.Controllers
         }
 
 
+        //[HttpPost("webhook")]
+        //[AllowAnonymous]
+        //public async Task<IActionResult> Webhook()
+        //{
+        //    using var reader = new StreamReader(Request.Body);
+        //    var raw = await reader.ReadToEndAsync();
+        //    var res = await _svc.HandleWebhookAsync(Request, raw);
+        //    return res.Status ? Ok(res) : BadRequest(res);
+        //}
         [HttpPost("webhook")]
         [AllowAnonymous]
         public async Task<IActionResult> Webhook()
         {
+            Request.EnableBuffering();
             using var reader = new StreamReader(Request.Body);
             var raw = await reader.ReadToEndAsync();
+            Request.Body.Position = 0;
+
             var res = await _svc.HandleWebhookAsync(Request, raw);
-            return res.Status ? Ok(res) : BadRequest(res);
+            return Ok(res); // مهم: 200 دائمًا لويبهوك بايموب
         }
+
+
+
+
+
 
 
         //[HttpPost("intention")]

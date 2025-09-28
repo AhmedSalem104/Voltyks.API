@@ -21,5 +21,7 @@ namespace Voltyks.Infrastructure
         void Update(TEntity entity);
         void Delete(TEntity entity);
         Task<bool> AnyAsync(Expression<Func<TEntity, bool>> predicate);
+        IQueryable<TEntity> Query(bool trackChanges = false);
+
     }
 }

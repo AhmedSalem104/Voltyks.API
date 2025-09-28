@@ -9,8 +9,8 @@ namespace Voltyks.Core.DTOs.Paymob.CardsDTOs
     public class ChargeWithSavedCardReq
     {
         public int CardId { get; set; }
-        public long AmountCents { get; set; }
-        public string? Currency { get; set; } = "EGP";
-        public string? MerchantOrderId { get; set; }
+        public double AmountCents { get; set; }
+        //public string? Currency { get; set; } = "EGP";
+        //public string? MerchantOrderId { get; set; }
     }
 }

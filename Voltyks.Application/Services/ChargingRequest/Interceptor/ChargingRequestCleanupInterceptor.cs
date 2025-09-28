@@ -47,20 +47,20 @@ namespace Voltyks.Application.Services.ChargingRequest.Interceptor
             // 3) لكل مستخدم متأثر، طبِّق منطق التنضيف:
             foreach (var uid in affectedUserIds)
             {
-                // هات كل الطلبات للمستخدم ده تنطبق عليها الشروط
-                // ملاحظة: استخدم نفس منطقك تمامًا (OR). لو عايز AND بدِّل التعليق.
+
                 var requestsToDelete = await ctx.ChargingRequests
                     .Where(c =>
                         c.UserId == uid &&
                         (
-                            EF.Functions.DateDiffMinute(c.RequestedAt, now) >= 5
-                            || !string.Equals(c.Status, "pending", StringComparison.OrdinalIgnoreCase)
-                        // لو عايزها AND بدل OR:
-                        // EF.Functions.DateDiffMinute(c.RequestedAt, now) >= 5
-                        // && !string.Equals(c.Status, "pending", StringComparison.OrdinalIgnoreCase)
+                            // الحالة الأولى: عدّى 5 دقائق ولسه Pending
+                            (EF.Functions.DateDiffMinute(c.RequestedAt, now) >= 5
+                                && string.Equals(c.Status, "pending", StringComparison.OrdinalIgnoreCase))
+
+                            // الحالة الثانية: الحالة = Rejected
+                            || string.Equals(c.Status, "rejected", StringComparison.OrdinalIgnoreCase)
                         )
-                    )
-                    .ToListAsync(ct);
+                    ).ToListAsync(ct);
+
 
                 if (requestsToDelete.Count == 0)
                     continue;
