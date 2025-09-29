@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
@@ -18,7 +19,9 @@ namespace Voltyks.Persistence.Data
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
             base.OnModelCreating(modelBuilder);
 
+
         }
+
 
         public DbSet<Vehicle> Vehicles { get; set; }
         public DbSet<Brand> Brands { get; set; }
@@ -39,7 +42,6 @@ namespace Voltyks.Persistence.Data
         public DbSet<PaymentAction> PaymentActions => Set<PaymentAction>();
         public DbSet<UserSavedCard> UserSavedCards => Set<UserSavedCard>();
 
-        
 
 
     }

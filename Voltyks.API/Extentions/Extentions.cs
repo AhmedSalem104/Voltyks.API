@@ -54,7 +54,8 @@ namespace Voltyks.API.Extentions
             services.AddHttpClient<PaymobService>();
             services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
             services.AddScoped<PaymobService>();
-         
+
+
             services.AddAuthentication()
             .AddGoogle("Google", options =>
             {
@@ -79,11 +80,14 @@ namespace Voltyks.API.Extentions
             }
 
             // Add Interceptor
-            services.AddSingleton<ChargingRequestCleanupInterceptor>();
+            //services.AddSingleton<ChargingRequestCleanupInterceptor>();
+            services.AddScoped<ChargingRequestCleanupInterceptor>();
+
             services.AddDbContext<VoltyksDbContext>((sp, options) =>
             {
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
                 options.AddInterceptors(sp.GetRequiredService<ChargingRequestCleanupInterceptor>());
+
             });
 
             return services;

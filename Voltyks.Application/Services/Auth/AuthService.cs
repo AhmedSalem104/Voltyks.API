@@ -354,6 +354,10 @@ namespace Voltyks.Application.Services.Auth
                 return new ApiResponse<List<ChargingRequestDetailsDto>>(
                     null, "Unauthorized", false);
 
+
+            await CleanupOldRequestsForUserAsync(userId);
+
+
             var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
 
             var requests = (await repo.GetAllWithIncludeAsync(
@@ -436,6 +440,42 @@ namespace Voltyks.Application.Services.Auth
         }
 
         // ---------- Private Methods ----------
+        private async Task CleanupOldRequestsForUserAsync(string userId)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-5);
+
+            var reqRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+            var notifRepo = _unitOfWork.GetRepository<Notification, int>();
+
+            // الطلبات المطلوب حذفها للمستخدم (سواء كان هو صاحب الطلب أو المستلم)
+            var toDelete = (await reqRepo.GetAllAsync(
+                c =>
+                    (c.UserId == userId || c.RecipientUserId == userId) &&
+                    (
+                        // Pending أقدم من 5 دقائق
+                        ((c.Status == "pending" || c.Status == "Pending") && c.RequestedAt <= cutoff)
+                        // أو مرفوض
+                        || (c.Status == "rejected" || c.Status == "Rejected")
+                    ),
+                trackChanges: true   // مهم علشان نقدر نحذف
+            )).ToList();
+
+            if (toDelete.Count == 0) return;
+
+            var ids = toDelete.Select(r => r.Id).ToList();
+
+            // احذف الإشعارات المرتبطة أولاً (لو مفيش Cascade)
+            var related = (await notifRepo.GetAllAsync(
+                n => n.RelatedRequestId.HasValue && ids.Contains(n.RelatedRequestId.Value),
+                trackChanges: true
+            )).ToList();
+
+            foreach (var n in related) notifRepo.Delete(n);
+            foreach (var r in toDelete) reqRepo.Delete(r);
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+
         private string GetCurrentUserId()
         {
             return httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
