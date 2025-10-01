@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
-
+using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
@@ -26,13 +26,17 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly IFirebaseService _firebaseService;
         private readonly IHttpContextAccessor _httpContext;
         private readonly IVehicleService _vehicleService ;
+        private readonly IFeesConfigService _feesConfigService;
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService)
+        
+
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
             _httpContext = httpContext;
             _vehicleService = vehicleService;
+            _feesConfigService = feesConfigService;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -48,7 +52,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     return new ApiResponse<NotificationResultDto>(null, "Car owner not found", false);
 
                 // 1) أنشئ الطلب
-                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage , dto.Latitude,dto.Longitude , charger.UserId);
+                var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage , dto.Latitude,dto.Longitude , charger.UserId ,  charger);
 
                 // 2) جهّز بيانات الإشعار
                 var recipientUserId = charger.UserId; // صاحب المحطة
@@ -326,19 +330,32 @@ namespace Voltyks.Application.Services.ChargingRequest
                 }
 
                 // (4) السعر التقديري
-                decimal estimatedPrice;
 
-                if (request.Charger?.PriceOption != null && request.Charger.Capacity?.kw > 0)
-                {
-                    decimal pricePerHour = request.Charger.PriceOption.Value
-                                           * (decimal)request.KwNeeded
-                                           / (decimal)request.Charger.Capacity.kw;
+                // (4) السعر التقديري النهائي (Total = Base + Fee)
+                decimal estimatedPriceFinal = request.EstimatedPrice;
 
-                    estimatedPrice = pricePerHour ; 
-                }
-                else
+                // fallback لو الطلب قديم/القيم صفر
+                if (estimatedPriceFinal <= 0)
                 {
-                    estimatedPrice = 0;
+                    // 1) حاول تستخدم BaseAmount المخزّن؛ ولو صفر احسبه من الشاحن
+                    decimal baseAmount = request.BaseAmount;
+                    if (baseAmount <= 0 && request.Charger?.PriceOption != null && request.Charger.Capacity?.kw > 0)
+                    {
+                        baseAmount = request.Charger.PriceOption.Value
+                                   * (decimal)request.KwNeeded
+                                   / (decimal)request.Charger.Capacity.kw;
+                    }
+
+                    // 2) حاول تستخدم VoltyksFee المخزّنة؛ ولو صفر احسبها من الإعدادات
+                    decimal voltyksFee = request.VoltyksFees;
+                    if (voltyksFee <= 0 && baseAmount > 0)
+                    {
+                        var feesCfg = await _feesConfigService.GetAsync();
+                        voltyksFee = ApplyRules(baseAmount, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
+                    }
+
+                    // 3) اجمع الإجمالي
+                    estimatedPriceFinal = baseAmount + voltyksFee;
                 }
 
 
@@ -390,7 +407,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                     VehicleArea = vehicleArea,
                     VehicleStreet = vehicleStreet,
                     EstimatedArrival = estimatedArrival,
-                    EstimatedPrice = estimatedPrice,
+                    BaseAmount = request.BaseAmount,
+                    VoltyksFees = request.VoltyksFees,
+                    EstimatedPrice = request.EstimatedPrice,
                     DistanceInKm = distanceKm
 
                 };
@@ -569,8 +588,28 @@ namespace Voltyks.Application.Services.ChargingRequest
                     c => c.User))
                 .FirstOrDefault();
         }
-        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage ,double Latitude,double Longitude ,string recipientUserId)
+        private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage ,double Latitude,double Longitude ,string recipientUserId, Charger charger)
         {
+
+            // 1) احسب الـ base amount اللى الرسوم هتتطبق عليه
+            // 1) حساب المبلغ الأساسي (Base Amount)
+            decimal baseAmount = 0m;
+            if (charger?.PriceOption != null && charger.Capacity?.kw > 0)
+            {
+                baseAmount = charger.PriceOption.Value
+                    * (decimal)KwNeeded
+                    / (decimal)charger.Capacity.kw;
+            }
+
+            // 2) حساب رسوم Voltyks
+            var feesCfg = await _feesConfigService.GetAsync();
+            decimal voltyksFee = ApplyRules(baseAmount, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
+
+            // 3) المجموع الكلي
+            decimal totalEstimatedPrice = baseAmount + voltyksFee;
+
+
+
             var request = new ChargingRequestEntity
             {
                 UserId = userId,
@@ -581,8 +620,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                 CurrentBatteryPercentage = CurrentBatteryPercentage,
                 Latitude = Latitude,
                 Longitude = Longitude,
-                RecipientUserId = recipientUserId
-                
+                RecipientUserId = recipientUserId,
+                BaseAmount = baseAmount,
+                VoltyksFees = voltyksFee,
+                EstimatedPrice = totalEstimatedPrice
+
             };
 
             await _unitOfWork.GetRepository<ChargingRequestEntity, int>().AddAsync(request);
@@ -766,7 +808,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
         //    // احصل على IDs الإشعارات المرتبطة بالطلب
         //    // الحصول على IDs الإشعارات المرتبطة بالطلبات
-         
+
         //    var relatedNotifIds = (await notifRepo.GetAllAsync(n =>
         //        requestsToDelete.Select(r => r.Id).ToList().Contains((int)n.RelatedRequestId)))
         //        .Select(n => n.Id)
@@ -798,7 +840,13 @@ namespace Voltyks.Application.Services.ChargingRequest
         //    return true;
         //}
 
-
+        private static decimal ApplyRules(decimal baseAmount, decimal percentage, decimal minimumFee)
+        {
+            if (baseAmount < 0) baseAmount = 0;
+            var pctValue = Math.Round(baseAmount * (percentage / 100m), 2, MidpointRounding.AwayFromZero);
+            var result = pctValue < minimumFee ? minimumFee : pctValue;
+            return Math.Round(result, 2, MidpointRounding.AwayFromZero);
+        }
     }
 
 

@@ -24,6 +24,13 @@ namespace Voltyks.Persistence.Entities.Main
         public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
         public DateTime? RespondedAt { get; set; }
         public DateTime? ConfirmedAt { get; set; }
+
+
+        public decimal BaseAmount { get; set; }      // المبلغ الأساسي (للشاحن)
+        public decimal VoltyksFees { get; set; }      // رسوم Voltyks
+        public decimal EstimatedPrice { get; set; }  // المجموع الكلي (Base + Fee)
+
+
     }
 
 }

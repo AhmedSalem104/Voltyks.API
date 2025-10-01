@@ -3,6 +3,7 @@ using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.DTOs.BrandsDTOs;
 using Voltyks.Core.DTOs.Charger;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.FeesConfig;
 using Voltyks.Core.DTOs.ModelDTOs;
 using Voltyks.Core.DTOs.VehicleDTOs;
 using Voltyks.Persistence.Entities.Identity;
@@ -121,6 +122,17 @@ namespace Voltyks.Core.Mapping
                 .ForMember(d => d.EstimatedArrival, o => o.Ignore())
                 .ForMember(d => d.EstimatedPrice, o => o.Ignore())
                 .ForMember(d => d.DistanceInKm, o => o.Ignore());
+
+
+          
+            // من Entity لعرض النتيجة
+            CreateMap<FeesConfig, FeesConfigDto>();
+
+            // من DTO لتحديث القيم للـ Entity
+            CreateMap<FeesConfigUpdateDto, FeesConfig>()
+                .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
+                .ForMember(dest => dest.UpdatedBy, opt => opt.Ignore());
+
         }
     }
 

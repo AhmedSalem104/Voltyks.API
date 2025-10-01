@@ -44,5 +44,10 @@ namespace Voltyks.Persistence.Data
 
 
 
+
+        public DbSet<FeesConfig> feesConfigs { get; set; }
+
+
+
     }
 }

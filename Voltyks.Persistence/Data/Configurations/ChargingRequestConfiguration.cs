@@ -30,7 +30,20 @@ namespace Voltyks.Persistence.Data.Configurations
 
             builder.Property(r => r.Status)
                    .HasColumnType("nvarchar(450)")  
-                   .IsRequired();  
+                   .IsRequired();
+
+            builder.Property(x => x.BaseAmount)
+                   .HasColumnType("decimal(18,2)")
+                   .HasDefaultValue(0);
+
+            builder.Property(x => x.VoltyksFees)
+                   .HasColumnType("decimal(18,2)")
+                   .HasDefaultValue(0);
+
+            builder.Property(x => x.EstimatedPrice)
+                   .HasColumnType("decimal(18,2)")
+                   .HasDefaultValue(0);
+
 
 
         }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Voltyks.Persistence.Data;
 
@@ -11,9 +12,11 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    partial class VoltyksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251001204753_AddFeesConfigEntity")]
+    partial class AddFeesConfigEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -417,11 +420,6 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("BaseAmount")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
-
                     b.Property<int>("ChargerId")
                         .HasColumnType("int");
 
@@ -432,9 +430,7 @@ namespace Voltyks.Persistence.Data.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("EstimatedPrice")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<double>("KwNeeded")
                         .HasColumnType("float");
@@ -462,11 +458,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<decimal>("VoltyksFees")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
 
                     b.HasKey("Id");
 
@@ -541,7 +532,7 @@ namespace Voltyks.Persistence.Data.Migrations
                             Id = 1,
                             MinimumFee = 40m,
                             Percentage = 10m,
-                            UpdatedAt = new DateTime(2025, 10, 1, 21, 36, 28, 986, DateTimeKind.Utc).AddTicks(3416),
+                            UpdatedAt = new DateTime(2025, 10, 1, 20, 47, 51, 160, DateTimeKind.Utc).AddTicks(5466),
                             UpdatedBy = "system"
                         });
                 });

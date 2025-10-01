@@ -11,6 +11,7 @@ using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Interfaces.Brand;
 using Voltyks.Application.Interfaces.ChargerStation;
 using Voltyks.Application.Interfaces.ChargingRequest;
+using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Application.Interfaces.Redis;
@@ -18,6 +19,7 @@ using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Services;
 using Voltyks.Application.Services.Auth;
 using Voltyks.Application.Services.ChargingRequest;
+using Voltyks.Application.Services.FeesConfig;
 using Voltyks.Application.Services.Paymob;
 using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.ServicesManager.ServicesManager;
@@ -45,7 +47,8 @@ namespace Voltyks.Application.ServicesManager
         , HttpClient _http
         ,IOptions<PaymobOptions> _opt
         ,ILogger<PaymobService> _log
-        , IPaymobAuthTokenProvider tokenProvider) : IServiceManager
+        , IPaymobAuthTokenProvider tokenProvider,
+        IFeesConfigService feesConfigService) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context, vehicleService);
@@ -54,8 +57,9 @@ namespace Voltyks.Application.ServicesManager
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
-        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService);
+        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService);
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager);
+        public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
 
     }
 }

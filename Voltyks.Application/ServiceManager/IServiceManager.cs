@@ -8,6 +8,7 @@ using Voltyks.Application.Interfaces.Auth;
 using Voltyks.Application.Interfaces.Brand;
 using Voltyks.Application.Interfaces.ChargerStation;
 using Voltyks.Application.Interfaces.ChargingRequest;
+using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Services.ChargingRequest;
@@ -24,6 +25,7 @@ namespace Voltyks.Application.ServicesManager.ServicesManager
         IChargerService ChargerService { get; }
         IChargingRequestService ChargingRequestService { get; }
         IPaymobService PaymobService  { get; }
+        IFeesConfigService FeesConfigService { get; }
 
 
     }

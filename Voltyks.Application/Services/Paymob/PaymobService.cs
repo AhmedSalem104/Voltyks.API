@@ -1514,12 +1514,8 @@ namespace Voltyks.Application.Services.Paymob
 
                 case "CARD_TOKEN":
                     {
-                        // 1) token
-                        var cardToken = FirstValue(fields,
-                            "obj.token", "obj.saved_card_token", "obj.card_token",
-                            "token", "saved_card_token", "card_token");
+                        var cardToken = FirstValue(fields, "obj.token", "obj.saved_card_token", "obj.card_token", "token", "saved_card_token", "card_token");
 
-                        // 2) last4
                         string? last4 = FirstValue(fields, "obj.last4", "last4");
                         if (string.IsNullOrWhiteSpace(last4))
                         {
@@ -1531,35 +1527,16 @@ namespace Voltyks.Application.Services.Paymob
                             }
                         }
 
-                        // 3) brand
-                        string? brand = FirstValue(fields,
-                            "obj.card_subtype", "card_subtype",
-                            "obj.source_data.type", "source_data.type",
-                            "obj.brand", "brand", "obj.scheme", "scheme");
+                        string? brand = FirstValue(fields, "obj.card_subtype", "card_subtype", "obj.source_data.type", "source_data.type", "obj.brand", "brand", "obj.scheme", "scheme");
 
-                        // 4) expiry (يدعم أسماء وصيغ متعددة)
                         int? expMonth = null, expYear = null;
 
-                        var mmStr = FirstValue(fields,
-                            "obj.expiry_month", "expiry_month",
-                            "obj.expiration_month", "expiration_month",
-                            "obj.exp_month", "exp_month",
-                            "obj.card_expiry_month", "card_expiry_month",
-                            "obj.source_data.exp_month", "source_data.exp_month");
-
-                        var yyStr = FirstValue(fields,
-                            "obj.expiry_year", "expiry_year",
-                            "obj.expiration_year", "expiration_year",
-                            "obj.exp_year", "exp_year",
-                            "obj.card_expiry_year", "card_expiry_year",
-                            "obj.source_data.exp_year", "source_data.exp_year");
-
+                        var mmStr = FirstValue(fields, "obj.expiry_month", "expiry_month", "obj.expiration_month", "expiration_month", "obj.exp_month", "exp_month", "obj.card_expiry_month", "card_expiry_month", "obj.source_data.exp_month", "source_data.exp_month");
+                        var yyStr = FirstValue(fields, "obj.expiry_year", "expiry_year", "obj.expiration_year", "expiration_year", "obj.exp_year", "exp_year", "obj.card_expiry_year", "card_expiry_year", "obj.source_data.exp_year", "source_data.exp_year");
                         var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration", "obj.source_data.expiry", "source_data.expiry");
 
                         if (int.TryParse(mmStr, out var mm)) expMonth = mm;
-
-                        if (int.TryParse(yyStr, out var yy))
-                            expYear = yy >= 100 ? yy : (2000 + yy);
+                        if (int.TryParse(yyStr, out var yy)) expYear = yy >= 100 ? yy : (2000 + yy);
                         else if (!string.IsNullOrWhiteSpace(expiryCombined))
                         {
                             var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
@@ -1573,10 +1550,8 @@ namespace Voltyks.Application.Services.Paymob
                         if (expMonth is < 1 or > 12) expMonth = null;
                         if (expYear is < 2000 or > 2100) expYear = null;
 
-                        // 5) Paymob token id
                         long paymobTokenId = TryParseLong(fields, "obj.id", "id");
 
-                        // 6) اربط بالمستخدم
                         var userId = await ResolveUserIdFromTokenContextAsync(fields);
 
                         if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
@@ -1586,10 +1561,8 @@ namespace Voltyks.Application.Services.Paymob
                             return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
                         }
 
-                        // 7) Upsert (مع dedupe بالشروط المطلوبة)
                         var repoCards = _uow.GetRepository<UserSavedCard, int>();
 
-                        // أولاً: جرّب المطابقة بالتوكن (الأدق)
                         var existing = await repoCards.GetFirstOrDefaultAsync(
                             c => c.UserId == userId && c.Token == cardToken,
                             trackChanges: true
@@ -1604,68 +1577,44 @@ namespace Voltyks.Application.Services.Paymob
                             bool haveExpMM = expMonth.HasValue;
                             bool haveExpYY = expYear.HasValue;
 
-                            // 1) last4 + brand + expiry
                             if (haveLast4 && haveBrand && haveExpMM && haveExpYY)
                             {
                                 toUpdate = await repoCards.GetFirstOrDefaultAsync(
-                                    c => c.UserId == userId
-                                         && c.Last4 == last4
-                                         && c.Brand == brand
-                                         && c.ExpiryMonth == expMonth
-                                         && c.ExpiryYear == expYear,
+                                    c => c.UserId == userId && c.Last4 == last4 && c.Brand == brand && c.ExpiryMonth == expMonth && c.ExpiryYear == expYear,
                                     trackChanges: true
                                 );
                             }
 
-                            // 2) last4 + brand
                             if (toUpdate is null && haveLast4 && haveBrand)
                             {
                                 toUpdate = await repoCards.GetFirstOrDefaultAsync(
-                                    c => c.UserId == userId
-                                         && c.Last4 == last4
-                                         && c.Brand == brand,
+                                    c => c.UserId == userId && c.Last4 == last4 && c.Brand == brand,
                                     trackChanges: true
                                 );
                             }
 
-                            // 3) last4 فقط
                             if (toUpdate is null && haveLast4)
                             {
                                 toUpdate = await repoCards.GetFirstOrDefaultAsync(
-                                    c => c.UserId == userId
-                                         && c.Last4 == last4,
+                                    c => c.UserId == userId && c.Last4 == last4,
                                     trackChanges: true
                                 );
                             }
 
                             if (toUpdate is not null)
                             {
-                                // تحديث السجل الموجود بدل إضافة سجل جديد
-                                if (string.IsNullOrWhiteSpace(toUpdate.Brand) && haveBrand)
-                                    toUpdate.Brand = brand;
+                                if (string.IsNullOrWhiteSpace(toUpdate.Brand) && haveBrand) toUpdate.Brand = brand;
+                                if (!toUpdate.ExpiryMonth.HasValue && haveExpMM) toUpdate.ExpiryMonth = expMonth;
+                                if (!toUpdate.ExpiryYear.HasValue && haveExpYY) toUpdate.ExpiryYear = expYear;
+                                if (string.IsNullOrEmpty(toUpdate.PaymobTokenId) && paymobTokenId > 0) toUpdate.PaymobTokenId = paymobTokenId.ToString();
+                                if (!toUpdate.MerchantId.HasValue && mid > 0) toUpdate.MerchantId = mid;
 
-                                if (!toUpdate.ExpiryMonth.HasValue && haveExpMM)
-                                    toUpdate.ExpiryMonth = expMonth;
+                                if (!await SavedCards.AnyAsync(c => c.UserId == userId && c.IsDefault)) toUpdate.IsDefault = true;
 
-                                if (!toUpdate.ExpiryYear.HasValue && haveExpYY)
-                                    toUpdate.ExpiryYear = expYear;
-
-                                if (string.IsNullOrEmpty(toUpdate.PaymobTokenId) && paymobTokenId > 0)
-                                    toUpdate.PaymobTokenId = paymobTokenId.ToString();
-
-                                if (!toUpdate.MerchantId.HasValue && mid > 0)
-                                    toUpdate.MerchantId = mid;
-
-                                // (اختياري) لو مفيش ولا كارت Default للمستخدم خلّي ده Default
-                                if (!await SavedCards.AnyAsync(c => c.UserId == userId && c.IsDefault))
-                                    toUpdate.IsDefault = true;
-
-                                _log?.LogWarning("Dedup matched → user={userId}, last4={last4}, brand={brand}, updated card id={id}",
-                                    userId, last4, brand, toUpdate.Id);
+                                _log?.LogWarning("Dedup matched → user={userId}, last4={last4}, brand={brand}, updated card id={id}", userId, last4, brand, toUpdate.Id);
                             }
                             else
                             {
-                                // لا يوجد تطابق → أضف كارت جديد
                                 bool isDefault = !await SavedCards.AnyAsync(c => c.UserId == userId);
 
                                 await SavedCards.AddAsync(new UserSavedCard
@@ -1682,34 +1631,20 @@ namespace Voltyks.Application.Services.Paymob
                                     MerchantId = mid > 0 ? mid : null
                                 });
 
-                                _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}",
-                                    userId, last4, brand, paymobTokenId);
+                                _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}", userId, last4, brand, paymobTokenId);
                             }
                         }
                         else
                         {
-                            // موجود بنفس الـToken: كمّل الناقص فقط
-                            if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4))
-                                existing.Last4 = last4;
-
-                            if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand))
-                                existing.Brand = brand;
-
-                            if (!existing.ExpiryMonth.HasValue && expMonth.HasValue)
-                                existing.ExpiryMonth = expMonth;
-
-                            if (!existing.ExpiryYear.HasValue && expYear.HasValue)
-                                existing.ExpiryYear = expYear;
-
-                            if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0)
-                                existing.PaymobTokenId = paymobTokenId.ToString();
-
-                            if (!existing.MerchantId.HasValue && mid > 0)
-                                existing.MerchantId = mid;
+                            if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4)) existing.Last4 = last4;
+                            if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand)) existing.Brand = brand;
+                            if (!existing.ExpiryMonth.HasValue && expMonth.HasValue) existing.ExpiryMonth = expMonth;
+                            if (!existing.ExpiryYear.HasValue && expYear.HasValue) existing.ExpiryYear = expYear;
+                            if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0) existing.PaymobTokenId = paymobTokenId.ToString();
+                            if (!existing.MerchantId.HasValue && mid > 0) existing.MerchantId = mid;
 
                             _log?.LogWarning("UPDATED existing card (same token) → user={userId}, token={token}", userId, cardToken);
                         }
-
 
                         await _uow.SaveChangesAsync();
 

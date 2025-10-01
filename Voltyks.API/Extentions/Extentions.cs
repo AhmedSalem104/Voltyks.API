@@ -30,6 +30,8 @@ using Voltyks.Application.Services.Paymob;
 using Voltyks.Core.DTOs.Paymob.Options;
 using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Application.Services.ChargingRequest.Interceptor;
+using Voltyks.Application.Interfaces.FeesConfig;
+using Voltyks.Application.Services.FeesConfig;
 
 
 namespace Voltyks.API.Extentions
@@ -208,6 +210,9 @@ namespace Voltyks.API.Extentions
 
             // إضافة وحدة العمل (UnitOfWork)
             services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+            services.AddScoped<IFeesConfigService, FeesConfigService>();
+
 
             services.AddHttpClient("paymob"); // تقدر تضيف BaseAddress لو تحب
             services.AddSingleton<IPaymobAuthTokenProvider, PaymobAuthTokenProviderRedis>();
