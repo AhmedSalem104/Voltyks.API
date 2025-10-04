@@ -104,22 +104,8 @@ namespace Voltyks.API.Controllers
         }
 
 
-
-
-
-
-
-        //[HttpPost("intention")]
-        //public async Task<ActionResult<ApiResponse<IntentionClientSecretDto>>> Intention(
-        //    [FromBody] IntentionExchangeRequest req, CancellationToken ct)
-        //{
-        //    var res = await _svc.ExchangePaymentKeyForClientSecretAsync(req.PaymentKey, null, ct);
-        //    return res.Status ? Ok(res) : BadRequest(res);
-        //}
-
         [HttpPost("intention")]
-        public async Task<ActionResult<ApiResponse<CreateIntentResponse>>> CreateIntention(
-                                                    [FromBody] CardCheckoutRequest req, CancellationToken ct)
+        public async Task<ActionResult<ApiResponse<CreateIntentResponse>>> CreateIntention([FromBody] CardCheckoutRequest req, CancellationToken ct)
         {
             if (req.AmountCents <= 0)
                 return BadRequest("Invalid amount/currency");
@@ -155,23 +141,6 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
 
-
-        //[HttpPost("notification")]
-        //public async Task<IActionResult> HandlePaymentNotification([FromBody] PaymentNotification notification, CancellationToken ct)
-        //{
-        //    var result = await _svc.HandlePaymentNotificationAsync(Request, notification.RawBody);
-
-        //    if (result.Status)
-        //    {
-        //        return Ok(result);
-        //    }
-
-
-        //    return BadRequest(result);
-        //}
-        // ===================== Saved Cards / Tokenization =====================
-
-        // بدء جلسة إضافة كارت (SDK هيعمل Save Card ويرجع Webhook بـ CARD_TOKEN)
         [HttpPost("tokenization")]
         public async Task<ActionResult<ApiResponse<TokenizationStartRes>>> StartCardTokenization()
         {
