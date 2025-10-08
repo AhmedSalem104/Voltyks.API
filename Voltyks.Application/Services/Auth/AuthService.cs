@@ -359,10 +359,14 @@ namespace Voltyks.Application.Services.Auth
 
 
             var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
+            // ✅ نضيف الشرط هنا
+            var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
 
             var requests = (await repo.GetAllWithIncludeAsync(
-                c => c.RecipientUserId == userId,
-                false,
+                c => c.RecipientUserId == userId
+                     && c.Status == "Pending"       
+                     && c.RequestedAt >= fiveMinutesAgo,                  
+                false,             
                 c => c.CarOwner,
                 c => c.Charger,
                 c => c.Charger.User,
