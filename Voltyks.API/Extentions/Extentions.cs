@@ -32,6 +32,8 @@ using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Application.Services.ChargingRequest.Interceptor;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Services.FeesConfig;
+using Voltyks.Application.Interfaces.Terms;
+using Voltyks.Application.Services.Terms;
 
 
 namespace Voltyks.API.Extentions
@@ -212,6 +214,7 @@ namespace Voltyks.API.Extentions
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             services.AddScoped<IFeesConfigService, FeesConfigService>();
+            services.AddScoped<ITermsService, TermsService>();
 
 
             services.AddHttpClient("paymob"); // تقدر تضيف BaseAddress لو تحب

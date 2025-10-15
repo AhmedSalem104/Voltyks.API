@@ -23,7 +23,9 @@ namespace Voltyks.Persistence.Entities.Identity
 
         public bool IsAvailable { get; set; } = true;
 
-   
+        public bool IsBanned { get; set; } = false;
+
+        public double? Wallet { get; set; }
 
 
 

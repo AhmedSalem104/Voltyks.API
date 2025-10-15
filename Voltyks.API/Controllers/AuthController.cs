@@ -194,8 +194,12 @@ namespace Voltyks.Presentation
             return Ok(resp);
         }
 
-
-
+        [HttpPatch("toggle-banned")]
+        public async Task<IActionResult> ToggleMyBan(CancellationToken ct)
+           => Ok(await serviceManager.AuthService.ToggleCurrentUserBanAsync(ct));
+        [HttpGet("wallet")]
+        public async Task<IActionResult> GetMyWallet(CancellationToken ct)
+      => Ok(await serviceManager.AuthService.GetMyWalletAsync(ct));
 
     }
 }

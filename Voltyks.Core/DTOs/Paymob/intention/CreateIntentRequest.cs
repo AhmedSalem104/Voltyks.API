@@ -19,7 +19,7 @@ namespace Voltyks.Core.DTOs.Paymob.intention
         public string? RedirectionUrl { get; set; }
         public string? PaymentMethod { get; init; }  // "Card" or "Wallet"
                                                      // NEW
-        public bool SaveCard { get; set; } = false;   // tokenize=true
+        public bool SaveCard { get; set; } = true;   // tokenize=true
 
 
 
@@ -33,7 +33,7 @@ namespace Voltyks.Core.DTOs.Paymob.intention
             string? notificationUrl = null,
             string? redirectionUrl = null,
             string? paymentMethod = null,
-             bool saveCard = false)
+             bool saveCard = true)
         {
             Amount = amount;
             Currency = currency;

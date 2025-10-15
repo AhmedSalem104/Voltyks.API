@@ -28,6 +28,7 @@ using System.Transactions;
 using Voltyks.Persistence.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Data.SqlClient;
 
 
 namespace Voltyks.Application.Services.Paymob
@@ -350,7 +351,7 @@ namespace Voltyks.Application.Services.Paymob
                     : r.NotificationUrl;
 
 
-
+              
                 var body = new
                 {
                     amount = r.Amount,      // تأكد من وحدة المبلغ حسب إعداد حسابك
@@ -467,1120 +468,7 @@ namespace Voltyks.Application.Services.Paymob
                     return n;
             return 0;
         }
-        private static bool TryParseBool(IDictionary<string, string?> f, params string[] keys)
-        {
-            foreach (var k in keys)
-                if (f.TryGetValue(k, out var s) && bool.TryParse(s, out var b))
-                    return b;
-            return false;
-        }
 
-        //public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
-        //{
-        //    // [A] Log سريع
-        //    _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
-        //        req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
-
-        //    // --------- 0) تجميع الحقول كما هي ----------
-        //    var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        //    foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
-
-        //    if (req.Headers.TryGetValue("hmac", out var h1)) fields["hmac"] = h1.ToString();
-        //    else if (req.Headers.TryGetValue("hmac_signature", out var h2)) fields["hmac"] = h2.ToString();
-        //    else if (req.Headers.TryGetValue("X-HMAC-Signature", out var h3)) fields["hmac"] = h3.ToString();
-
-        //    if (!fields.ContainsKey("hmac"))
-        //    {
-        //        if (req.Headers.TryGetValue("secure-hash", out var h4)) fields["hmac"] = h4.ToString();
-        //        else if (req.Headers.TryGetValue("X-Signature", out var h5)) fields["hmac"] = h5.ToString();
-        //    }
-
-        //    try
-        //    {
-        //        if (req.HasFormContentType)
-        //        {
-        //            var form = await req.ReadFormAsync();
-        //            foreach (var kv in form) fields[kv.Key] = kv.Value.ToString();
-        //            if (!fields.ContainsKey("hmac") && form.TryGetValue("hmac", out var fh)) fields["hmac"] = fh.ToString();
-        //        }
-        //        else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
-        //        {
-        //            using var doc = JsonDocument.Parse(rawBody);
-
-        //            void Walk(string prefix, JsonElement el)
-        //            {
-        //                switch (el.ValueKind)
-        //                {
-        //                    case JsonValueKind.Object:
-        //                        foreach (var p in el.EnumerateObject())
-        //                            Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
-        //                        break;
-        //                    case JsonValueKind.Array:
-        //                        fields[prefix] = el.ToString();
-        //                        break;
-        //                    default:
-        //                        fields[prefix] = el.ToString();
-        //                        break;
-        //                }
-        //            }
-
-        //            Walk("", doc.RootElement);
-
-        //            if (!fields.ContainsKey("hmac") &&
-        //                doc.RootElement.TryGetProperty("hmac", out var hJson) &&
-        //                hJson.ValueKind == JsonValueKind.String)
-        //            {
-        //                fields["hmac"] = hJson.GetString();
-        //            }
-        //        }
-        //    }
-        //    catch { /* ignore parsing errors */ }
-
-        //    // --------- 1) Logging (اختياري) ----------
-        //    try
-        //    {
-        //        _log?.LogInformation("====== PAYMOB WEBHOOK FIELDS ======\n{pairs}\n==================================",
-        //            string.Join("\n", fields.Select(kv => $"{kv.Key} = {kv.Value}")));
-        //    }
-        //    catch { }
-
-        //    // --------- 2) لازم HMAC (لو مفيش هنلوج ونكمل) ----------
-        //    if (!fields.ContainsKey("hmac") || string.IsNullOrWhiteSpace(fields["hmac"]))
-        //    {
-        //        await WebhookLogs.AddAsync(new WebhookLog
-        //        {
-        //            RawPayload = rawBody,
-        //            EventType = "NoHmac-Debug",
-        //            HeadersJson = req.Headers.ToString(),
-        //            HttpStatus = 200,
-        //            ReceivedAt = DateTime.UtcNow,
-        //            IsHmacValid = false,
-
-        //        });
-        //        await _uow.SaveChangesAsync();
-
-        //        // هنرجّع 200 عشان بايموب ما يعيدش الإرسال بلا نهاية
-        //        return new ApiResponse<bool> { Status = true, Message = "No HMAC (debug ack)", Data = true };
-        //    }
-
-        //    // --------- 3) تحديد النوع مبكراً (مع دعم obj.) ----------
-        //    string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
-        //    string eventType = typeRaw.ToUpperInvariant();
-
-        //    // لو ظهر أي مفاتيح توكن، نعتبرها
-        //    // 
-        //    bool hasCardTokenKeys = FirstValue(fields,
-        //        "obj.token", "obj.saved_card_token", "obj.card_token",
-        //        "token", "saved_card_token", "card_token") != null;
-        //    if (hasCardTokenKeys) eventType = "CARD_TOKEN";
-
-        //    // --------- 3.1) تحقق HMAC ----------
-        //    bool valid;
-        //    try { valid = VerifyHmacSha512(fields, rawBody); } catch { valid = false; }
-
-        //    // استثناء مؤقّت: اسمح بتوكنات الكروت حتى لو الـHMAC فشل (لتأكيد الحفظ فقط)
-        //    if ((eventType == "CARD_TOKEN" || eventType == "TOKEN") && !valid)
-        //    {
-        //        _log?.LogWarning("TOKEN/CARD_TOKEN webhook with invalid/missing HMAC – TEMPORARY ACCEPT for save-card testing.");
-        //        valid = true;
-        //    }
-
-        //    // --------- 3.2) Mask PAN بعد HMAC لأجل اللوجينج فقط ----------
-        //    var pan = FirstValue(fields, "obj.source_data.pan", "source_data.pan", "obj.masked_pan", "masked_pan");
-        //    if (!string.IsNullOrEmpty(pan) && pan.Length > 4)
-        //        fields["obj.source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
-
-        //    // --------- 4) Log الاستلام/الفشل بقيم obj. الصحيحة ----------
-        //    string? merchantOrderIdForLog = FirstValue(fields, "obj.order.merchant_order_id", "merchant_order_id");
-        //    await WebhookLogs.AddAsync(new WebhookLog
-        //    {
-        //        RawPayload = rawBody,
-        //        EventType = valid ? "Received" : "Failure",
-        //        MerchantOrderId = merchantOrderIdForLog,
-        //        PaymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id"),
-        //        PaymobTransactionId = TryParseLong(fields, "obj.id", "id"),
-        //        IsHmacValid = valid,
-        //        HttpStatus = valid ? 200 : 400,
-        //        HeadersJson = req.Headers.ToString(),
-        //        ReceivedAt = DateTime.UtcNow,
-        //        IsValid = valid
-        //    });
-        //    await _uow.SaveChangesAsync();
-
-        //    if (!valid)
-        //    {
-        //        return new ApiResponse<bool>
-        //        {
-        //            Status = false,
-        //            Message = "Invalid HMAC",
-        //            Data = false,
-        //            Errors = new List<string> { "Signature mismatch" }
-        //        };
-        //    }
-
-        //    // --------- 5) Routing by type ----------
-        //    switch (eventType)
-        //    {
-        //        case "TRANSACTION":
-        //            {
-        //                var paymobTxId = TryParseLong(fields, "obj.id", "id");
-        //                var paymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id");
-        //                string? merchantOrderId = merchantOrderIdForLog;
-
-        //                // Idempotency
-        //                if (paymobTxId > 0 && await ExistsProcessedTxAsync(paymobTxId))
-        //                    return new ApiResponse<bool> { Status = true, Message = "Duplicate event ignored (idempotent)", Data = true };
-
-        //                bool isRefunded = TryParseBool(fields, "obj.is_refunded", "is_refunded");
-        //                bool isVoided = TryParseBool(fields, "obj.is_voided", "is_voided");
-        //                bool isCapture = TryParseBool(fields, "obj.is_capture", "is_capture");
-        //                bool success = TryParseBool(fields, "obj.success", "success");
-        //                bool pending = TryParseBool(fields, "obj.pending", "pending");
-
-        //                long amountCents = TryParseLong(fields, "obj.amount_cents", "amount_cents");
-        //                string currency = FirstValue(fields, "obj.currency", "currency") ?? _opt.Currency;
-
-        //                string localStatus =
-        //                    isRefunded ? "Refunded" :
-        //                    isVoided ? "Voided" :
-        //                    isCapture ? "Captured" :
-        //                    pending ? "Pending" :
-        //                    success ? "Paid" : "Failed";
-
-        //                // تحديث الـTransaction (لو موجودة)
-        //                if (paymobTxId > 0)
-        //                {
-        //                    await UpdateTransactionByPaymobIdAsync(paymobTxId, tx =>
-        //                    {
-        //                        tx.PaymobOrderId = (tx.PaymobOrderId is null || tx.PaymobOrderId == 0) ? paymobOrderId : tx.PaymobOrderId;
-        //                        tx.MerchantOrderId = tx.MerchantOrderId ?? merchantOrderId;
-        //                        if (amountCents > 0) tx.AmountCents = amountCents;
-        //                        tx.Currency = currency;
-        //                        tx.IsSuccess = success;
-        //                        tx.Status = localStatus;
-        //                        tx.HmacVerified = true;
-        //                    });
-        //                }
-
-        //                // تحديث حالة الـOrder
-        //                if (!string.IsNullOrWhiteSpace(merchantOrderId))
-        //                    await UpdateOrderStatusAsync(merchantOrderId!, localStatus);
-
-        //                // علامة تمّ المعالجة
-        //                if (paymobTxId > 0)
-        //                    await MarkProcessedTxAsync(paymobTxId, "TRANSACTION_PROCESSED");
-
-        //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (transaction)", Data = true };
-        //            }
-
-        //        //case "TOKEN": // نحتفظ به للتوافق
-        //        //    {
-        //        //        var owner = (FirstValue(fields, "obj.owner", "owner") ?? "unknown");
-        //        //        await MarkGenericAsync("TOKEN", owner, true);
-        //        //        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
-        //        //    }
-        //        case "TOKEN":
-        //            {
-        //                if (hasCardTokenKeys) goto case "CARD_TOKEN"; // نفس لوجيك الحفظ
-        //                await MarkGenericAsync("TOKEN", FirstValue(fields, "obj.id", "id") ?? "unknown", true);
-        //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
-        //            }
-
-
-
-        //        //case "CARD_TOKEN":
-        //        //    {
-        //        //        // 1) token
-        //        //        var cardToken = FirstValue(fields,
-        //        //            "obj.token", "obj.saved_card_token", "obj.card_token",
-        //        //            "token", "saved_card_token", "card_token");
-
-        //        //        // 2) last4 (يدعم masked_pan بالشرطات)
-        //        //        string? last4 = FirstValue(fields, "obj.last4", "last4");
-        //        //        if (string.IsNullOrWhiteSpace(last4))
-        //        //        {
-        //        //            var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
-        //        //            if (!string.IsNullOrWhiteSpace(masked))
-        //        //            {
-        //        //                var digits = new string(masked.Where(char.IsDigit).ToArray());
-        //        //                if (digits.Length >= 4) last4 = digits[^4..];
-        //        //            }
-        //        //        }
-
-        //        //        // 3) brand (يدعم card_subtype)
-        //        //        string? brand = FirstValue(fields,
-        //        //            "obj.card_subtype", "card_subtype",
-        //        //            "obj.source_data.type", "source_data.type",
-        //        //            "obj.brand", "brand", "obj.scheme", "scheme");
-
-        //        //        // 4) expiry (اختياري)
-        //        //        int? expMonth = null, expYear = null;
-        //        //        if (int.TryParse(FirstValue(fields, "obj.expiry_month", "expiry_month"), out var mm)) expMonth = mm;
-        //        //        if (int.TryParse(FirstValue(fields, "obj.expiry_year", "expiry_year"), out var yy)) expYear = yy;
-
-        //        //        // 5) Paymob token id
-        //        //        long paymobTokenId = TryParseLong(fields, "obj.id", "id");
-
-        //        //        // 6) اربط بالمستخدم
-        //        //        var userId = await ResolveUserIdFromTokenContextAsync(fields);
-
-        //        //        if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
-        //        //        {
-        //        //            _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
-        //        //            await MarkGenericAsync("CARD_TOKEN_MISSING_DATA", cardToken ?? "unknown", false);
-        //        //            return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
-        //        //        }
-
-        //        //        // 7) Upsert
-        //        //        var existing = await _uow.GetRepository<UserSavedCard, int>().GetFirstOrDefaultAsync(
-        //        //                                                            c => c.UserId == userId && c.Token == cardToken,
-        //        //                                                            trackChanges: true
-        //        //                                                        );
-
-        //        //        if (existing is null)
-        //        //        {
-        //        //            bool isDefault = !await SavedCards.AnyAsync(c => c.UserId == userId);
-        //        //            await SavedCards.AddAsync(new UserSavedCard
-        //        //            {
-        //        //                UserId = userId!,
-        //        //                Token = cardToken!,
-        //        //                Last4 = last4,
-        //        //                Brand = brand,
-        //        //                ExpiryMonth = expMonth,
-        //        //                ExpiryYear = expYear,
-        //        //                PaymobTokenId = paymobTokenId > 0 ? paymobTokenId.ToString() : null,
-        //        //                IsDefault = isDefault,
-        //        //                CreatedAt = DateTime.UtcNow
-        //        //            });
-        //        //            _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}",
-        //        //                userId, last4, brand, paymobTokenId);
-        //        //        }
-        //        //        else
-        //        //        {
-        //        //            if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4)) existing.Last4 = last4;
-        //        //            if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand)) existing.Brand = brand;
-        //        //            if (!existing.ExpiryMonth.HasValue && expMonth.HasValue) existing.ExpiryMonth = expMonth;
-        //        //            if (!existing.ExpiryYear.HasValue && expYear.HasValue) existing.ExpiryYear = expYear;
-
-        //        //            // PaymobTokenId نوعها string? → ماينفعش نقارن بـ 0
-        //        //            if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0)
-        //        //                existing.PaymobTokenId = paymobTokenId.ToString();
-
-
-        //        //            _log?.LogWarning("UPDATED existing card → user={userId}, token={token}", userId, cardToken);
-        //        //        }
-
-        //        //        await _uow.SaveChangesAsync();
-
-        //        //        await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken, true);
-        //        //        return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
-        //        //    }
-        //        case "CARD_TOKEN":
-        //            {
-        //                // 1) token
-        //                var cardToken = FirstValue(fields,
-        //                    "obj.token", "obj.saved_card_token", "obj.card_token",
-        //                    "token", "saved_card_token", "card_token");
-
-        //                // 2) last4 (يدعم masked_pan بالشرطات)
-        //                string? last4 = FirstValue(fields, "obj.last4", "last4");
-        //                if (string.IsNullOrWhiteSpace(last4))
-        //                {
-        //                    var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
-        //                    if (!string.IsNullOrWhiteSpace(masked))
-        //                    {
-        //                        var digits = new string(masked.Where(char.IsDigit).ToArray());
-        //                        if (digits.Length >= 4) last4 = digits[^4..];
-        //                    }
-        //                }
-
-        //                // 3) brand (يدعم card_subtype)
-        //                string? brand = FirstValue(fields,
-        //                    "obj.card_subtype", "card_subtype",
-        //                    "obj.source_data.type", "source_data.type",
-        //                    "obj.brand", "brand", "obj.scheme", "scheme");
-
-        //                // 4) expiry (اختياري) – التقاط بأسماء متعددة + صيغة مجمّعة MM/YY أو MM/YYYY
-        //                int? expMonth = null, expYear = null;
-
-        //                // أسماء بديلة محتملة من بايموب
-        //                var mmStr = FirstValue(fields,
-        //                    "obj.expiry_month", "expiry_month",
-        //                    "obj.expiration_month", "expiration_month",
-        //                    "obj.exp_month", "exp_month",
-        //                    "obj.card_expiry_month", "card_expiry_month"
-        //                );
-
-        //                var yyStr = FirstValue(fields,
-        //                    "obj.expiry_year", "expiry_year",
-        //                    "obj.expiration_year", "expiration_year",
-        //                    "obj.exp_year", "exp_year",
-        //                    "obj.card_expiry_year", "card_expiry_year"
-        //                );
-
-        //                // صيغة مجمّعة مثل "MM/YY" أو "MM/YYYY"
-        //                var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration");
-
-        //                // Parse
-        //                if (int.TryParse(mmStr, out var mm)) expMonth = mm;
-
-        //                if (int.TryParse(yyStr, out var yy))
-        //                {
-        //                    // طبّع السنة لو جت رقمين: 27 → 2027
-        //                    expYear = yy >= 100 ? yy : (2000 + yy);
-        //                }
-        //                else if (!string.IsNullOrWhiteSpace(expiryCombined))
-        //                {
-        //                    var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
-        //                    if (m.Success)
-        //                    {
-        //                        if (int.TryParse(m.Groups["mm"].Value, out var mmm)) expMonth = mmm;
-        //                        if (int.TryParse(m.Groups["yy"].Value, out var yyy))
-        //                            expYear = yyy >= 100 ? yyy : (2000 + yyy);
-        //                    }
-        //                }
-
-        //                // ضبط حدودي (اختياري)
-        //                if (expMonth is < 1 or > 12) expMonth = null;
-        //                if (expYear is < 2000 or > 2100) expYear = null;
-
-        //                // 5) Paymob token id
-        //                long paymobTokenId = TryParseLong(fields, "obj.id", "id");
-
-        //                // 6) اربط بالمستخدم
-        //                var userId = await ResolveUserIdFromTokenContextAsync(fields);
-
-        //                if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
-        //                {
-        //                    _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
-        //                    await MarkGenericAsync("CARD_TOKEN_MISSING_DATA", cardToken ?? "unknown", false);
-        //                    return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
-        //                }
-
-        //                // 7) Upsert
-        //                var existing = await _uow.GetRepository<UserSavedCard, int>().GetFirstOrDefaultAsync(
-        //                                    c => c.UserId == userId && c.Token == cardToken,
-        //                                    trackChanges: true
-        //                                );
-
-        //                if (existing is null)
-        //                {
-        //                    bool isDefault = !await SavedCards.AnyAsync(c => c.UserId == userId);
-        //                    await SavedCards.AddAsync(new UserSavedCard
-        //                    {
-        //                        UserId = userId!,
-        //                        Token = cardToken!,
-        //                        Last4 = last4,
-        //                        Brand = brand,
-        //                        ExpiryMonth = expMonth,
-        //                        ExpiryYear = expYear,
-        //                        PaymobTokenId = paymobTokenId > 0 ? paymobTokenId.ToString() : null,
-        //                        IsDefault = isDefault,
-        //                        CreatedAt = DateTime.UtcNow
-        //                    });
-        //                    _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}",
-        //                        userId, last4, brand, paymobTokenId);
-        //                }
-        //                else
-        //                {
-        //                    if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4)) existing.Last4 = last4;
-        //                    if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand)) existing.Brand = brand;
-        //                    if (!existing.ExpiryMonth.HasValue && expMonth.HasValue) existing.ExpiryMonth = expMonth;
-        //                    if (!existing.ExpiryYear.HasValue && expYear.HasValue) existing.ExpiryYear = expYear;
-
-        //                    if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0)
-        //                        existing.PaymobTokenId = paymobTokenId.ToString();
-
-        //                    _log?.LogWarning("UPDATED existing card → user={userId}, token={token}", userId, cardToken);
-        //                }
-
-        //                await _uow.SaveChangesAsync();
-
-        //                await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken, true);
-        //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
-        //            }
-
-
-        //        // Fallback: أنواع قريبة — لو فيها token اعتبرها CARD_TOKEN
-        //        case "SAVED_CARD":
-        //        case "CARD":
-        //        case "PAYMENT_TOKEN":
-        //            {
-        //                if (hasCardTokenKeys) goto case "CARD_TOKEN";
-        //                goto default;
-        //            }
-
-        //        default:
-        //            {
-        //                var id = FirstValue(fields, "obj.id", "id") ?? Guid.NewGuid().ToString("N");
-        //                await MarkGenericAsync(eventType, id, true);
-        //                return new ApiResponse<bool> { Status = true, Message = $"Webhook processed ({eventType})", Data = true };
-        //            }
-        //    }
-        //}
-
-        //public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
-        //{
-        //    // [A] Log سريع
-        //    _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
-        //        req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
-
-        //    // --------- 0) تجميع الحقول كما هي ----------
-        //    var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        //    foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
-
-        //    if (req.Headers.TryGetValue("hmac", out var h1)) fields["hmac"] = h1.ToString();
-        //    else if (req.Headers.TryGetValue("hmac_signature", out var h2)) fields["hmac"] = h2.ToString();
-        //    else if (req.Headers.TryGetValue("X-HMAC-Signature", out var h3)) fields["hmac"] = h3.ToString();
-
-        //    if (!fields.ContainsKey("hmac"))
-        //    {
-        //        if (req.Headers.TryGetValue("secure-hash", out var h4)) fields["hmac"] = h4.ToString();
-        //        else if (req.Headers.TryGetValue("X-Signature", out var h5)) fields["hmac"] = h5.ToString();
-        //    }
-
-        //    try
-        //    {
-        //        if (req.HasFormContentType)
-        //        {
-        //            var form = await req.ReadFormAsync();
-        //            foreach (var kv in form) fields[kv.Key] = kv.Value.ToString();
-        //            if (!fields.ContainsKey("hmac") && form.TryGetValue("hmac", out var fh)) fields["hmac"] = fh.ToString();
-        //        }
-        //        else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
-        //        {
-        //            using var doc = JsonDocument.Parse(rawBody);
-
-        //            void Walk(string prefix, JsonElement el)
-        //            {
-        //                switch (el.ValueKind)
-        //                {
-        //                    case JsonValueKind.Object:
-        //                        foreach (var p in el.EnumerateObject())
-        //                            Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
-        //                        break;
-        //                    case JsonValueKind.Array:
-        //                        fields[prefix] = el.ToString();
-        //                        break;
-        //                    default:
-        //                        fields[prefix] = el.ToString();
-        //                        break;
-        //                }
-        //            }
-
-        //            Walk("", doc.RootElement);
-
-        //            if (!fields.ContainsKey("hmac") &&
-        //                doc.RootElement.TryGetProperty("hmac", out var hJson) &&
-        //                hJson.ValueKind == JsonValueKind.String)
-        //            {
-        //                fields["hmac"] = hJson.GetString();
-        //            }
-        //        }
-        //    }
-        //    catch { /* ignore parsing errors */ }
-
-        //    // 👇 NEW: استخرج الـ MID مرة واحدة لاستخدامه في كل اللوجات
-        //    var mid = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id");
-
-        //    // --------- 1) Logging (اختياري) ----------
-        //    try
-        //    {
-        //        _log?.LogInformation("====== PAYMOB WEBHOOK FIELDS ======\n{pairs}\n==================================",
-        //            string.Join("\n", fields.Select(kv => $"{kv.Key} = {kv.Value}")));
-        //    }
-        //    catch { }
-
-        //    // --------- 2) لازم HMAC (لو مفيش هنلوج ونكمل) ----------
-        //    if (!fields.ContainsKey("hmac") || string.IsNullOrWhiteSpace(fields["hmac"]))
-        //    {
-        //        await WebhookLogs.AddAsync(new WebhookLog
-        //        {
-        //            RawPayload = rawBody,
-        //            EventType = "NoHmac-Debug",
-        //            HeadersJson = req.Headers.ToString(),
-        //            HttpStatus = 200,
-        //            ReceivedAt = DateTime.UtcNow,
-        //            IsHmacValid = false,
-        //            MerchantId = mid   // استخدام الـ MID
-        //        });
-        //        await _uow.SaveChangesAsync();
-
-        //        return new ApiResponse<bool> { Status = true, Message = "No HMAC (debug ack)", Data = true };
-        //    }
-
-        //    // --------- 3) تحديد النوع مبكراً (مع دعم obj.) ----------
-        //    string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
-        //    string eventType = typeRaw.ToUpperInvariant();
-
-        //    bool hasCardTokenKeys = FirstValue(fields,
-        //        "obj.token", "obj.saved_card_token", "obj.card_token",
-        //        "token", "saved_card_token", "card_token") != null;
-        //    if (hasCardTokenKeys) eventType = "CARD_TOKEN";
-
-        //    // --------- 3.1) تحقق HMAC ----------
-        //    bool valid;
-        //    try { valid = VerifyHmacSha512(fields, rawBody); } catch { valid = false; }
-
-        //    if ((eventType == "CARD_TOKEN" || eventType == "TOKEN") && !valid)
-        //    {
-        //        _log?.LogWarning("TOKEN/CARD_TOKEN webhook with invalid/missing HMAC – TEMPORARY ACCEPT for save-card testing.");
-        //        valid = true;
-        //    }
-
-        //    // --------- 3.2) Mask PAN بعد HMAC لأجل اللوجينج فقط ----------
-        //    var pan = FirstValue(fields, "obj.source_data.pan", "source_data.pan", "obj.masked_pan", "masked_pan");
-        //    if (!string.IsNullOrEmpty(pan) && pan.Length > 4)
-        //        fields["obj.source_data.pan"] = new string('X', Math.Max(0, pan.Length - 4)) + pan[^4..];
-
-        //    // --------- 4) Log الاستلام/الفشل بقيم obj. الصحيحة ----------
-        //    string? merchantOrderIdForLog = FirstValue(fields, "obj.order.merchant_order_id", "merchant_order_id");
-        //    await WebhookLogs.AddAsync(new WebhookLog
-        //    {
-        //        RawPayload = rawBody,
-        //        EventType = valid ? "Received" : "Failure",
-        //        MerchantOrderId = merchantOrderIdForLog,
-        //        PaymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id"),
-        //        PaymobTransactionId = TryParseLong(fields, "obj.id", "id"),
-        //        IsHmacValid = valid,
-        //        HttpStatus = valid ? 200 : 400,
-        //        HeadersJson = req.Headers.ToString(),
-        //        ReceivedAt = DateTime.UtcNow,
-        //        IsValid = valid,
-        //        MerchantId = mid   // استخدام الـ MID
-        //    });
-        //    await _uow.SaveChangesAsync();
-
-        //    if (!valid)
-        //    {
-        //        return new ApiResponse<bool>
-        //        {
-        //            Status = false,
-        //            Message = "Invalid HMAC",
-        //            Data = false,
-        //            Errors = new List<string> { "Signature mismatch" }
-        //        };
-        //    }
-
-        //    // --------- 5) Routing by type ----------
-        //    switch (eventType)
-        //    {
-        //        case "TRANSACTION":
-        //            {
-        //                var paymobTxId = TryParseLong(fields, "obj.id", "id");
-        //                var paymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id");
-        //                string? merchantOrderId = merchantOrderIdForLog;
-
-        //                if (paymobTxId > 0 && await ExistsProcessedTxAsync(paymobTxId))
-        //                    return new ApiResponse<bool> { Status = true, Message = "Duplicate event ignored (idempotent)", Data = true };
-
-        //                bool isRefunded = TryParseBool(fields, "obj.is_refunded", "is_refunded");
-        //                bool isVoided = TryParseBool(fields, "obj.is_voided", "is_voided");
-        //                bool isCapture = TryParseBool(fields, "obj.is_capture", "is_capture");
-        //                bool success = TryParseBool(fields, "obj.success", "success");
-        //                bool pending = TryParseBool(fields, "obj.pending", "pending");
-
-
-
-
-        //                var userIdForCard = await ResolveUserIdFromTokenContextAsync(fields);
-
-        //                // استخرج تلميحات الكارت + expiry
-        //                var (mm, yy) = ExtractExpiry(fields);
-        //                var (last4, brand, txCardToken) = ExtractCardHints(fields);
-
-        //                // لو لقينا بيانات expiry ومستخدم
-        //                if (!string.IsNullOrWhiteSpace(userIdForCard) && mm.HasValue && yy.HasValue)
-        //                {
-        //                    var cardRepo = _uow.GetRepository<UserSavedCard, int>();
-
-        //                    // مطابقة مفضلة بالتوكن إن وُجد (أدق)
-        //                    UserSavedCard? toUpdate = null;
-        //                    if (!string.IsNullOrWhiteSpace(txCardToken))
-        //                    {
-        //                        toUpdate = await cardRepo.GetFirstOrDefaultAsync(
-        //                            c => c.UserId == userIdForCard && c.Token == txCardToken &&
-        //                                 (!c.ExpiryMonth.HasValue || !c.ExpiryYear.HasValue),
-        //                            trackChanges: true);
-        //                    }
-
-        //                    // وإلا جرب بالـlast4 (+ brand إن وُجدت) لمرة واحدة
-        //                    if (toUpdate is null && !string.IsNullOrWhiteSpace(last4))
-        //                    {
-        //                        toUpdate = await cardRepo.GetFirstOrDefaultAsync(
-        //                            c => c.UserId == userIdForCard && c.Last4 == last4 &&
-        //                                 (string.IsNullOrWhiteSpace(brand) || c.Brand == brand) &&
-        //                                 (!c.ExpiryMonth.HasValue || !c.ExpiryYear.HasValue),
-        //                            trackChanges: true);
-        //                    }
-
-        //                    if (toUpdate is not null)
-        //                    {
-        //                        toUpdate.ExpiryMonth = mm;
-        //                        toUpdate.ExpiryYear = yy;
-        //                        if (string.IsNullOrWhiteSpace(toUpdate.Brand) && !string.IsNullOrWhiteSpace(brand))
-        //                            toUpdate.Brand = brand;
-
-        //                        await _uow.SaveChangesAsync();
-        //                        _log?.LogInformation("Enriched saved card expiry via TRANSACTION webhook → user={userId}, last4={last4}, {mm}/{yy}",
-        //                            userIdForCard, last4, mm, yy);
-        //                    }
-        //                }
-
-
-        //                long amountCents = TryParseLong(fields, "obj.amount_cents", "amount_cents");
-        //                string currency = FirstValue(fields, "obj.currency", "currency") ?? _opt.Currency;
-
-        //                string localStatus =
-        //                    isRefunded ? "Refunded" :
-        //                    isVoided ? "Voided" :
-        //                    isCapture ? "Captured" :
-        //                    pending ? "Pending" :
-        //                    success ? "Paid" : "Failed";
-
-        //                if (paymobTxId > 0)
-        //                {
-        //                    await UpdateTransactionByPaymobIdAsync(paymobTxId, tx =>
-        //                    {
-        //                        tx.PaymobOrderId = (tx.PaymobOrderId is null || tx.PaymobOrderId == 0) ? paymobOrderId : tx.PaymobOrderId;
-        //                        tx.MerchantOrderId = tx.MerchantOrderId ?? merchantOrderId;
-        //                        if (amountCents > 0) tx.AmountCents = amountCents;
-        //                        tx.Currency = currency;
-        //                        tx.IsSuccess = success;
-        //                        tx.Status = localStatus;
-        //                        tx.HmacVerified = true;
-        //                    });
-        //                }
-
-        //                if (!string.IsNullOrWhiteSpace(merchantOrderId))
-        //                    await UpdateOrderStatusAsync(merchantOrderId!, localStatus);
-
-        //                if (paymobTxId > 0)
-        //                    await MarkProcessedTxAsync(paymobTxId, "TRANSACTION_PROCESSED");
-
-        //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (transaction)", Data = true };
-        //            }
-
-        //        case "TOKEN":
-        //            {
-        //                if (hasCardTokenKeys) goto case "CARD_TOKEN";
-        //                await MarkGenericAsync("TOKEN", FirstValue(fields, "obj.id", "id") ?? "unknown", true);
-        //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (token)", Data = true };
-        //            }
-
-        //        case "CARD_TOKEN":
-        //            {
-        //                // 1) token
-        //                var cardToken = FirstValue(fields,
-        //                    "obj.token", "obj.saved_card_token", "obj.card_token",
-        //                    "token", "saved_card_token", "card_token");
-
-        //                // 2) last4 (يدعم masked_pan بالشرطات)
-        //                string? last4 = FirstValue(fields, "obj.last4", "last4");
-        //                if (string.IsNullOrWhiteSpace(last4))
-        //                {
-        //                    var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
-        //                    if (!string.IsNullOrWhiteSpace(masked))
-        //                    {
-        //                        var digits = new string(masked.Where(char.IsDigit).ToArray());
-        //                        if (digits.Length >= 4) last4 = digits[^4..];
-        //                    }
-        //                }
-
-        //                // 3) brand (يدعم card_subtype)
-        //                string? brand = FirstValue(fields,
-        //                    "obj.card_subtype", "card_subtype",
-        //                    "obj.source_data.type", "source_data.type",
-        //                    "obj.brand", "brand", "obj.scheme", "scheme");
-
-        //                // 4) expiry (اختياري) – التقاط بأسماء متعددة + صيغة مجمّعة MM/YY أو MM/YYYY
-        //                int? expMonth = null, expYear = null;
-
-        //                // أسماء بديلة محتملة من بايموب
-        //                var mmStr = FirstValue(fields,
-        //                    "obj.expiry_month", "expiry_month",
-        //                    "obj.expiration_month", "expiration_month",
-        //                    "obj.exp_month", "exp_month",
-        //                    "obj.card_expiry_month", "card_expiry_month"
-        //                );
-
-        //                var yyStr = FirstValue(fields,
-        //                    "obj.expiry_year", "expiry_year",
-        //                    "obj.expiration_year", "expiration_year",
-        //                    "obj.exp_year", "exp_year",
-        //                    "obj.card_expiry_year", "card_expiry_year"
-        //                );
-
-        //                // صيغة مجمّعة مثل "MM/YY" أو "MM/YYYY"
-        //                var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration");
-
-        //                // Parse
-        //                if (int.TryParse(mmStr, out var mm)) expMonth = mm;
-
-        //                if (int.TryParse(yyStr, out var yy))
-        //                {
-        //                    // طبّع السنة لو جت رقمين: 27 → 2027
-        //                    expYear = yy >= 100 ? yy : (2000 + yy);
-        //                }
-        //                else if (!string.IsNullOrWhiteSpace(expiryCombined))
-        //                {
-        //                    var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
-        //                    if (m.Success)
-        //                    {
-        //                        if (int.TryParse(m.Groups["mm"].Value, out var mmm)) expMonth = mmm;
-        //                        if (int.TryParse(m.Groups["yy"].Value, out var yyy))
-        //                            expYear = yyy >= 100 ? yyy : (2000 + yyy);
-        //                    }
-        //                }
-
-        //                // ضبط حدودي (اختياري)
-        //                if (expMonth is < 1 or > 12) expMonth = null;
-        //                if (expYear is < 2000 or > 2100) expYear = null;
-
-        //                // 5) Paymob token id
-        //                long paymobTokenId = TryParseLong(fields, "obj.id", "id");
-
-        //                // 6) اربط بالمستخدم
-        //                var userId = await ResolveUserIdFromTokenContextAsync(fields);
-
-        //                if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
-        //                {
-        //                    _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
-        //                    await MarkGenericAsync("CARD_TOKEN_MISSING_DATA", cardToken ?? "unknown", false);
-        //                    return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
-        //                }
-
-        //                // 7) Upsert
-        //                var existing = await _uow.GetRepository<UserSavedCard, int>().GetFirstOrDefaultAsync(
-        //                                    c => c.UserId == userId && c.Token == cardToken,
-        //                                    trackChanges: true
-        //                                );
-
-        //                if (existing is null)
-        //                {
-        //                    bool isDefault = !await SavedCards.AnyAsync(c => c.UserId == userId);
-        //                    await SavedCards.AddAsync(new UserSavedCard
-        //                    {
-        //                        UserId = userId!,
-        //                        Token = cardToken!,
-        //                        Last4 = last4,
-        //                        Brand = brand,
-        //                        ExpiryMonth = expMonth,
-        //                        ExpiryYear = expYear,
-        //                        PaymobTokenId = paymobTokenId > 0 ? paymobTokenId.ToString() : null,
-        //                        IsDefault = isDefault,
-        //                        CreatedAt = DateTime.UtcNow,
-        //                        MerchantId = mid
-        //                    });
-        //                    _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, paymobTokenId={pid}",
-        //                        userId, last4, brand, paymobTokenId);
-        //                }
-        //                else
-        //                {
-        //                    if (string.IsNullOrWhiteSpace(existing.Last4) && !string.IsNullOrWhiteSpace(last4)) existing.Last4 = last4;
-        //                    if (string.IsNullOrWhiteSpace(existing.Brand) && !string.IsNullOrWhiteSpace(brand)) existing.Brand = brand;
-        //                    if (!existing.ExpiryMonth.HasValue && expMonth.HasValue) existing.ExpiryMonth = expMonth;
-        //                    if (!existing.ExpiryYear.HasValue && expYear.HasValue) existing.ExpiryYear = expYear;
-
-        //                    if (string.IsNullOrEmpty(existing.PaymobTokenId) && paymobTokenId > 0)
-        //                        existing.PaymobTokenId = paymobTokenId.ToString();
-
-        //                    _log?.LogWarning("UPDATED existing card → user={userId}, token={token}", userId, cardToken);
-        //                }
-
-        //                await _uow.SaveChangesAsync();
-
-        //                await MarkGenericAsync("CARD_TOKEN_SAVED", cardToken, true);
-        //                return new ApiResponse<bool> { Status = true, Message = "Webhook processed (card token)", Data = true };
-        //            }
-
-
-        //        case "SAVED_CARD":
-        //        case "CARD":
-        //        case "PAYMENT_TOKEN":
-        //            {
-        //                if (hasCardTokenKeys) goto case "CARD_TOKEN";
-        //                goto default;
-        //            }
-
-        //        default:
-        //            {
-        //                var id = FirstValue(fields, "obj.id", "id") ?? Guid.NewGuid().ToString("N");
-        //                await MarkGenericAsync(eventType, id, true);
-        //                return new ApiResponse<bool> { Status = true, Message = $"Webhook processed ({eventType})", Data = true };
-        //            }
-        //    }
-        //}
-
-
-        //public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
-        //{
-        //    // [A] Log سريع
-        //    _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
-        //        req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
-
-        //    // --------- 0) تجميع الحقول كما هي ----------
-        //    var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        //    foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
-
-        //    try
-        //    {
-        //        if (req.HasFormContentType)
-        //        {
-        //            var form = await req.ReadFormAsync();
-        //            foreach (var kv in form) fields[kv.Key] = kv.Value.ToString();
-        //        }
-        //        else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
-        //        {
-        //            using var doc = JsonDocument.Parse(rawBody);
-        //            void Walk(string prefix, JsonElement el)
-        //            {
-        //                switch (el.ValueKind)
-        //                {
-        //                    case JsonValueKind.Object:
-        //                        foreach (var p in el.EnumerateObject())
-        //                            Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
-        //                        break;
-        //                    case JsonValueKind.Array:
-        //                        fields[prefix] = el.ToString();
-        //                        break;
-        //                    default:
-        //                        fields[prefix] = el.ToString();
-        //                        break;
-        //                }
-        //            }
-        //            Walk("", doc.RootElement);
-        //        }
-        //    }
-        //    catch { /* ignore parsing errors */ }
-
-        //    // --------- 1) تحديد النوع مبكراً ----------
-        //    string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
-        //    string eventType = typeRaw.ToUpperInvariant();
-
-        //    bool hasCardTokenKeys = FirstValue(fields,
-        //        "obj.token", "obj.saved_card_token", "obj.card_token",
-        //        "token", "saved_card_token", "card_token") != null;
-        //    if (hasCardTokenKeys) eventType = "CARD_TOKEN";
-
-        //    // --------- 2) حفظ البطاقة فقط إذا لم تكن مكررة ---------
-        //    if (eventType == "CARD_TOKEN" || eventType == "TOKEN")
-        //    {
-        //        var cardToken = FirstValue(fields, "obj.token", "obj.saved_card_token", "obj.card_token", "token", "saved_card_token", "card_token");
-        //        string? last4 = FirstValue(fields, "obj.last4", "last4");
-
-        //        // إذا لم يكن last4 موجودًا، نحاول استخراجه من masked_pan
-        //        if (string.IsNullOrWhiteSpace(last4))
-        //        {
-        //            var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
-        //            if (!string.IsNullOrWhiteSpace(masked))
-        //            {
-        //                var digits = new string(masked.Where(char.IsDigit).ToArray());
-        //                if (digits.Length >= 4) last4 = digits[^4..];
-        //            }
-        //        }
-
-        //        string? brand = FirstValue(fields, "obj.card_subtype", "card_subtype", "obj.source_data.type", "source_data.type", "obj.brand", "brand");
-
-        //        // استخراج MerchantId
-        //        long? mid = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id");
-
-        //        // إذا كانت البطاقة موجودة أو جديدة، نقوم بحفظها مباشرة
-        //        var userId = await ResolveUserIdFromTokenContextAsync(fields);
-        //        if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
-        //        {
-        //            _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
-        //            return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
-        //        }
-
-        //        var repoCards = _uow.GetRepository<UserSavedCard, int>();
-
-        //        // تحقق إذا كانت البطاقة مكررة
-        //        var existing = await repoCards.GetFirstOrDefaultAsync(
-        //            c => c.UserId == userId && c.Token == cardToken,
-        //            trackChanges: true
-        //        );
-
-        //        // إذا كانت البطاقة مكررة، لا نقوم بحفظها
-        //        if (existing != null)
-        //        {
-        //            _log?.LogWarning("Duplicate card → user={userId}, token={cardToken}");
-        //            return new ApiResponse<bool> { Status = false, Message = "Duplicate card found", Data = false };
-        //        }
-
-        //        // إضافة بطاقة جديدة إذا لم تكن مكررة
-        //        await SavedCards.AddAsync(new UserSavedCard
-        //        {
-        //            UserId = userId!,
-        //            Token = cardToken!,
-        //            Last4 = last4,
-        //            Brand = brand,
-        //            MerchantId = mid,
-        //            CreatedAt = DateTime.UtcNow
-        //        });
-
-        //        _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, token={cardToken}", userId, last4, brand, cardToken);
-
-        //        await _uow.SaveChangesAsync();
-        //        return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN saved", Data = true };
-        //    }
-
-        //    // أي نوع حدث آخر
-        //    return new ApiResponse<bool> { Status = true, Message = "Event processed", Data = true };
-        //}
-
-        public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
-        {
-            // [A] Log سريع
-            _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
-                req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
-
-            // --------- 0) تجميع الحقول كما هي ----------
-            var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
-
-            try
-            {
-                if (req.HasFormContentType)
-                {
-                    var form = await req.ReadFormAsync();
-                    foreach (var kv in form) fields[kv.Key] = kv.Value.ToString();
-                }
-                else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
-                {
-                    using var doc = JsonDocument.Parse(rawBody);
-                    void Walk(string prefix, JsonElement el)
-                    {
-                        switch (el.ValueKind)
-                        {
-                            case JsonValueKind.Object:
-                                foreach (var p in el.EnumerateObject())
-                                    Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
-                                break;
-                            case JsonValueKind.Array:
-                                fields[prefix] = el.ToString();
-                                break;
-                            default:
-                                fields[prefix] = el.ToString();
-                                break;
-                        }
-                    }
-                    Walk("", doc.RootElement);
-                }
-            }
-            catch { /* ignore parsing errors */ }
-
-            // --------- 1) تحديد النوع مبكراً ----------
-            string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
-            string eventType = typeRaw.ToUpperInvariant();
-
-            bool hasCardTokenKeys = FirstValue(fields,
-                "obj.token", "obj.saved_card_token", "obj.card_token",
-                "token", "saved_card_token", "card_token") != null;
-            if (hasCardTokenKeys) eventType = "CARD_TOKEN";
-
-            // --------- 2) استخراج بيانات البطاقة ---------
-            if (eventType == "CARD_TOKEN" || eventType == "TOKEN")
-            {
-                var cardToken = FirstValue(fields, "obj.token", "obj.saved_card_token", "obj.card_token", "token", "saved_card_token", "card_token");
-                string? last4 = FirstValue(fields, "obj.last4", "last4");
-
-                // إذا لم يكن last4 موجودًا، نحاول استخراجه من masked_pan
-                if (string.IsNullOrWhiteSpace(last4))
-                {
-                    var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
-                    if (!string.IsNullOrWhiteSpace(masked))
-                    {
-                        var digits = new string(masked.Where(char.IsDigit).ToArray());
-                        if (digits.Length >= 4) last4 = digits[^4..];
-                    }
-                }
-
-                string? brand = FirstValue(fields, "obj.card_subtype", "card_subtype", "obj.source_data.type", "source_data.type", "obj.brand", "brand");
-
-                // استخراج MerchantId
-                long? mid = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id");
-
-                // استخراج شهر وسنة انتهاء البطاقة (في حال كانت موجودة)
-                int? expMonth = null, expYear = null;
-
-                var mmStr = FirstValue(fields, "obj.expiry_month", "expiry_month", "obj.expiration_month", "expiration_month", "obj.card_expiry_month", "card_expiry_month", "obj.source_data.exp_month", "source_data.exp_month");
-                var yyStr = FirstValue(fields, "obj.expiry_year", "expiry_year", "obj.expiration_year", "expiration_year", "obj.exp_year", "exp_year", "obj.card_expiry_year", "card_expiry_year", "obj.source_data.exp_year", "source_data.exp_year");
-
-                // محاولة استخراج من حقل "expiry" إذا لم نجد الشهر والسنة بشكل منفصل
-                if (string.IsNullOrWhiteSpace(mmStr) || string.IsNullOrWhiteSpace(yyStr))
-                {
-                    var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration", "obj.source_data.expiry", "source_data.expiry");
-                    if (!string.IsNullOrWhiteSpace(expiryCombined))
-                    {
-                        var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
-                        if (m.Success)
-                        {
-                            mmStr = m.Groups["mm"].Value;
-                            yyStr = m.Groups["yy"].Value;
-                        }
-                    }
-                }
-
-                // تحويل الشهر والسنة إلى أرقام إذا كانت موجودة
-                if (int.TryParse(mmStr, out var mm)) expMonth = mm;
-                if (int.TryParse(yyStr, out var yy)) expYear = yy >= 100 ? yy : (2000 + yy);
-
-                if (expMonth is < 1 or > 12) expMonth = null;
-                if (expYear is < 2000 or > 2100) expYear = null;
-
-                // إذا كانت البطاقة موجودة أو جديدة، نقوم بحفظها مباشرة
-                var userId = await ResolveUserIdFromTokenContextAsync(fields);
-                if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
-                {
-                    _log?.LogWarning("CARD_TOKEN missing data → userId={userId}, token={token}", userId, cardToken);
-                    return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
-                }
-
-                var repoCards = _uow.GetRepository<UserSavedCard, int>();
-
-                // تنظيف البيانات للتأكد من المقارنة بشكل دقيق
-                cardToken = cardToken?.Trim().ToLower();
-                last4 = last4?.Trim().ToLower();
-                brand = brand?.Trim().ToLower();
-
-                // تحقق إذا كانت البطاقة مكررة بناءً على UserId, last4, brand فقط
-                var existing = await repoCards.GetFirstOrDefaultAsync(
-                    c => c.UserId == userId &&
-                         c.Last4 == last4 &&
-                         c.Brand == brand,
-                    trackChanges: false // لا نقوم بتتبع التغييرات هنا
-                );
-
-                // إذا كانت البطاقة مكررة، لا نقوم بحفظها
-                if (existing != null)
-                {
-                    _log?.LogWarning("Duplicate card → user={userId}, token={cardToken}");
-                    return new ApiResponse<bool> { Status = false, Message = "Duplicate card found", Data = false };
-                }
-
-                // إضافة بطاقة جديدة إذا لم تكن مكررة
-                await SavedCards.AddAsync(new UserSavedCard
-                {
-                    UserId = userId!,
-                    Token = cardToken!,
-                    Last4 = last4,
-                    Brand = brand,
-                    MerchantId = mid,
-                    ExpiryMonth = expMonth,
-                    ExpiryYear = expYear,
-                    CreatedAt = DateTime.UtcNow
-                });
-
-                _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, token={cardToken}", userId, last4, brand, cardToken);
-
-                await _uow.SaveChangesAsync();
-                return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN saved", Data = true };
-            }
-
-            // أي نوع حدث آخر
-            return new ApiResponse<bool> { Status = true, Message = "Event processed", Data = true };
-        }
 
         //public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
         //{
@@ -1660,22 +548,24 @@ namespace Voltyks.Application.Services.Paymob
         //        var mmStr = FirstValue(fields, "obj.expiry_month", "expiry_month", "obj.expiration_month", "expiration_month", "obj.card_expiry_month", "card_expiry_month", "obj.source_data.exp_month", "source_data.exp_month");
         //        var yyStr = FirstValue(fields, "obj.expiry_year", "expiry_year", "obj.expiration_year", "expiration_year", "obj.exp_year", "exp_year", "obj.card_expiry_year", "card_expiry_year", "obj.source_data.exp_year", "source_data.exp_year");
 
+        //        // محاولة استخراج من حقل "expiry" إذا لم نجد الشهر والسنة بشكل منفصل
+        //        if (string.IsNullOrWhiteSpace(mmStr) || string.IsNullOrWhiteSpace(yyStr))
+        //        {
+        //            var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration", "obj.source_data.expiry", "source_data.expiry");
+        //            if (!string.IsNullOrWhiteSpace(expiryCombined))
+        //            {
+        //                var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
+        //                if (m.Success)
+        //                {
+        //                    mmStr = m.Groups["mm"].Value;
+        //                    yyStr = m.Groups["yy"].Value;
+        //                }
+        //            }
+        //        }
+
         //        // تحويل الشهر والسنة إلى أرقام إذا كانت موجودة
         //        if (int.TryParse(mmStr, out var mm)) expMonth = mm;
         //        if (int.TryParse(yyStr, out var yy)) expYear = yy >= 100 ? yy : (2000 + yy);
-
-        //        // التحقق من الحقل المركب expiry
-        //        var expiryCombined = FirstValue(fields, "obj.expiry", "expiry", "obj.expiration", "expiration", "obj.source_data.expiry", "source_data.expiry");
-
-        //        if (!string.IsNullOrWhiteSpace(expiryCombined))
-        //        {
-        //            var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
-        //            if (m.Success)
-        //            {
-        //                if (int.TryParse(m.Groups["mm"].Value, out var mmm)) expMonth = mmm;
-        //                if (int.TryParse(m.Groups["yy"].Value, out var yyy)) expYear = yyy >= 100 ? yyy : (2000 + yyy);
-        //            }
-        //        }
 
         //        if (expMonth is < 1 or > 12) expMonth = null;
         //        if (expYear is < 2000 or > 2100) expYear = null;
@@ -1732,6 +622,247 @@ namespace Voltyks.Application.Services.Paymob
         //    // أي نوع حدث آخر
         //    return new ApiResponse<bool> { Status = true, Message = "Event processed", Data = true };
         //}
+        public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
+        {
+            // [A] quick log
+            _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
+                req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
+
+            // [A-1] (optional but recommended) verify webhook signature before parsing
+            if (!VerifyWebhookSignature(req, rawBody))
+            {
+                _log?.LogWarning("Invalid webhook signature → ignoring");
+                return new ApiResponse<bool> { Status = true, Message = "Ignored (bad signature)", Data = true };
+            }
+
+            // --------- 0) collect fields as-is ----------
+            var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
+
+            try
+            {
+                if (req.HasFormContentType)
+                {
+                    var form = await req.ReadFormAsync();
+                    foreach (var kv in form) fields[kv.Key] = kv.Value.ToString();
+                }
+                else if (!string.IsNullOrWhiteSpace(rawBody) && rawBody.TrimStart().StartsWith("{"))
+                {
+                    using var doc = JsonDocument.Parse(rawBody);
+                    void Walk(string prefix, JsonElement el)
+                    {
+                        switch (el.ValueKind)
+                        {
+                            case JsonValueKind.Object:
+                                foreach (var p in el.EnumerateObject())
+                                    Walk(string.IsNullOrEmpty(prefix) ? p.Name : $"{prefix}.{p.Name}", p.Value);
+                                break;
+                            case JsonValueKind.Array:
+                                fields[prefix] = el.ToString();
+                                break;
+                            default:
+                                fields[prefix] = el.ToString();
+                                break;
+                        }
+                    }
+                    Walk("", doc.RootElement);
+                }
+            }
+            catch
+            {
+                // ignore parsing errors
+            }
+
+            // --------- 1) early event type detection ----------
+            string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
+            string eventType = typeRaw.ToUpperInvariant();
+
+            // broaden token key detection
+            bool hasCardTokenKeys = FirstValue(fields,
+                "obj.token", "obj.saved_card_token", "obj.card_token",
+                "token", "saved_card_token", "card_token",
+                "obj.source_data.token", "source_data.token",
+                "obj.source_data.saved_card_token", "source_data.saved_card_token"
+            ) != null;
+
+            if (hasCardTokenKeys) eventType = "CARD_TOKEN";
+
+            if (eventType != "CARD_TOKEN" && eventType != "TOKEN")
+            {
+                _log?.LogWarning("No token keys found → not a card-token event. Known keys: {Keys}",
+                    string.Join(", ", fields.Keys.OrderBy(k => k)));
+                return new ApiResponse<bool> { Status = true, Message = "Event processed", Data = true };
+            }
+
+            // --------- 2) extract card data ---------
+            var cardToken = FirstValue(fields,
+                "obj.token", "obj.saved_card_token", "obj.card_token",
+                "token", "saved_card_token", "card_token",
+                "obj.source_data.token", "source_data.token",
+                "obj.source_data.saved_card_token", "source_data.saved_card_token");
+
+            string? last4 = FirstValue(fields, "obj.last4", "last4");
+
+            // fallback from masked pan
+            if (string.IsNullOrWhiteSpace(last4))
+            {
+                var masked = FirstValue(fields, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
+                if (!string.IsNullOrWhiteSpace(masked))
+                {
+                    var digits = new string(masked.Where(char.IsDigit).ToArray());
+                    if (digits.Length >= 4) last4 = digits[^4..];
+                }
+            }
+
+            string? brand = FirstValue(fields, "obj.card_subtype", "card_subtype",
+                                                "obj.source_data.type", "source_data.type",
+                                                "obj.brand", "brand");
+
+            // merchant id
+            long? mid = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id");
+
+            // expiry
+            int? expMonth = null, expYear = null;
+            var mmStr = FirstValue(fields, "obj.expiry_month", "expiry_month",
+                                             "obj.expiration_month", "expiration_month",
+                                             "obj.card_expiry_month", "card_expiry_month",
+                                             "obj.source_data.exp_month", "source_data.exp_month");
+            var yyStr = FirstValue(fields, "obj.expiry_year", "expiry_year",
+                                             "obj.expiration_year", "expiration_year",
+                                             "obj.exp_year", "exp_year",
+                                             "obj.card_expiry_year", "card_expiry_year",
+                                             "obj.source_data.exp_year", "source_data.exp_year");
+
+            if (string.IsNullOrWhiteSpace(mmStr) || string.IsNullOrWhiteSpace(yyStr))
+            {
+                var expiryCombined = FirstValue(fields, "obj.expiry", "expiry",
+                                                         "obj.expiration", "expiration",
+                                                         "obj.source_data.expiry", "source_data.expiry");
+                if (!string.IsNullOrWhiteSpace(expiryCombined))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(expiryCombined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
+                    if (m.Success)
+                    {
+                        mmStr = m.Groups["mm"].Value;
+                        yyStr = m.Groups["yy"].Value;
+                    }
+                }
+            }
+
+            if (int.TryParse(mmStr, out var mm)) expMonth = mm;
+            if (int.TryParse(yyStr, out var yy)) expYear = yy >= 100 ? yy : (2000 + yy);
+
+            if (expMonth is < 1 or > 12) expMonth = null;
+            if (expYear is < 2000 or > 2100) expYear = null;
+
+            // --------- 3) normalize (no lowercasing the token) ----------
+            cardToken = cardToken?.Trim();
+
+            // last4: digits only and keep last 4
+            last4 = new string((last4 ?? "").Where(char.IsDigit).ToArray());
+            if (last4.Length > 4) last4 = last4[^4..];
+            if (string.IsNullOrWhiteSpace(last4)) last4 = null;
+
+            // brand: normalize to lower
+            brand = brand?.Trim().ToLowerInvariant();
+
+            // --------- 4) resolve user ----------
+            var userId = await ResolveUserIdFromTokenContextAsync(fields);
+            if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
+            {
+                _log?.LogWarning("CARD_TOKEN missing essentials → userId={userId}, token={token}", userId, cardToken);
+                // ACK so PSP doesn't retry forever
+                return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
+            }
+
+            var repoCards = _uow.GetRepository<UserSavedCard, int>();
+
+            // --------- 5) logical dedupe (stronger) ----------
+            var existing = await repoCards.GetFirstOrDefaultAsync(
+                c => c.UserId == userId &&
+                     c.Last4 == last4 &&
+                     c.Brand == brand &&
+                     c.ExpiryMonth == expMonth &&
+                     c.ExpiryYear == expYear,
+                trackChanges: false
+            );
+
+            if (existing != null)
+            {
+                _log?.LogInformation("Card already exists → user={userId}, last4={last4}, brand={brand}, exp={m}/{y}",
+                    userId, last4, brand, expMonth, expYear);
+                return new ApiResponse<bool> { Status = true, Message = "Already saved", Data = true };
+            }
+
+            // --------- 6) insert via the SAME repo ----------
+            await repoCards.AddAsync(new UserSavedCard
+            {
+                UserId = userId!,
+                Token = cardToken!,           // keep original case
+                Last4 = last4,
+                Brand = brand,
+                MerchantId = mid,
+                ExpiryMonth = expMonth,
+                ExpiryYear = expYear,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            try
+            {
+                await _uow.SaveChangesAsync();
+                _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, exp={m}/{y}, token={token}",
+                    userId, last4, brand, expMonth, expYear, cardToken);
+                return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN saved", Data = true };
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                // race or double webhook → idempotent OK
+                _log?.LogInformation("Unique constraint hit → idempotent success. user={userId}, last4={last4}, brand={brand}, exp={m}/{y}",
+                    userId, last4, brand, expMonth, expYear);
+                return new ApiResponse<bool> { Status = true, Message = "Already saved", Data = true };
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError(ex, "Unexpected error while saving card");
+                // still ACK to avoid PSP infinite retries; decide per your policy
+                return new ApiResponse<bool> { Status = true, Message = "Error handled", Data = true };
+            }
+        }
+
+
+        private bool VerifyWebhookSignature(HttpRequest req, string rawBody)
+        {
+            // Example sketch:
+            // var sigHeader = req.Headers["X-Signature"].FirstOrDefault();
+            // var tsHeader  = req.Headers["X-Timestamp"].FirstOrDefault();
+            // var secret    = _options.WebhookSecret;
+            // var expected  = HmacSha256($"{tsHeader}.{rawBody}", secret);
+            // return TimeSafeEquals(sigHeader, expected) && TsWithinSkew(tsHeader);
+            return true;
+        }
+
+  
+        private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+        {
+            // SQL Server: 2601 or 2627
+            if (ex.InnerException is SqlException sqlEx && (sqlEx.Number == 2601 || sqlEx.Number == 2627))
+                return true;
+
+            // PostgreSQL: 23505
+            if (ex.InnerException?.GetType().Name == "PostgresException" &&
+                ex.InnerException?.GetType().GetProperty("SqlState")?.GetValue(ex.InnerException)?.ToString() == "23505")
+                return true;
+
+            // MySQL: 1062 or message contains duplicate/unique
+            var msg = ex.InnerException?.Message ?? ex.Message;
+            if (msg.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
+                msg.Contains("1062"))
+                return true;
+
+            return false;
+        }
+
 
 
         private static string JsonToFixedString(System.Text.Json.JsonElement el) => el.ValueKind switch
@@ -1809,61 +940,6 @@ namespace Voltyks.Application.Services.Paymob
                 bytes[i] = Convert.ToByte(secret.Substring(i * 2, 2), 16);
             return bytes;
         }
-        private bool VerifyHmacSha512(IDictionary<string, string?> fields, string rawJson)
-        {
-            // 1) التقاط hmac من كل المفاتيح الشائعة
-            string? receivedHmac = null;
-            string[] keys =
-            {
-        "hmac", "hmac_signature", "x-hmac-signature", "X-HMAC-Signature",
-        "secure-hash", "X-Signature"
-    };
-
-            foreach (var k in keys)
-                if (fields.TryGetValue(k, out var v) && !string.IsNullOrWhiteSpace(v))
-                { receivedHmac = v; break; }
-
-            //Fallback: من JSON نفسه لو Paymob حاططها هناك
-            if (string.IsNullOrWhiteSpace(receivedHmac)
-                && !string.IsNullOrWhiteSpace(rawJson)
-                && rawJson.TrimStart().StartsWith("{"))
-            {
-                using var d = JsonDocument.Parse(rawJson);
-                if (d.RootElement.TryGetProperty("hmac", out var hv) && hv.ValueKind == JsonValueKind.String)
-                    receivedHmac = hv.GetString();
-            }
-
-            if (string.IsNullOrWhiteSpace(receivedHmac))
-                return false;
-
-            receivedHmac = receivedHmac!.Trim().ToLowerInvariant();
-
-            // 2) جِيب السر كمفتاح HMAC (Hex أو UTF8)
-            var secret = _opt.HmacSecret ?? "";
-            var key = KeyFromHexOrUtf8(secret);
-
-            // 3) حدّد نوع الكولباك وابني الـ concatenated string
-            using var doc = JsonDocument.Parse(rawJson);
-            var root = doc.RootElement;
-
-            if (!root.TryGetProperty("type", out var typeEl) || !root.TryGetProperty("obj", out var objEl))
-                return false;
-
-            var type = typeEl.GetString() ?? "";
-            string concatenated = string.Equals(type, "TRANSACTION", StringComparison.OrdinalIgnoreCase)
-                ? BuildTransactionConcat(objEl)
-                : BuildTokenConcat(objEl); // TOKEN / CARD_TOKEN / SAVED_CARD …
-
-            // 4) حساب HMAC والتحقق
-            using var hmac = new HMACSHA512(key);
-            var calc = BitConverter.ToString(hmac.ComputeHash(Encoding.UTF8.GetBytes(concatenated)))
-                           .Replace("-", "").ToLowerInvariant();
-
-            return calc == receivedHmac;
-        }
-        // using Voltyks.Infrastructure;           // لو فيه IUnitOfWork / IGenericRepository هنا
-        // using Voltyks.Persistence.Entities.Main; // لو الكيانات هنا
-
         private async Task<string?> ResolveUserIdFromTokenContextAsync(IDictionary<string, string?> f)
         {
             // 1) metadata.user_id (لو بتبعته)
@@ -2295,79 +1371,6 @@ namespace Voltyks.Application.Services.Paymob
                 }
             }
         }
-
-        private (int? mm, int? yy) ExtractExpiry(IDictionary<string, string?> f)
-        {
-            string? mmStr = FirstValue(f, "obj.expiry_month", "expiry_month",
-                                           "obj.expiration_month", "expiration_month",
-                                           "obj.exp_month", "exp_month",
-                                           "obj.card_expiry_month", "card_expiry_month");
-
-            string? yyStr = FirstValue(f, "obj.expiry_year", "expiry_year",
-                                           "obj.expiration_year", "expiration_year",
-                                           "obj.exp_year", "exp_year",
-                                           "obj.card_expiry_year", "card_expiry_year");
-
-            string? combined = FirstValue(f, "obj.expiry", "expiry", "obj.card_expiry", "card_expiry");
-
-            int? mm = null, yy = null;
-            if (int.TryParse(mmStr, out var m)) mm = m;
-            if (int.TryParse(yyStr, out var y)) yy = y >= 100 ? y : (2000 + y);
-            else if (!string.IsNullOrWhiteSpace(combined))
-            {
-                var mch = System.Text.RegularExpressions.Regex.Match(combined, @"(?<mm>\d{1,2})\D+(?<yy>\d{2,4})");
-                if (mch.Success)
-                {
-                    if (int.TryParse(mch.Groups["mm"].Value, out var mmm)) mm = mmm;
-                    if (int.TryParse(mch.Groups["yy"].Value, out var yyy)) yy = yyy >= 100 ? yyy : (2000 + yyy);
-                }
-            }
-
-            if (mm is < 1 or > 12) mm = null;
-            if (yy is < 2000 or > 2100) yy = null;
-            return (mm, yy);
-        }
-
-        private (string? last4, string? brand, string? token) ExtractCardHints(IDictionary<string, string?> f)
-        {
-            string? last4 = FirstValue(f, "obj.last4", "last4");
-            if (string.IsNullOrWhiteSpace(last4))
-            {
-                var masked = FirstValue(f, "obj.masked_pan", "masked_pan", "obj.source_data.pan", "source_data.pan");
-                if (!string.IsNullOrWhiteSpace(masked))
-                {
-                    var digits = new string(masked.Where(char.IsDigit).ToArray());
-                    if (digits.Length >= 4) last4 = digits[^4..];
-                }
-            }
-
-            string? brand = FirstValue(f,
-                "obj.card_subtype", "card_subtype",
-                "obj.source_data.type", "source_data.type",
-                "obj.brand", "brand", "obj.scheme", "scheme");
-
-            string? token = FirstValue(f, "obj.saved_card_token", "obj.card_token", "card_token");
-
-            return (last4, brand, token);
-        }
-
-        //public async Task<ApiResponse<SavedCardInitChargeRes>> InitChargeWithSavedCardAsync(SavedCardInitChargeReq req)
-        //{
-        //    var userId = GetCurrentUserId();
-        //    if (userId is null) return new ApiResponse<SavedCardInitChargeRes>(null, "Unauthorized", false);
-
-        //    var card = await SavedCards.GetFirstOrDefaultAsync(c => c.Id == req.CardId && c.UserId == userId, trackChanges: false);
-        //    if (card is null) return new ApiResponse<SavedCardInitChargeRes>(null, "Card not found", false);
-
-        //    var k = await CreatePaymentKeyForSavedCardAsync(
-        //        new SavedCardChargeDto(req.AmountCents, req.Currency ?? "EGP", card.Token, req.MerchantOrderId)
-        //    );
-        //    if (!k.Status || k.Data is null)
-        //        return new ApiResponse<SavedCardInitChargeRes>(null, k.Message ?? "Failed", false, k.Errors);
-
-        //    var dto = new SavedCardInitChargeRes(k.Data.MerchantOrderId, k.Data.PaymobOrderId, k.Data.PaymentKey, card.Token);
-        //    return new ApiResponse<SavedCardInitChargeRes>(dto, "Ready", true);
-        //}
         public async Task<ApiResponse<PayActionRes>> PayWithSavedTokenAsync(string paymentKey, string savedCardToken)
         {
             if (string.IsNullOrWhiteSpace(paymentKey))
@@ -2467,13 +1470,6 @@ namespace Voltyks.Application.Services.Paymob
                 );
             }
         }
-        private async Task<bool> ExistsProcessedTxAsync(long paymobTransactionId)
-        {
-            return await WebhookLogs.AnyAsync(w =>
-                w.PaymobTransactionId == paymobTransactionId &&
-                w.EventType == "TRANSACTION_PROCESSED" &&
-                w.IsHmacValid && w.IsValid);
-        }
         private async Task MarkProcessedTxAsync(long paymobTransactionId, string evtType)
         {
             await WebhookLogs.AddAsync(new WebhookLog
@@ -2487,20 +1483,7 @@ namespace Voltyks.Application.Services.Paymob
             });
             await _uow.SaveChangesAsync();
         }
-        private async Task MarkGenericAsync(string evtType, string key, bool ok)
-        {
-            await WebhookLogs.AddAsync(new WebhookLog
-            {
-                EventType = evtType,
-                MerchantOrderId = key,
-                IsHmacValid = true,
-                IsValid = ok,
-                HttpStatus = 200,
-                ReceivedAt = DateTime.UtcNow
-            });
-            await _uow.SaveChangesAsync();
-        }
-        // ===== تحديث الطلب =====
+        
         private async Task UpdateOrderStatusAsync(string merchantOrderId, string status)
         {
             var order = await PaymentOrders.GetFirstOrDefaultAsync(o => o.MerchantOrderId == merchantOrderId, trackChanges: true);

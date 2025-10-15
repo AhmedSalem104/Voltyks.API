@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Voltyks.Persistence.Data;
 
@@ -11,9 +12,11 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    partial class VoltyksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251014221331_AddTerms")]
+    partial class AddTerms
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -217,9 +220,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsBanned")
-                        .HasColumnType("bit");
-
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -268,9 +268,6 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     b.Property<DateTime?>("VcodeExpirationDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<double?>("Wallet")
-                        .HasColumnType("float");
 
                     b.HasKey("Id");
 
@@ -547,7 +544,7 @@ namespace Voltyks.Persistence.Data.Migrations
                             Id = 1,
                             MinimumFee = 40m,
                             Percentage = 10m,
-                            UpdatedAt = new DateTime(2025, 10, 15, 0, 55, 41, 205, DateTimeKind.Utc).AddTicks(8894),
+                            UpdatedAt = new DateTime(2025, 10, 14, 22, 13, 29, 193, DateTimeKind.Utc).AddTicks(251),
                             UpdatedBy = "system"
                         });
                 });

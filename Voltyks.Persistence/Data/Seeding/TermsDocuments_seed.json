@@ -1,0 +1,178 @@
+[
+    {
+        "VersionNumber": 1,
+        "Lang": "en",
+        "IsActive": true,
+        "PayloadJson": {
+            "title": "Voltyks Terms of Service",
+            "sections": [
+                {
+                    "key": "eligibility",
+                    "title": "Eligibility",
+                    "items": [
+                        "You must be at least 18 years old.",
+                        "You must hold a valid driving licence."
+                    ]
+                },
+                {
+                    "key": "use_of_service",
+                    "title": "Use of Service",
+                    "items": [
+                        "Voltyks provides a platform connecting electric vehicle (EV) owners with individuals offering charging services.",
+                        "Users may either:",
+                        "• Request access to charging stations listed on the app.",
+                        "• Offer their chargers for others to use and receive payment.",
+                        "Voltyks is a facilitator only. We do not own or operate any chargers."
+                    ]
+                },
+                {
+                    "key": "fees_payments",
+                    "title": "Fees & Payments",
+                    "items": [
+                        "Voltyks may charge a service fee for facilitating connections.",
+                        "Charging prices are set solely by charger owners. Voltyks does not control or influence the pricing of charging services.",
+                        "Payments for charging are settled directly between users. Voltyks has no responsibility for external payment disputes.",
+                        "Voltyks Fees are strictly non-refundable under any circumstances. By using the app, you acknowledge and accept that all Voltyks Fees are final."
+                    ]
+                },
+                {
+                    "key": "wallet_dues",
+                    "title": "Wallet & Dues",
+                    "items": [
+                        "Each user has a Voltyks Wallet which may reflect balances, credits, or dues.",
+                        "In case of misconduct, fraud, or non-payment, Voltyks reserves the right to impose negative balances (dues) in the user’s Wallet.",
+                        "Such dues must be settled and may be automatically deducted from any future use of the app.",
+                        "Users who have been defrauded may be credited appropriately in their Wallet for future use."
+                    ]
+                },
+                {
+                    "key": "user_responsibilities",
+                    "title": "User Responsibilities",
+                    "items": [
+                        "Users must provide accurate and complete information regarding their identity, vehicle, and charger.",
+                        "Users are responsible for ensuring the safety, compatibility, and lawful use of chargers.",
+                        "Misuse, fraudulent activity, or failure to fulfill obligations may result in suspension, termination, or financial penalties applied to the Wallet."
+                    ]
+                },
+                {
+                    "key": "liability_disclaimer",
+                    "title": "Liability & Disclaimers",
+                    "items": [
+                        "Voltyks does not guarantee charger quality, availability, safety, or suitability.",
+                        "Voltyks is not liable for any damages, losses, or disputes arising between users.",
+                        "Users are encouraged to review ratings and make informed choices before engaging in transactions."
+                    ]
+                },
+                {
+                    "key": "termination",
+                    "title": "Termination",
+                    "items": [
+                        "We may suspend or terminate accounts that violate these Terms or engage in misconduct."
+                    ]
+                },
+                {
+                    "key": "support",
+                    "title": "Support",
+                    "items": [
+                        "Users may contact Voltyks through the in-app support system for assistance or to report issues."
+                    ]
+                },
+                {
+                    "key": "amendments",
+                    "title": "Amendments",
+                    "items": [
+                        "Voltyks reserves the right to update these Terms at any time. Continued use of the app indicates acceptance of the updated Terms."
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "VersionNumber": 1,
+        "Lang": "ar",
+        "IsActive": true,
+        "PayloadJson": {
+            "title": "شروط وأحكام استخدام تطبيق Voltyks",
+            "sections": [
+                {
+                    "key": "eligibility",
+                    "title": "الأهلية",
+                    "items": [
+                        "يجب أن يكون عمرك 18 عامًا على الأقل.",
+                        "يجب أن تمتلك رخصة قيادة سارية."
+                    ]
+                },
+                {
+                    "key": "use_of_service",
+                    "title": "استخدام الخدمة",
+                    "items": [
+                        "يقدم تطبيق Voltyks منصة تربط بين مالكي السيارات الكهربائية (EV) والأشخاص الذين يوفرون خدمات الشحن.",
+                        "يمكن للمستخدمين إما:",
+                        "• طلب الوصول إلى محطات الشحن المسجلة في التطبيق.",
+                        "• عرض شواحنهم الخاصة للآخرين مقابل رسوم.",
+                        "Voltyks هو مجرد وسيط ولا يمتلك أو يدير أي محطات شحن."
+                    ]
+                },
+                {
+                    "key": "fees_payments",
+                    "title": "الرسوم والدفع",
+                    "items": [
+                        "قد تفرض Voltyks رسوم خدمة مقابل تسهيل الاتصال بين المستخدمين.",
+                        "تحدد أسعار الشحن فقط من قبل أصحاب الشواحن، ولا تتحكم Voltyks في تلك الأسعار.",
+                        "يتم تسوية المدفوعات مباشرة بين المستخدمين، وVoltyks ليست مسؤولة عن أي نزاعات خارجية.",
+                        "رسوم Voltyks غير قابلة للاسترداد تحت أي ظرف. باستخدامك للتطبيق، فإنك توافق على أن جميع رسوم Voltyks نهائية."
+                    ]
+                },
+                {
+                    "key": "wallet_dues",
+                    "title": "المحفظة والمستحقات",
+                    "items": [
+                        "يمتلك كل مستخدم محفظة Voltyks قد تحتوي على أرصدة أو مستحقات أو ديون.",
+                        "في حال حدوث سلوك غير لائق أو احتيال أو عدم سداد، تحتفظ Voltyks بالحق في فرض أرصدة سالبة (ديون) على المحفظة.",
+                        "يجب تسوية هذه المستحقات، وقد يتم خصمها تلقائيًا من أي استخدام مستقبلي للتطبيق.",
+                        "قد يتم تعويض المستخدمين الذين تعرضوا للاحتيال من خلال إضافة رصيد لمحافظهم لاستخدامه لاحقًا."
+                    ]
+                },
+                {
+                    "key": "user_responsibilities",
+                    "title": "مسؤوليات المستخدم",
+                    "items": [
+                        "يجب على المستخدمين تقديم معلومات دقيقة وكاملة عن هويتهم ومركباتهم وشواحنهم.",
+                        "يتحمل المستخدم مسؤولية سلامة واستخدام الشاحن بطريقة قانونية وآمنة.",
+                        "أي إساءة استخدام أو نشاط احتيالي قد يؤدي إلى إيقاف الحساب أو فرض غرامات مالية على المحفظة."
+                    ]
+                },
+                {
+                    "key": "liability_disclaimer",
+                    "title": "المسؤولية والتنصل",
+                    "items": [
+                        "لا تضمن Voltyks جودة أو توفر أو سلامة أو ملاءمة الشواحن.",
+                        "لا تتحمل Voltyks أي مسؤولية عن الأضرار أو الخسائر أو النزاعات بين المستخدمين.",
+                        "يُنصح المستخدمون بمراجعة التقييمات قبل التعامل لضمان تجربة موثوقة."
+                    ]
+                },
+                {
+                    "key": "termination",
+                    "title": "إنهاء الخدمة",
+                    "items": [
+                        "يجوز لنا تعليق أو إلغاء الحسابات التي تنتهك هذه الشروط أو تمارس سلوكًا مخالفًا."
+                    ]
+                },
+                {
+                    "key": "support",
+                    "title": "الدعم",
+                    "items": [
+                        "يمكن للمستخدمين التواصل مع Voltyks من خلال نظام الدعم داخل التطبيق للإبلاغ عن المشاكل أو طلب المساعدة."
+                    ]
+                },
+                {
+                    "key": "amendments",
+                    "title": "التعديلات",
+                    "items": [
+                        "تحتفظ Voltyks بحقها في تعديل هذه الشروط في أي وقت. استمرار استخدامك للتطبيق يعني موافقتك على الشروط المعدلة."
+                    ]
+                }
+            ]
+        }
+    }
+]

@@ -141,12 +141,51 @@ namespace Voltyks.Persistence
                     }
                 }
 
+
+                //// Seeding For TermsDocuments From Json File
+                if (!_context.termsDocuments.Any())
+                {
+                    // 1) Read all data from Json file
+                    var json = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\TermsDocuments_seed.json");
+
+                    // 2) Transform to List<TermsDocument>
+                    var docs = JsonSerializer.Deserialize<List<SeedItem>>(json, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+                    // 3) Add to DB
+                    if (docs is not null && docs.Any())
+                    {
+                        foreach (var d in docs)
+                        {
+                            var entity = new TermsDocument
+                            {
+                                VersionNumber = d.VersionNumber,
+                                Lang = (d.Lang?.ToLowerInvariant()) == "ar" ? "ar" : "en",
+                                IsActive = d.IsActive,
+                                PublishedAt = DateTime.UtcNow,
+                                PayloadJson = d.PayloadJson.GetRawText() // نخزن JSON كما هو string
+                            };
+                            await _context.termsDocuments.AddAsync(entity);
+                        }
+                        await _context.SaveChangesAsync();
+                    }
+                }
             }
             catch (Exception)
             {
 
                 throw;
             }
+        }
+        private class SeedItem
+        {
+            public int VersionNumber { get; set; }
+            public string? Lang { get; set; }                // "en" | "ar"
+            public bool IsActive { get; set; }
+            public DateTime? PublishedAt { get; set; }       // اختياري في الملف
+            public JsonElement PayloadJson { get; set; }     // نقرأ الـ object كما هو
         }
         public async Task InitializeIdentityAsync()
         {

@@ -27,7 +27,9 @@ namespace Voltyks.Application.Interfaces.Auth
 
         Task<ApiResponse<List<ChargingRequestDetailsDto>>> GetChargerRequestsAsync();
 
+        Task<ApiResponse<object>> ToggleCurrentUserBanAsync(CancellationToken ct = default);
 
+        Task<ApiResponse<double?>> GetMyWalletAsync(CancellationToken ct = default);
 
     }
 

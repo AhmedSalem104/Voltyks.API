@@ -18,8 +18,11 @@ namespace Voltyks.Application.Interfaces.ChargingRequest
         Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(List<TransRequest> dtos);
         Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto);
         Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto);
+        Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto);
 
-        Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto); 
+
+        Task<ApiResponse<decimal>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default);
+        Task<ApiResponse<object>> TransferVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default);
     }
 
 

@@ -13,6 +13,8 @@ using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.Enums;
 using Voltyks.Infrastructure.UnitOfWork;
+using Voltyks.Persistence.Data;
+using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using   ChargingRequestEntity =  Voltyks.Persistence.Entities.Main.ChargingRequest;
 
@@ -27,16 +29,18 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly IHttpContextAccessor _httpContext;
         private readonly IVehicleService _vehicleService ;
         private readonly IFeesConfigService _feesConfigService;
+        private readonly VoltyksDbContext _db;
 
-        
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService)
+
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
             _httpContext = httpContext;
             _vehicleService = vehicleService;
             _feesConfigService = feesConfigService;
+            _db = db;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -473,6 +477,79 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return (area, street);
             }
         }
+        public async Task<ApiResponse<decimal>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
+        {
+            var req = await _db.Set<ChargingRequestEntity>()
+                .AsNoTracking()
+                .Where(r => r.Id == dto.RequestId)
+                .Select(r => new { r.Id, r.VoltyksFees })
+                .FirstOrDefaultAsync(ct);
+
+            if (req is null)
+                return new ApiResponse<decimal>("Request not found", status: false);
+
+            return new ApiResponse<decimal>(req.VoltyksFees, "Fees fetched successfully", true);
+        }
+
+        // ➋ ينفّذ التحويل: +UserId ، -RecipientUserId
+        public async Task<ApiResponse<object>> TransferVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
+        {
+            // نجيب UserId, RecipientUserId, Fees
+            var req = await _db.Set<ChargingRequestEntity>()
+                .AsNoTracking()
+                .Where(r => r.Id == dto.RequestId)
+                .Select(r => new { r.Id, r.UserId, r.RecipientUserId, r.VoltyksFees })
+                .FirstOrDefaultAsync(ct);
+
+            if (req is null)
+                return new ApiResponse<object>("Request not found", status: false);
+
+            if (req.VoltyksFees <= 0)
+                return new ApiResponse<object>("Invalid fees value", status: false,
+                    new() { "VoltyksFees must be greater than zero." });
+
+            // نجيب المستخدمين
+            var ids = new[] { req.UserId, req.RecipientUserId }.Distinct().ToList();
+            var users = await _db.Set<AppUser>().Where(u => ids.Contains(u.Id)).ToListAsync(ct);
+
+            var carOwner = users.FirstOrDefault(u => u.Id == req.UserId);
+            var stationOwner = users.FirstOrDefault(u => u.Id == req.RecipientUserId);
+
+            if (carOwner is null || stationOwner is null)
+                return new ApiResponse<object>("One or both users not found", status: false);
+
+            var fees = (double)req.VoltyksFees;
+
+            // التحويل: + لصاحب العربية، - لصاحب المحطة
+            carOwner.Wallet = (carOwner.Wallet ?? 0) + fees;
+            stationOwner.Wallet = (stationOwner.Wallet ?? 0) - fees;
+
+            using var tx = await _db.Database.BeginTransactionAsync(ct);
+            try
+            {
+                _db.Update(carOwner);
+                _db.Update(stationOwner);
+                await _db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync(ct);
+                return new ApiResponse<object>("Failed to update wallets", status: false, errors: new() { ex.Message });
+            }
+
+            var data = new
+            {
+                requestId = req.Id,
+                feesTransferred = req.VoltyksFees,
+                userId = carOwner.Id,
+                userNewWallet = carOwner.Wallet,
+                recipientUserId = stationOwner.Id,
+                recipientNewWallet = stationOwner.Wallet
+            };
+            return new ApiResponse<object>(data, "Wallets updated successfully", true);
+        }
+
         private async Task<ChargingRequestEntity?> GetAndUpdateRequestAsync(TransRequest dto, string newStatus)
         {
             var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()

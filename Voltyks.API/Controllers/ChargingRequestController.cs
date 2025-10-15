@@ -74,7 +74,13 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
 
+        [HttpPost("voltyksFeesForRequest")]
+        public async Task<IActionResult> VoltyksFeesForRequest([FromBody] RequestIdDto dto, CancellationToken ct)
+            => Ok(await _service.ChargingRequestService.GetVoltyksFeesAsync(dto, ct));
 
-       
+        [HttpPost("transfer-fees")]
+        public async Task<IActionResult> TransferFees([FromBody] RequestIdDto dto, CancellationToken ct)
+            => Ok(await _service.ChargingRequestService.TransferVoltyksFeesAsync(dto, ct));
+
     }
 }

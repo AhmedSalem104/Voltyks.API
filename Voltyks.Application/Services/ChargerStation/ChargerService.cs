@@ -212,13 +212,19 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                     .Append(" ") // إضافة مسافة بين الاسم الأول واسم العائلة
                     .Append(charger.User.LastName)
                     .ToString(),
+                PhoneNumber = charger.User.PhoneNumber,
                 Rating = charger.AverageRating,
                 RatingCount = charger.RatingCount,
                 Area = charger.Address?.Area,
                 Street = charger.Address?.Street,
+                BuildingNumber = charger.Address.BuildingNumber,
+                Latitude = request.UserLat,
+                Longitude = request.UserLon,
                 Protocol = charger.Protocol?.Name,
                 Capacity = charger.Capacity != null ? new CapacityDto { KW = charger.Capacity.kw } : null,
-                PricePerHour = charger.PriceOption != null ? $"{charger.PriceOption.Value} EGP" : "N/A",
+                PricePerHour = charger.PriceOption != null ? charger.PriceOption.Value : 0m,
+
+
                 AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available"
             };
 
@@ -300,7 +306,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             double chargerCapacity = charger.Capacity.kw;
             double sessionDurationHr = kwNeed / chargerCapacity;
             double estimatedCost = EstimatePrice(sessionDurationHr, charger.PriceOption.Value);
-            dto.PriceEstimated = $"{estimatedCost} EGP";
+            dto.PriceEstimated = estimatedCost;
         }
         private double CalculateDistanceInKm(double lat1, double lon1, double lat2, double lon2)
         {
@@ -318,11 +324,11 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         {
             return deg * (Math.PI / 180);
         }
-        private string EstimateTime(double distanceKm)
+        private double EstimateTime(double distanceKm)
         {
             double averageSpeedKmPerMin = 0.1; // 6 كم/ساعة = مشي تقريبًا
             int minutes = (int)Math.Ceiling(distanceKm / averageSpeedKmPerMin);
-            return $"{minutes} Mins";
+            return minutes;
         }
         private double EstimatePrice(double sessionDurationHr, decimal pricePerHour)
         {

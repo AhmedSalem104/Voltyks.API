@@ -29,6 +29,7 @@ using Voltyks.Application.Interfaces;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
+using static System.Net.WebRequestMethods;
 
 namespace Voltyks.Application.Services.Auth
 {
@@ -44,7 +45,41 @@ namespace Voltyks.Application.Services.Auth
 
         ) : IAuthService
     {
+        public async Task<ApiResponse<object>> ToggleCurrentUserBanAsync(CancellationToken ct = default)
+        {
+            // 1) هات الـ userId من الـ Claims
+            var userId = GetCurrentUserId();
 
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<object>("Unauthorized", status: false, errors: new() { "No current user context." });
+
+            // 2) هات المستخدم
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null)
+                return new ApiResponse<object>("User not found", status: false, errors: new() { "Invalid user." });
+
+            // 3) Toggle
+            user.IsBanned = !user.IsBanned;
+
+            // اختياري: لما يتحظر ابطّل availability وامسح refresh token
+            if (user.IsBanned)
+            {
+                user.IsAvailable = false;
+                user.RefreshToken = null;
+            }
+
+            var result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                var errs = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<object>("Failed to update user", status: false, errors: errs);
+            }
+
+            var msg = user.IsBanned ? "User banned successfully" : "User unbanned successfully";
+            var data = new { userId = user.Id, isBanned = user.IsBanned };
+
+            return new ApiResponse<object>(data, message: msg, status: true);
+        }  
         public async Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId)
         {
             if (!IsAuthorized(userId))
@@ -98,6 +133,9 @@ namespace Voltyks.Application.Services.Auth
                     Message = ErrorMessages.UserNotFound
                 };
             }
+            // 🚫 جديد: منع دخول المحظورين
+            if (user.IsBanned)
+                return BannedResponse<UserLoginResultDto>();
 
             var isPasswordValid = await userManager.CheckPasswordAsync(user, model.Password);
             if (!isPasswordValid)
@@ -165,6 +203,18 @@ namespace Voltyks.Application.Services.Auth
             }
             model.PhoneNumber = normalizedPhone;
 
+
+            // 🚫 جديد: لو فيه حساب محظور بنفس الإيميل → امنع التسجيل
+            var bannedByEmail = await userManager.Users
+                .AnyAsync(u => u.Email == model.Email && u.IsBanned);
+            if (bannedByEmail)
+                return BannedResponse<UserRegisterationResultDto>("Email is associated with a banned account.");
+
+            // 🚫 جديد: لو فيه حساب محظور بنفس رقم الموبايل → امنع التسجيل
+            var bannedByPhone = await userManager.Users
+                .AnyAsync(u => u.PhoneNumber == model.PhoneNumber && u.IsBanned);
+            if (bannedByPhone)
+                return BannedResponse<UserRegisterationResultDto>("Phone number is associated with a banned account.");
 
 
             var emailCheck = await CheckEmailExistsAsync(new EmailDto { Email = model.Email });
@@ -240,6 +290,9 @@ namespace Voltyks.Application.Services.Auth
                     };
                 }
 
+                if (user.IsBanned)
+                    return BannedResponse<string>();
+
                 var redisStoredToken = await redisService.GetAsync($"refresh_token:{user.Id}");
                 if (redisStoredToken != dto.RefreshToken)
                 {
@@ -278,36 +331,32 @@ namespace Voltyks.Application.Services.Auth
         }
         public async Task<ApiResponse<List<string>>> CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
         {
-            //var errors = new List<string>();
-
             if (string.IsNullOrWhiteSpace(phoneNumberDto.PhoneNumber))
-                return new ApiResponse<List<string>>( ErrorMessages.PhoneRequired) { Status = false };
-
+                return new ApiResponse<List<string>>(ErrorMessages.PhoneRequired) { Status = false };
             else if (!IsPhoneNumber(phoneNumberDto.PhoneNumber))
                 return new ApiResponse<List<string>>(ErrorMessages.InvalidPhoneFormat) { Status = false };
+
             string normalizedPhone;
-            try
-            {
-                normalizedPhone = NormalizePhoneToInternational(phoneNumberDto.PhoneNumber);
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse<List<string>>(ex.Message) { Status = false };
-            }
+            try { normalizedPhone = NormalizePhoneToInternational(phoneNumberDto.PhoneNumber); }
+            catch (Exception ex) { return new ApiResponse<List<string>>(ex.Message) { Status = false }; }
 
             var existingPhoneUser = await userManager.Users
                 .FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
 
             if (existingPhoneUser is not null)
-                return new ApiResponse<List<string>>(ErrorMessages.PhoneAlreadyExists) { Status = false };
+            {
+                // 🚫 جديد: لو الحساب محظور
+                if (existingPhoneUser.IsBanned)
+                    return BannedResponse<List<string>>("Phone number belongs to a banned account.");
 
+                // كان عندك قبل كده “موجود”
+                return new ApiResponse<List<string>>(ErrorMessages.PhoneAlreadyExists) { Status = false };
+            }
 
             return new ApiResponse<List<string>>(SuccessfulMessage.PhoneIsAvailable) { Status = true };
         }
         public async Task<ApiResponse<List<string>>> CheckEmailExistsAsync(EmailDto emailDto)
         {
-            //var errors = new List<string>();
-
             if (string.IsNullOrWhiteSpace(emailDto.Email))
                 return new ApiResponse<List<string>>(ErrorMessages.EmailRequired) { Status = false };
             else if (!IsEmail(emailDto.Email))
@@ -317,9 +366,13 @@ namespace Voltyks.Application.Services.Auth
                 .FirstOrDefaultAsync(e => e.Email == emailDto.Email);
 
             if (existingEmailUser is not null)
-                return new ApiResponse<List<string>>(ErrorMessages.EmailAlreadyExists) { Status = false };
+            {
+                // 🚫 جديد: لو الحساب محظور
+                if (existingEmailUser.IsBanned)
+                    return BannedResponse<List<string>>("Email belongs to a banned account.");
 
-          
+                return new ApiResponse<List<string>>(ErrorMessages.EmailAlreadyExists) { Status = false };
+            }
 
             return new ApiResponse<List<string>>(null, SuccessfulMessage.EmailIsAvailable) { Status = true };
         }
@@ -440,6 +493,31 @@ namespace Voltyks.Application.Services.Auth
                 list,
                 SuccessfulMessage.DataRetrievedSuccessfully,
                 true
+            );
+        }
+        public async Task<ApiResponse<double?>> GetMyWalletAsync(CancellationToken ct = default)
+        {
+            var userId =
+                httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<double?>("Unauthorized", status: false, errors: new() { "No current user context." });
+
+            // أسرع استعلام مباشر لقيمة الـ Wallet
+            var wallet = await userManager.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.Wallet)   // double?
+                .FirstOrDefaultAsync(ct);
+
+            // لو مش لاقي مستخدم (نادرًا)
+            if (wallet == default && !await userManager.Users.AnyAsync(u => u.Id == userId, ct))
+                return new ApiResponse<double?>("User not found", status: false);
+
+            return new ApiResponse<double?>(
+                data: wallet,                    // ممكن تكون null لو لسه ما اتحددتش
+                message: "Wallet fetched successfully",
+                status: true
             );
         }
 
@@ -741,104 +819,6 @@ namespace Voltyks.Application.Services.Auth
              )).ToList();
 
         }
-        //private async Task<List<ChargingRequestEntity>> GetChargerRequestsAsync(string userId)
-        //{
-        //    var chargerRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
-        //    return (await chargerRepo.GetAllWithIncludeAsync(
-        //        c => c.UserId == userId, // تصفية حسب UserId
-        //        false,
-        //        c => c.Charger // إدراج العلاقة مع Charger
-        //    )).ToList();
-        //}
-        //private async Task<List<ChargingRequestEntity>> GetChargerRequestsAsync(string userId)
-        //{
-        //    var chargerRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
-
-        //    var userRequests = await chargerRepo.GetAllWithIncludeAsync(
-        //        c => c.UserId == userId,  
-        //        false,
-        //        c => c.Charger 
-        //    );
-
-        //    var simplifiedRequests = userRequests.Select(req => new ChargingRequestEntity
-        //    {
-        //        Id = req.Id,
-        //        UserId = req.UserId,
-        //        Status = req.Status,
-        //        RequestedAt = req.RequestedAt,
-        //        ChargerId = req.ChargerId
-        //    }).ToList();
-
-        //    return simplifiedRequests;
-        //}
-        //public async Task<List<ChargingRequestDetailsDto>> GetChargerRequestsAsync(string userId)
-        //{
-        //    var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
-
-        //    var requests = (await repo.GetAllWithIncludeAsync(
-        //                 c => c.UserId == userId,
-        //                 false,
-        //                 c => c.CarOwner,
-        //                 c => c.Charger,
-        //                 c => c.Charger.User,
-        //                 c => c.Charger.Address,
-        //                 c => c.Charger.Protocol,
-        //                 c => c.Charger.Capacity,
-        //                 c => c.Charger.PriceOption
-        //             )).ToList();   // 👈 هنا
-
-
-        //    var list = _mapper.Map<List<ChargingRequestDetailsDto>>(requests);
-
-        //    // اكمل البيانات المحسوبة
-        //    for (int i = 0; i < list.Count; i++)
-        //    {
-        //        var req = requests[i];
-        //        var dto = list[i];
-
-        //        // حساب المسافة والوقت
-        //        if (req.Latitude != 0 && req.Longitude != 0
-        //                  && req.Charger?.Address?.Latitude != 0
-        //                 && req.Charger?.Address?.Longitude != 0)
-        //        {
-        //            dto.DistanceInKm = CalculateDistance(
-        //                req.Latitude,
-        //                req.Longitude,
-        //                req.Charger.Address.Latitude,
-        //                req.Charger.Address.Longitude
-        //            );
-
-        //            dto.EstimatedArrival = Math.Ceiling((dto.DistanceInKm / 40.0) * 60.0);
-        //        }
-
-
-        //        // السعر
-        //        if (req.Charger?.PriceOption != null && req.Charger.Capacity?.kw > 0)
-        //        {
-        //            dto.EstimatedPrice = req.Charger.PriceOption.Value
-        //                                 * (decimal)req.KwNeeded
-        //                                 / (decimal)req.Charger.Capacity.kw;
-        //        }
-
-        //        // بيانات السيارة
-        //        var vehicles = await _vehicleService.GetVehiclesByUserIdAsync(req.CarOwner.Id);
-        //        var vehicle = vehicles?.Data?.FirstOrDefault();
-        //        if (vehicle != null)
-        //        {
-        //            dto.VehicleBrand = vehicle.BrandName;
-        //            dto.VehicleModel = vehicle.ModelName;
-        //            dto.VehicleColor = vehicle.Color;
-        //            dto.VehiclePlate = vehicle.Plate;
-        //            dto.VehicleCapacity = vehicle.Capacity;
-        //        }
-
-        //        // عنوان السيارة (اختياري)
-        //        dto.VehicleArea = "N/A";
-        //        dto.VehicleStreet = "N/A";
-        //    }
-
-        //    return list;
-        //}
         private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
         {
             double R = 6371; // Radius of earth in KM
@@ -915,6 +895,11 @@ namespace Voltyks.Application.Services.Auth
 
                 return (area, street);
             }
+        }
+        private static ApiResponse<T> BannedResponse<T>(string? message = null)
+        {
+            var msg = message ?? "This account is banned. Please contact support.";
+            return new ApiResponse<T>(msg, status: false, errors: new List<string> { msg });
         }
 
     }
