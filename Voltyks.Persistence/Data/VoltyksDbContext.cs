@@ -47,8 +47,13 @@ namespace Voltyks.Persistence.Data
 
         public DbSet<FeesConfig> feesConfigs { get; set; }
         public DbSet<TermsDocument>  termsDocuments{ get; set; }
+        public DbSet<RatingsHistory> RatingsHistory { get; set; }
+        public DbSet<Process> Process { get; set; }
+
+        public DbSet<UserReport> UserReports { get; set; }
 
 
+        public DbSet<UsersBanned> UsersBanneds { get; set; }
 
 
     }

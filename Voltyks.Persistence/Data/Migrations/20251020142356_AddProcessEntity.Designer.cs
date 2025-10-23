@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Voltyks.Persistence.Data;
 
@@ -11,9 +12,11 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    partial class VoltyksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251020142356_AddProcessEntity")]
+    partial class AddProcessEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -271,9 +274,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
-
-                    b.Property<bool>("UserShouldBeBanned")
-                        .HasColumnType("bit");
 
                     b.Property<int?>("Vcode")
                         .HasColumnType("int");
@@ -559,7 +559,7 @@ namespace Voltyks.Persistence.Data.Migrations
                             Id = 1,
                             MinimumFee = 40m,
                             Percentage = 10m,
-                            UpdatedAt = new DateTime(2025, 10, 22, 10, 9, 36, 37, DateTimeKind.Utc).AddTicks(3701),
+                            UpdatedAt = new DateTime(2025, 10, 20, 14, 23, 53, 569, DateTimeKind.Utc).AddTicks(3036),
                             UpdatedBy = "system"
                         });
                 });
@@ -1052,36 +1052,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.ToTable("TermsDocuments", (string)null);
                 });
 
-            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.UserReport", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsResolved")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("ProcessId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ReportDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProcessId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserReports");
-                });
-
             modelBuilder.Entity("Voltyks.Persistence.Entities.Main.UserType", b =>
                 {
                     b.Property<int>("Id")
@@ -1096,33 +1066,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("UserTypes");
-                });
-
-            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.UsersBanned", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime?>("BanExpiryDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("BanReason")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("BannedDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("UsersBanneds");
                 });
 
             modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Vehicle", b =>
@@ -1370,25 +1313,6 @@ namespace Voltyks.Persistence.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("ChargerRequest");
-                });
-
-            modelBuilder.Entity("Voltyks.Persistence.Entities.Main.UserReport", b =>
-                {
-                    b.HasOne("Voltyks.Persistence.Entities.Main.Process", "Process")
-                        .WithMany()
-                        .HasForeignKey("ProcessId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Voltyks.Persistence.Entities.Identity.AppUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Process");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Voltyks.Persistence.Entities.Main.Vehicle", b =>

@@ -14,9 +14,11 @@ using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Paymob;
+using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Interfaces.Terms;
+using Voltyks.Application.Interfaces.UserReport;
 using Voltyks.Application.Services;
 using Voltyks.Application.Services.Auth;
 using Voltyks.Application.Services.ChargingRequest;
@@ -24,9 +26,11 @@ using Voltyks.Application.Services.FeesConfig;
 using Voltyks.Application.Services.Paymob;
 using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.Services.Terms;
+using Voltyks.Application.Services.UserReport;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.DTOs.Paymob.Options;
+using Voltyks.Core.DTOs.Processes;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
@@ -50,7 +54,7 @@ namespace Voltyks.Application.ServicesManager
         ,IOptions<PaymobOptions> _opt
         ,ILogger<PaymobService> _log
         , IPaymobAuthTokenProvider tokenProvider,
-        IFeesConfigService feesConfigService) : IServiceManager
+    IFeesConfigService feesConfigService) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context, vehicleService);
@@ -63,6 +67,11 @@ namespace Voltyks.Application.ServicesManager
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
         public ITermsService TermsService { get; } = new TermsService(context);
+        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor);
+        public IUserReportService UserReportService  { get; } = new UserReportService(context,mapper);
+
+
+
 
 
     }

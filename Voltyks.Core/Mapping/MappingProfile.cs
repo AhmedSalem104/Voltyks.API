@@ -5,11 +5,14 @@ using Voltyks.Core.DTOs.Charger;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.DTOs.FeesConfig;
 using Voltyks.Core.DTOs.ModelDTOs;
+using Voltyks.Core.DTOs.Report;
 using Voltyks.Core.DTOs.VehicleDTOs;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using ChargerDto = Voltyks.Core.DTOs.Charger.ChargerDto;
 using VehicleDto = Voltyks.Core.DTOs.VehicleDTOs.VehicleDto;
+using UserReportEntity = Voltyks.Persistence.Entities.Main.UserReport;
+
 
 namespace Voltyks.Core.Mapping
 {
@@ -132,6 +135,10 @@ namespace Voltyks.Core.Mapping
             CreateMap<FeesConfigUpdateDto, FeesConfig>()
                 .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
                 .ForMember(dest => dest.UpdatedBy, opt => opt.Ignore());
+
+
+
+            CreateMap<UserReportEntity, ReportDto>();
 
         }
     }

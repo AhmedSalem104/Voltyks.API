@@ -97,7 +97,7 @@ namespace Voltyks.Presentation
         [HttpPost("Logout")]
         public async Task<IActionResult> Logout([FromBody] TokenDto tokenDto)
         {
-          
+
 
             var result = await serviceManager.AuthService.LogoutAsync(tokenDto);
 
@@ -200,6 +200,8 @@ namespace Voltyks.Presentation
         [HttpGet("wallet")]
         public async Task<IActionResult> GetMyWallet(CancellationToken ct)
       => Ok(await serviceManager.AuthService.GetMyWalletAsync(ct));
+
+
 
     }
 }

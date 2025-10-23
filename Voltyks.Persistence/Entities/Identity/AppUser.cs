@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -28,7 +29,22 @@ namespace Voltyks.Persistence.Entities.Identity
         public double? Wallet { get; set; }
 
 
+        public string? CurrentActivitiesJson { get; set; } = "[]";
 
+
+        [NotMapped]
+        public ICollection<int> CurrentActivities
+        {
+            get => string.IsNullOrWhiteSpace(CurrentActivitiesJson)
+                    ? new List<int>()
+                    : System.Text.Json.JsonSerializer.Deserialize<List<int>>(CurrentActivitiesJson) ?? new List<int>();
+            set => CurrentActivitiesJson = System.Text.Json.JsonSerializer.Serialize(value ?? new List<int>());
+        }
+
+        public bool UserShouldBeBanned { get; set; } = false;
+
+        public double Rating { get; set; } = 0;
+        public int RatingCount { get; set; } = 0;
         // Relations
         public ICollection<Charger> Chargers { get; set; } = new List<Charger>();
         public ICollection<DeviceToken> DeviceTokens { get; set; } = new List<DeviceToken>();

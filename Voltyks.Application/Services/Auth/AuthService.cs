@@ -79,7 +79,7 @@ namespace Voltyks.Application.Services.Auth
             var data = new { userId = user.Id, isBanned = user.IsBanned };
 
             return new ApiResponse<object>(data, message: msg, status: true);
-        }  
+        }
         public async Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId)
         {
             if (!IsAuthorized(userId))
@@ -89,10 +89,28 @@ namespace Voltyks.Application.Services.Auth
             if (user == null)
                 return UserNotFoundResponse();
 
+            // التحقق من حالة الحظر
+            var bannedInfo = await context.UsersBanneds.FirstOrDefaultAsync(b => b.UserId == userId);
+            if (bannedInfo != null)
+            {
+                // إذا كان الحظر ساريًا
+                if (bannedInfo.BanExpiryDate.HasValue && bannedInfo.BanExpiryDate.Value > DateTime.UtcNow)
+                {
+                    return new ApiResponse<UserDetailsDto>("User is banned until " + bannedInfo.BanExpiryDate.Value.ToString("yyyy-MM-dd"), false);
+                }
+
+                // تحديث IsBanned و UserShouldBeBanned
+                user.IsBanned = true;
+                user.UserShouldBeBanned = true;
+                context.Update(user);
+                await context.SaveChangesAsync();
+            }
+
+            // استرجاع التفاصيل الإضافية للمركبات والمحطات
             var vehicles = await GetUserVehiclesAsync(userId);
             var chargers = await GetUserChargersAsync(userId);
-            //var Requests = await GetChargerRequestsAsync(userId);
-            var result =  BuildUserDetailsDto(user, vehicles, chargers);
+
+            var result = BuildUserDetailsDto(user, vehicles, chargers);
             return new ApiResponse<UserDetailsDto>(result, SuccessfulMessage.UserDataRetrievedSuccessfully, true);
         }
         public async Task<ApiResponse<bool>> ToggleUserAvailabilityAsync()
@@ -898,7 +916,7 @@ namespace Voltyks.Application.Services.Auth
         }
         private static ApiResponse<T> BannedResponse<T>(string? message = null)
         {
-            var msg = message ?? "This account is banned. Please contact support.";
+            var msg = message ?? "user_Is_Banned";
             return new ApiResponse<T>(msg, status: false, errors: new List<string> { msg });
         }
 

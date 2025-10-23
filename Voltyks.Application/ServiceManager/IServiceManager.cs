@@ -10,8 +10,10 @@ using Voltyks.Application.Interfaces.ChargerStation;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Paymob;
+using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Interfaces.Terms;
+using Voltyks.Application.Interfaces.UserReport;
 using Voltyks.Application.Services.ChargingRequest;
 
 namespace Voltyks.Application.ServicesManager.ServicesManager
@@ -28,8 +30,8 @@ namespace Voltyks.Application.ServicesManager.ServicesManager
         IPaymobService PaymobService  { get; }
         IFeesConfigService FeesConfigService { get; }
         ITermsService TermsService { get; }
-
-
+        IProcessesService ProcessesService  { get; }
+        IUserReportService UserReportService { get; }
 
     }
 }
