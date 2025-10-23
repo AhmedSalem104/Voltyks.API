@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Voltyks.Persistence.Data;
 
@@ -11,9 +12,11 @@ using Voltyks.Persistence.Data;
 namespace Voltyks.Persistence.Data.Migrations
 {
     [DbContext(typeof(VoltyksDbContext))]
-    partial class VoltyksDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251023112044_ChangeProcessConfigration")]
+    partial class ChangeProcessConfigration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -559,7 +562,7 @@ namespace Voltyks.Persistence.Data.Migrations
                             Id = 1,
                             MinimumFee = 40m,
                             Percentage = 10m,
-                            UpdatedAt = new DateTime(2025, 10, 23, 11, 59, 23, 358, DateTimeKind.Utc).AddTicks(4077),
+                            UpdatedAt = new DateTime(2025, 10, 23, 11, 20, 43, 8, DateTimeKind.Utc).AddTicks(3926),
                             UpdatedBy = "system"
                         });
                 });
@@ -1064,10 +1067,6 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     b.Property<int>("ProcessId")
                         .HasColumnType("int");
-
-                    b.Property<string>("ReportContent")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("ReportDate")
                         .HasColumnType("datetime2");

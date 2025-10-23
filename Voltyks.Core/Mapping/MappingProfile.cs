@@ -139,6 +139,7 @@ namespace Voltyks.Core.Mapping
 
 
             CreateMap<UserReportEntity, ReportDto>();
+           // CreateMap<ReportDto, ReportDataDto>().ReverseMap();
 
         }
     }

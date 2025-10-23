@@ -13,14 +13,14 @@ namespace Voltyks.Persistence.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<Process> b)
         {
-            b.ToTable("Processes");
+            b.ToTable("Process");
             b.HasKey(x => x.Id);
 
             b.Property(x => x.VehicleOwnerId).IsRequired();
             b.Property(x => x.ChargerOwnerId).IsRequired();
             b.Property(x => x.Status).HasConversion<int>();
 
-            b.HasIndex(x => x.ChargerRequestId).IsUnique(); // 1:1 مع الطلب
+            //b.HasIndex(x => x.ChargerRequestId).IsUnique(); // 1:1 مع الطلب
         }
     }
 }

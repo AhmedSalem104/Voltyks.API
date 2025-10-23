@@ -37,7 +37,9 @@ namespace Voltyks.Infrastructure
         }
         public async Task<TEntity?> GetAsync(TKey id)
         {
-            return await _context.Set<TEntity>().FindAsync(id);
+            var x = await _context.Set<TEntity>().FindAsync(id);
+            Console.WriteLine(x);
+            return x ;
         }
         public async Task<IEnumerable<TEntity>> GetAllWithIncludeAsync(
         Expression<Func<TEntity, bool>>? filter = null,

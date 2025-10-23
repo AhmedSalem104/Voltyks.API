@@ -9,11 +9,11 @@ namespace Voltyks.Core.DTOs.Report
     public class ReportDto
     {
         public int ProcessId { get; set; }
-        public string UserId { get; set; }
-        public DateTime ReportDate { get; set; } = DateTime.UtcNow;
-        public bool IsResolved { get; set; }
+        public string? UserId { get; set; }
+        public DateTime? ReportDate { get; set; } = DateTime.Now;
+        public bool? IsResolved { get; set; }
         public UserDetailDto UserDetails { get; set; }
-        public int ReportId { get; set; }
+        public string? ReportContent { get; set; }
     }
 
 }

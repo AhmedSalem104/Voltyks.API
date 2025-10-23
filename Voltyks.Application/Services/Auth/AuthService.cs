@@ -105,6 +105,7 @@ namespace Voltyks.Application.Services.Auth
                 context.Update(user);
                 await context.SaveChangesAsync();
             }
+            await HandleUserBanAsync(user);
 
             // استرجاع التفاصيل الإضافية للمركبات والمحطات
             var vehicles = await GetUserVehiclesAsync(userId);
@@ -919,6 +920,26 @@ namespace Voltyks.Application.Services.Auth
             var msg = message ?? "user_Is_Banned";
             return new ApiResponse<T>(msg, status: false, errors: new List<string> { msg });
         }
+        private async Task HandleUserBanAsync(AppUser user)
+        {
+            // التحقق إذا كان المستخدم محظورًا في جدول UsersBanned
+            var bannedInfo = await context.UsersBanneds.FirstOrDefaultAsync(b => b.UserId == user.Id);
 
+            if (bannedInfo != null)
+            {
+                // إذا كان الحظر ساريًا
+                if (bannedInfo.BanExpiryDate.HasValue && bannedInfo.BanExpiryDate.Value > DateTime.UtcNow)
+                {
+                    // إرجاع رسالة تفيد أن المستخدم محظور حتى تاريخ معين
+                    throw new InvalidOperationException($"User is banned until {bannedInfo.BanExpiryDate.Value.ToString("yyyy-MM-dd")}");
+                }
+
+                // إذا انتهت فترة الحظر، نقوم بتحديث حالة الحظر
+                user.IsBanned = true;
+                user.UserShouldBeBanned = true;
+                context.Update(user);
+                await context.SaveChangesAsync();
+            }
+        }
     }
 }

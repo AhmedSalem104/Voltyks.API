@@ -6,11 +6,9 @@ using System.Threading.Tasks;
 
 namespace Voltyks.Core.DTOs.Report
 {
-    public class UserDetailDto
+    public class ReportDataDto
     {
-        public string? FullName { get; set; }
-        public string? Email { get; set; }
-        public string? Phone { get; set; }
+        public int ProcessId { get; set; }
+        public string? ReportContent { get; set; }
     }
-
 }

@@ -18,7 +18,7 @@ namespace Voltyks.API.Controllers
 
         // Endpoint لإنشاء تقرير جديد
         [HttpPost("create")]
-        public async Task<IActionResult> CreateReport([FromBody] ReportDto dto, CancellationToken ct = default)
+        public async Task<IActionResult> CreateReport([FromBody] ReportDataDto dto, CancellationToken ct = default)
         {
             var result = await _serviceManager.UserReportService.CreateReportAsync(dto, ct);
             return Ok(result);

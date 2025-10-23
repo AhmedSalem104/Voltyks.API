@@ -10,10 +10,8 @@ namespace Voltyks.Persistence.Entities.Main
     public enum ProcessStatus { PendingCompleted = 0, Completed = 1, Aborted = 2 }
 
     public class Process :BaseEntity<int>
-    {
-        
+    {        
         public int ChargerRequestId { get; set; }
-
         public string VehicleOwnerId { get; set; } = default!;
         public string ChargerOwnerId { get; set; } = default!;
 
