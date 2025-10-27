@@ -45,11 +45,18 @@ namespace Voltyks.API.Controllers
 
         [HttpPut("RejectRequest")]
         [Authorize]
-        public async Task<IActionResult> RejectRequest([FromBody] List<RequestIdDto> dto)
+        public async Task<IActionResult> RejectRequest([FromBody] RejectRequestDto dto)
         {
             var result = await _service.ChargingRequestService.RejectRequestsAsync(dto);
             return Ok(result);
         }
+        //[HttpPut("RejectRequest")]
+        //[Authorize]
+        //public async Task<IActionResult> RejectRequest([FromBody] List<RequestIdDto> dto)
+        //{
+        //    var result = await _service.ChargingRequestService.RejectRequestsAsync(dto);
+        //    return Ok(result);
+        //}
 
         //[HttpPut("RejectRequest")]
         //[Authorize]

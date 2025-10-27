@@ -218,8 +218,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 Area = charger.Address?.Area,
                 Street = charger.Address?.Street,
                 BuildingNumber = charger.Address.BuildingNumber,
-                Latitude = request.UserLat,
-                Longitude = request.UserLon,
+                Latitude = charger.Address.Latitude,
+                Longitude = charger.Address.Longitude,
                 Protocol = charger.Protocol?.Name,
                 Capacity = charger.Capacity != null ? new CapacityDto { KW = charger.Capacity.kw } : null,
                 PricePerHour = charger.PriceOption != null ? charger.PriceOption.Value : 0m,
@@ -244,6 +244,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                     (c.ProtocolId == searchDto.ProtocolId ||
                      (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
                      c.User.IsAvailable == true &&
+                     c.User.IsBanned == false &&
                      c.User.Id != currentUserId,
                false,
                c => c.Capacity,

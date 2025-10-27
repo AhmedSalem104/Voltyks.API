@@ -61,7 +61,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 // 2) جهّز بيانات الإشعار
                 var recipientUserId = charger.UserId; // صاحب المحطة
                 var title = "New Charging Request 🚗";
-                var body = $"Driver {userId} requested to charge at your station.";
+                var body = $"Driver requested to charge at your station.";
                 var notificationType = NotificationTypes.VehicleOwner_RequestCharger; // ثوابت
                 var userTypeId = (int)NotificationUserType.ChargerOwner;              // 1
 
@@ -225,26 +225,30 @@ namespace Voltyks.Application.Services.ChargingRequest
         //        return new ApiResponse<List<NotificationResultDto>>(null, ex.Message, false);
         //    }
         //}
-        public async Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(List<RequestIdDto> requestIds)
+        public async Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(RejectRequestDto dto)
         {
             try
             {
+                var requestIds = dto?.RequestIds;
                 if (requestIds == null || requestIds.Count == 0)
                     return new ApiResponse<List<NotificationResultDto>>(null, "No requests provided", false);
 
                 var results = new List<NotificationResultDto>();
 
-                foreach (var dto in requestIds)
+                foreach (var reqDto in requestIds)
                 {
                     var request = await _db.Set<ChargingRequestEntity>()
-                        .FirstOrDefaultAsync(r => r.Id == dto.RequestId);
+                        .Include(r => r.CarOwner)
+                        .Include(r => r.Charger)
+                            .ThenInclude(c => c.User)
+                        .FirstOrDefaultAsync(r => r.Id == reqDto.RequestId);
 
                     if (request == null)
                         continue;
 
                     // Update request status to rejected
                     request.Status = "Rejected";
-                    _db.Update(request);
+                    _db.Entry(request).Property(r => r.Status).IsModified = true;
 
                     var recipientUserId = request.CarOwner?.Id;
                     if (string.IsNullOrWhiteSpace(recipientUserId))
@@ -267,6 +271,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                     if (sent != null)
                         results.Add(sent);
                 }
+
+                // نفذ الحفظ مرة واحدة بعد إنهاء المعالجة
+                await _db.SaveChangesAsync();
 
                 return new ApiResponse<List<NotificationResultDto>>(results, "Charging requests processed", true);
             }

@@ -16,7 +16,7 @@ namespace Voltyks.Application.Interfaces.ChargingRequest
         Task<ApiResponse<bool>> RegisterDeviceTokenAsync(DeviceTokenDto token);
         Task<ApiResponse<NotificationResultDto>> AcceptRequestAsync(TransRequest dto);
         // Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(List<TransRequest> dtos);
-        Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(List<RequestIdDto> requestIds);
+        Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(RejectRequestDto requestIds);
 
         Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto);
         Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto);
