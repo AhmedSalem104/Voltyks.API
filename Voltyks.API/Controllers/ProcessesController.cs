@@ -30,5 +30,13 @@ namespace Voltyks.API.Controllers
         [HttpGet("my-activities")]
         public async Task<IActionResult> MyActivities(CancellationToken ct)
             => Ok(await _svc.ProcessesService.GetMyActivitiesAsync(ct));
+
+        [HttpPost("Get-Two-Way-Rating")]
+        [Authorize]
+        public async Task<IActionResult> GetRatingsSummary([FromBody] ProcessIdDTO dto, CancellationToken ct)
+            => Ok(await _svc.ProcessesService.GetRatingsSummaryAsync(dto.Id , ct));
+
+
+
     }
 }

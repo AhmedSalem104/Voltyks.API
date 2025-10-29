@@ -284,7 +284,7 @@ namespace Voltyks.Application.Services.Paymob
                 currency,
                 paymobOrderId,
                 txId,
-                DateTime.UtcNow
+                GetEgyptTime()
             );
 
             // 7) Response
@@ -610,7 +610,7 @@ namespace Voltyks.Application.Services.Paymob
         //            MerchantId = mid,
         //            ExpiryMonth = expMonth,
         //            ExpiryYear = expYear,
-        //            CreatedAt = DateTime.UtcNow
+        //            CreatedAt = GetEgyptTime()
         //        });
 
         //        _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, token={cardToken}", userId, last4, brand, cardToken);
@@ -804,7 +804,7 @@ namespace Voltyks.Application.Services.Paymob
                 MerchantId = mid,
                 ExpiryMonth = expMonth,
                 ExpiryYear = expYear,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = GetEgyptTime()
             });
 
             try
@@ -1479,7 +1479,7 @@ namespace Voltyks.Application.Services.Paymob
                 IsHmacValid = true,
                 IsValid = true,
                 HttpStatus = 200,
-                ReceivedAt = DateTime.UtcNow
+                ReceivedAt = GetEgyptTime()
             });
             await _uow.SaveChangesAsync();
         }
@@ -1490,7 +1490,7 @@ namespace Voltyks.Application.Services.Paymob
             if (order is null) return;
 
             order.Status = status;
-            order.UpdatedAt = DateTime.UtcNow;
+            order.UpdatedAt = GetEgyptTime();
 
             PaymentOrders.Update(order);
             await _uow.SaveChangesAsync();
@@ -1502,7 +1502,7 @@ namespace Voltyks.Application.Services.Paymob
             if (tx is null) return;
 
             mutate(tx);
-            tx.UpdatedAt = DateTime.UtcNow;
+            tx.UpdatedAt = GetEgyptTime();
 
             PaymentTransactions.Update(tx);
             await _uow.SaveChangesAsync();
@@ -1584,7 +1584,7 @@ namespace Voltyks.Application.Services.Paymob
 
             order.PaymobOrderId = paymobOrderId;
             order.Status = "OrderCreated";
-            order.UpdatedAt = DateTime.UtcNow;
+            order.UpdatedAt = GetEgyptTime();
             OrdersRepo.Update(order);
             await _uow.SaveChangesAsync();
 
@@ -1593,7 +1593,7 @@ namespace Voltyks.Application.Services.Paymob
         private bool IsKeyValid(PaymentOrder o)
             => !string.IsNullOrWhiteSpace(o.LastPaymentKey)
                && o.PaymentKeyExpiresAt.HasValue
-               && o.PaymentKeyExpiresAt.Value > DateTime.UtcNow.AddSeconds(30);
+               && o.PaymentKeyExpiresAt.Value > GetEgyptTime().AddSeconds(30);
         private async Task<string> GetOrCreatePaymentKeyAsync(PaymentOrder order, long amountCents, string currency, BillingData billing, int integrationId, int expirationSeconds = 3600,bool tokenize = false)
         {
             if (IsKeyValid(order))
@@ -1613,9 +1613,9 @@ namespace Voltyks.Application.Services.Paymob
             var data = await res.Content.ReadFromJsonAsync<PaymobPaymentKeyRes>();
             var key = data!.token;
             order.LastPaymentKey = key;
-            order.PaymentKeyExpiresAt = DateTime.UtcNow.AddSeconds(expirationSeconds);
+            order.PaymentKeyExpiresAt = GetEgyptTime().AddSeconds(expirationSeconds);
             order.Status = "Pending";
-            order.UpdatedAt = DateTime.UtcNow;
+            order.UpdatedAt = GetEgyptTime();
             OrdersRepo.Update(order);
             await _uow.SaveChangesAsync();
 
@@ -1672,7 +1672,7 @@ namespace Voltyks.Application.Services.Paymob
                     AmountCents = amountCents,
                     Currency = currency,
                     Status = "Pending",
-                    CreatedAt = DateTime.UtcNow,
+                    CreatedAt = GetEgyptTime(),
                     UserId = currentUserId
                 };
                 await OrdersRepo.AddAsync(order);
@@ -1681,7 +1681,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 order.AmountCents = amountCents;
                 order.Currency = currency;
-                order.UpdatedAt = DateTime.UtcNow;
+                order.UpdatedAt = GetEgyptTime();
 
                 if (order.UserId != currentUserId)
                     order.UserId = currentUserId;
@@ -1737,7 +1737,7 @@ namespace Voltyks.Application.Services.Paymob
                 IntegrationType = integrationType,
                 Status = status,
                 IsSuccess = isSuccess,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = GetEgyptTime()
             };
             await TxRepo.AddAsync(tx);
             await _uow.SaveChangesAsync();
@@ -1748,7 +1748,7 @@ namespace Voltyks.Application.Services.Paymob
         //    if (order != null)
         //    {
         //        order.Status = status;
-        //        order.UpdatedAt = DateTime.UtcNow;
+        //        order.UpdatedAt = GetEgyptTime();
         //        OrdersRepo.Update(order);
         //        await _uow.SaveChangesAsync();
         //    }
@@ -1759,7 +1759,7 @@ namespace Voltyks.Application.Services.Paymob
         //    if (tx != null)
         //    {
         //        mutate(tx);
-        //        tx.UpdatedAt = DateTime.UtcNow;
+        //        tx.UpdatedAt = GetEgyptTime();
         //        TxRepo.Update(tx);
         //        await _uow.SaveChangesAsync();
         //    }
@@ -1777,8 +1777,17 @@ namespace Voltyks.Application.Services.Paymob
             if (bool.TryParse(v, out var b)) return b;
             return v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase);
         }
+        public static DateTime GetEgyptTime()
+        {
+            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
+        }
 
-       
+
+
+
+
+
     }
 }
 

@@ -43,7 +43,7 @@ namespace Voltyks.Application.Services.FeesConfig
                     Id = SINGLE_ROW_ID,
                     MinimumFee = 40m,
                     Percentage = 10m,
-                    UpdatedAt = DateTime.UtcNow,
+                    UpdatedAt = GetEgyptTime(),
                     UpdatedBy = "system"
                 };
                 await repo.AddAsync(row);
@@ -66,7 +66,7 @@ namespace Voltyks.Application.Services.FeesConfig
             var row = await repo.GetFirstOrDefaultAsync(x => x.Id == SINGLE_ROW_ID);
 
             var updatedBy = GetCurrentUserName() ?? GetCurrentUserId() ?? "system";
-            var nowUtc = DateTime.UtcNow;
+            var nowUtc = GetEgyptTime();
 
             if (row is null)
             {
@@ -109,5 +109,15 @@ namespace Voltyks.Application.Services.FeesConfig
                 ?? u.FindFirst("user_id")?.Value
                 ?? u.FindFirst("id")?.Value;
         }
+
+        public static DateTime GetEgyptTime()
+        {
+            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
+        }
+
+
+
+
     }
 }

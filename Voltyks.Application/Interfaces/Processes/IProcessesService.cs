@@ -14,5 +14,7 @@ namespace Voltyks.Application.Interfaces.Processes
         Task<ApiResponse<object>> OwnerDecisionAsync(OwnerDecisionDto dto, CancellationToken ct = default);
         Task<ApiResponse<object>> SubmitRatingAsync(SubmitRatingDto dto, CancellationToken ct = default);
         Task<ApiResponse<object>> GetMyActivitiesAsync(CancellationToken ct = default);
+        Task<ApiResponse<object>> GetRatingsSummaryAsync(int Id, CancellationToken ct = default);
+
     }
 }

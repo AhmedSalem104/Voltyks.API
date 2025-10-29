@@ -94,7 +94,7 @@ namespace Voltyks.Application.Services.Auth
             if (bannedInfo != null)
             {
                 // إذا كان الحظر ساريًا
-                if (bannedInfo.BanExpiryDate.HasValue && bannedInfo.BanExpiryDate.Value > DateTime.UtcNow)
+                if (bannedInfo.BanExpiryDate.HasValue && bannedInfo.BanExpiryDate.Value > GetEgyptTime())
                 {
                     return new ApiResponse<UserDetailsDto>("User is banned until " + bannedInfo.BanExpiryDate.Value.ToString("yyyy-MM-dd"), false);
                 }
@@ -329,7 +329,7 @@ namespace Voltyks.Application.Services.Auth
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
-                    Expires = DateTime.UtcNow.AddMinutes(20),
+                    Expires = GetEgyptTime().AddMinutes(20),
                     MaxAge = TimeSpan.FromMinutes(20)
                 });
 
@@ -432,7 +432,7 @@ namespace Voltyks.Application.Services.Auth
 
             var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
             // ✅ نضيف الشرط هنا
-            var fiveMinutesAgo = DateTime.UtcNow.AddMinutes(-5);
+            var fiveMinutesAgo = GetEgyptTime().AddMinutes(-5);
 
             var requests = (await repo.GetAllWithIncludeAsync(
                 c => c.RecipientUserId == userId
@@ -543,7 +543,7 @@ namespace Voltyks.Application.Services.Auth
         // ---------- Private Methods ----------
         private async Task CleanupOldRequestsForUserAsync(string userId)
         {
-            var cutoff = DateTime.UtcNow.AddMinutes(-5);
+            var cutoff = GetEgyptTime().AddMinutes(-5);
 
             var reqRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
             var notifRepo = _unitOfWork.GetRepository<Notification, int>();
@@ -682,7 +682,7 @@ namespace Voltyks.Application.Services.Auth
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(jwtOptions.ExpiresInMinutes),
+                Expires = GetEgyptTime().AddMinutes(jwtOptions.ExpiresInMinutes),
                 SigningCredentials = creds,
                 Issuer = jwtOptions.Issuer,
                 Audience = jwtOptions.Audience
@@ -721,7 +721,7 @@ namespace Voltyks.Application.Services.Auth
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddMinutes(20)
+                Expires = GetEgyptTime().AddMinutes(20)
             });
 
             response.Cookies.Append("Refresh_Token", refreshToken, new CookieOptions
@@ -729,7 +729,7 @@ namespace Voltyks.Application.Services.Auth
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = GetEgyptTime().AddDays(7)
             });
         }
         private AppUser CreateUserFromRegisterModel(RegisterDTO model)
@@ -928,7 +928,7 @@ namespace Voltyks.Application.Services.Auth
             if (bannedInfo != null)
             {
                 // إذا كان الحظر ساريًا
-                if (bannedInfo.BanExpiryDate.HasValue && bannedInfo.BanExpiryDate.Value > DateTime.UtcNow)
+                if (bannedInfo.BanExpiryDate.HasValue && bannedInfo.BanExpiryDate.Value > GetEgyptTime())
                 {
                     // إرجاع رسالة تفيد أن المستخدم محظور حتى تاريخ معين
                     throw new InvalidOperationException($"User is banned until {bannedInfo.BanExpiryDate.Value.ToString("yyyy-MM-dd")}");
@@ -940,6 +940,12 @@ namespace Voltyks.Application.Services.Auth
                 context.Update(user);
                 await context.SaveChangesAsync();
             }
+        }
+
+        public static DateTime GetEgyptTime()
+        {
+            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
         }
     }
 }

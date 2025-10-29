@@ -639,7 +639,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return null;
 
             request.Status = newStatus;
-            request.RespondedAt = DateTime.UtcNow;
+            request.RespondedAt = GetEgyptTime();
 
             _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
             await _unitOfWork.SaveChangesAsync();
@@ -659,7 +659,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 Title = title,
                 Body = body,
                 IsRead = false,
-                SentAt = DateTime.UtcNow,
+                SentAt = GetEgyptTime(),
                 UserId = receiverUserId,
                 RelatedRequestId = relatedRequestId,
                 UserTypeId = userTypeId
@@ -767,7 +767,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             {
                 UserId = userId,
                 ChargerId = chargerId,
-                RequestedAt = DateTime.UtcNow,
+                RequestedAt = GetEgyptTime(),
                 Status = "pending",
                 KwNeeded = KwNeeded,
                 CurrentBatteryPercentage = CurrentBatteryPercentage,
@@ -814,7 +814,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (existing.UserId != userId)
                     existing.UserId = userId;
 
-                existing.RegisteredAt = DateTime.UtcNow;
+                existing.RegisteredAt = GetEgyptTime();
                 repo.Update(existing);
             }
             else
@@ -825,7 +825,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     Token = token,
                     UserId = userId,
                     RoleContext = "Owner",
-                    RegisteredAt = DateTime.UtcNow,
+                    RegisteredAt = GetEgyptTime(),
                 });
             }
 
@@ -843,7 +843,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (again.UserId != userId)
                     again.UserId = userId;
 
-                again.RegisteredAt = DateTime.UtcNow;
+                again.RegisteredAt = GetEgyptTime();
                 repo.Update(again);
                 await _unitOfWork.SaveChangesAsync();
                 return true;
@@ -901,7 +901,7 @@ namespace Voltyks.Application.Services.ChargingRequest
         //            r => r.RequestedAt != null,  // نتحقق إذا كان التاريخ موجودًا
         //            trackChanges: true))
         //        .AsEnumerable()  // إيقاف الترجمة إلى SQL
-        //        .Where(r => (DateTime.UtcNow - r.RequestedAt).TotalMinutes >= 5 && r.Status.ToLower() != "pending") // تنفيذ الحساب في الذاكرة
+        //        .Where(r => (GetEgyptTime() - r.RequestedAt).TotalMinutes >= 5 && r.Status.ToLower() != "pending") // تنفيذ الحساب في الذاكرة
         //        .ToList();
 
         //    if (!requestsToDelete.Any()) return false;
@@ -948,7 +948,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
         //    // 3) تصفية الطلبات حسب الشرطين: مر عليها أكثر من 5 دقائق والحالة ليست "pending"
         //    var requestsToDelete = userRequests
-        //        .Where(c => (DateTime.UtcNow - c.RequestedAt).TotalMinutes >= 5
+        //        .Where(c => (GetEgyptTime() - c.RequestedAt).TotalMinutes >= 5
         //                    || c.Status.ToLower() != "pending")
         //        .ToList();
 
@@ -992,6 +992,14 @@ namespace Voltyks.Application.Services.ChargingRequest
         //    // إرجاع true إذا تم الحذف بنجاح
         //    return true;
         //}
+        public static DateTime GetEgyptTime()
+        {
+            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
+        }
+
+
+
 
         private static decimal ApplyRules(decimal baseAmount, decimal percentage, decimal minimumFee)
         {
