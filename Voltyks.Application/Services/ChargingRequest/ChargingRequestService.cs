@@ -362,6 +362,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             }
         }
         public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
+
         {
             try
             {
@@ -405,9 +406,12 @@ namespace Voltyks.Application.Services.ChargingRequest
                         request.Charger.Address.Longitude
                     );
 
-                    double estimatedMinutes = (distanceKm / 40.0) * 60.0;
+                    double estimatedMinutes = (distanceKm / 60.0) * 60.0;
                     estimatedArrival =  Math.Ceiling(estimatedMinutes);
                 }
+
+
+
 
                 // (4) السعر التقديري
 
@@ -468,12 +472,12 @@ namespace Voltyks.Application.Services.ChargingRequest
                     KwNeeded = request.KwNeeded,
                     CurrentBatteryPercentage = request.CurrentBatteryPercentage,
                     CarOwnerName = $"{request.CarOwner.FirstName} {request.CarOwner.LastName}",
-
+                    CarOwnerPhone = request.CarOwner?.PhoneNumber ?? "N/A",
                     VehicleBrand = vehicle?.BrandName ?? "Unknown",
                     VehicleModel = vehicle?.ModelName ?? "Unknown",
                     VehicleColor = vehicle?.Color ?? "Unknown",
                     VehiclePlate = vehicle?.Plate ?? "Unknown",
-                    VehicleCapacity = vehicle?.Capacity ?? 0, 
+                    VehicleCapacity = vehicle?.Capacity ?? 0,
 
                     StationOwnerId = request.Charger.User.Id,
                     StationOwnerName = $"{request.Charger.User.FirstName} {request.Charger.User.LastName}",
@@ -489,7 +493,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     EstimatedArrival = estimatedArrival,
                     BaseAmount = request.BaseAmount,
                     VoltyksFees = request.VoltyksFees,
-                    EstimatedPrice = request.EstimatedPrice,
+                    //EstimatedPrice = request.EstimatedPrice,
+                    EstimatedPrice = estimatedPriceFinal,
                     DistanceInKm = distanceKm
 
                 };

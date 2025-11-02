@@ -17,6 +17,8 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         // Car Owner Info
         public string CarOwnerId { get; set; }
         public string CarOwnerName { get; set; }
+        public string CarOwnerPhone { get; set; }
+
 
         // Station Owner Info
         public string StationOwnerId { get; set; }

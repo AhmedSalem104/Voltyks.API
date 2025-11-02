@@ -201,15 +201,13 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             if (charger == null)
                 return new ApiResponse<ChargerDetailsDto>(ErrorMessages.ChargerNotFound, false);
 
-            //var dto = _mapper.Map<ChargerDetailsDto>(charger);
 
-             
 
             var dto = new ChargerDetailsDto
             {
                 FullName = new StringBuilder()
                     .Append(charger.User.FirstName)
-                    .Append(" ") // إضافة مسافة بين الاسم الأول واسم العائلة
+                    .Append(" ") 
                     .Append(charger.User.LastName)
                     .ToString(),
                 PhoneNumber = charger.User.PhoneNumber,
@@ -223,14 +221,14 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 Protocol = charger.Protocol?.Name,
                 Capacity = charger.Capacity != null ? new CapacityDto { KW = charger.Capacity.kw } : null,
                 PricePerHour = charger.PriceOption != null ? charger.PriceOption.Value : 0m,
-
+        
 
                 AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available"
             };
 
 
-            CalculateDistanceAndArrival(request.UserLat, request.UserLon, charger, dto);
-            SetEstimatedPrice(request.KwNeed, charger, dto);
+                  CalculateDistanceAndArrival(request.UserLat, request.UserLon, charger, dto);
+                   SetEstimatedPrice(request.KwNeed, charger, dto);
 
             return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
         }

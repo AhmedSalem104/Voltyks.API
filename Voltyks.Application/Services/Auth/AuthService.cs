@@ -468,7 +468,7 @@ namespace Voltyks.Application.Services.Auth
                     );
 
                     // افتراض سرعة 40 كم/س → وقت الوصول بالدقائق
-                    dto.EstimatedArrival = Math.Ceiling((dto.DistanceInKm / 40.0) * 60.0);
+                    dto.EstimatedArrival = Math.Ceiling((dto.DistanceInKm / 60.0) * 60.0);
                 }
 
                 // تقدير السعر
