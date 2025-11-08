@@ -11,8 +11,9 @@ namespace Voltyks.Application.Interfaces.Redis
         Task SetAsync(string key, string value, TimeSpan? expiry = null);
         Task<string?> GetAsync(string key);
         Task RemoveAsync(string key);
-        Task<long> IncrementAsync(string key);                 // atomic INCR
-        Task ExpireAsync(string key, TimeSpan ttl);        // set/refresh TTL
+        Task<long> IncrementAsync(string key);          
+        Task ExpireAsync(string key, TimeSpan ttl);       
+        Task<IEnumerable<string>> GetAllKeysAsync(string pattern = "*");
 
     }
 

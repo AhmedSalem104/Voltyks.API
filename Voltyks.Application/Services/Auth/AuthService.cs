@@ -33,7 +33,7 @@ using static System.Net.WebRequestMethods;
 
 namespace Voltyks.Application.Services.Auth
 {
-    public class AuthService(UserManager<AppUser> userManager ,
+    public class AuthService(UserManager<AppUser> userManager,
         IHttpContextAccessor httpContextAccessor
         , IOptions<JwtOptions> options
         , IRedisService redisService
@@ -45,6 +45,7 @@ namespace Voltyks.Application.Services.Auth
 
         ) : IAuthService
     {
+
         public async Task<ApiResponse<object>> ToggleCurrentUserBanAsync(CancellationToken ct = default)
         {
             // 1) هات الـ userId من الـ Claims
@@ -60,6 +61,10 @@ namespace Voltyks.Application.Services.Auth
 
             // 3) Toggle
             user.IsBanned = !user.IsBanned;
+
+            await redisService.RemoveAsync($"refresh_token:{user.Id}");
+            await redisService.RemoveAsync($"fcm_tokens:{user.Id}"); // اختياري
+
 
             // اختياري: لما يتحظر ابطّل availability وامسح refresh token
             if (user.IsBanned)
@@ -123,7 +128,7 @@ namespace Voltyks.Application.Services.Auth
             var userId = userIdClaim.Value;
 
             var user = context.Users.Find(userId);
-            
+
 
             if (user == null)
                 return new ApiResponse<bool>("User not found", false);
@@ -269,8 +274,8 @@ namespace Voltyks.Application.Services.Auth
                 return new ApiResponse<UserRegisterationResultDto>
                 {
                     Status = false,
-                    Message = creationResult.Message,       
-                    Errors = creationResult.Data            
+                    Message = creationResult.Message,
+                    Errors = creationResult.Data
                 };
             }
 
@@ -280,7 +285,7 @@ namespace Voltyks.Application.Services.Auth
                SuccessfulMessage.UserCreatedSuccessfully
             );
 
-           
+
         }
         public async Task<ApiResponse<string>> RefreshJwtTokenAsync(RefreshTokenDto dto)
         {
@@ -332,6 +337,16 @@ namespace Voltyks.Application.Services.Auth
                     Expires = GetEgyptTime().AddMinutes(20),
                     MaxAge = TimeSpan.FromMinutes(20)
                 });
+
+                // 1) جرّبه من الـ DTO لو تحب تضيف خاصية اختيارية dto.FcmToken
+                var fcmFromDto = (dto as dynamic)?.FcmToken as string;
+
+                // 2) أو من Header بدون أي API جديدة:
+                var fcmFromHeader = httpContextAccessor.HttpContext?.Request?.Headers?["X-FCM-Token"].ToString();
+
+                var fcmToken = !string.IsNullOrWhiteSpace(fcmFromDto) ? fcmFromDto : fcmFromHeader;
+                if (!string.IsNullOrWhiteSpace(fcmToken))
+                    await AddFcmTokenAsync(user.Id, fcmToken);
 
                 return new ApiResponse<string>(
                     data: newAccessToken,
@@ -436,9 +451,9 @@ namespace Voltyks.Application.Services.Auth
 
             var requests = (await repo.GetAllWithIncludeAsync(
                 c => c.RecipientUserId == userId
-                     && c.Status == "Pending"       
-                     && c.RequestedAt >= fiveMinutesAgo,                  
-                false,             
+                     && c.Status == "Pending"
+                     && c.RequestedAt >= fiveMinutesAgo,
+                false,
                 c => c.CarOwner,
                 c => c.Charger,
                 c => c.Charger.User,
@@ -505,7 +520,7 @@ namespace Voltyks.Application.Services.Auth
                     dto.VehicleCapacity = vehicle.Capacity;
                 }
 
-             
+
             }
 
             return new ApiResponse<List<ChargingRequestDetailsDto>>(
@@ -753,7 +768,7 @@ namespace Voltyks.Application.Services.Auth
         private async Task<ApiResponse<List<string>>> CreateUserAsync(AppUser user, string password)
         {
             var result = await userManager.CreateAsync(user, password);
-                       //await _unitOfWork.SaveChangesAsync();
+            //await _unitOfWork.SaveChangesAsync();
 
             if (!result.Succeeded)
             {
@@ -854,7 +869,7 @@ namespace Voltyks.Application.Services.Auth
             return distance;
         }
         private double DegreesToRadians(double deg) => deg * (Math.PI / 180);
-        private UserDetailsDto BuildUserDetailsDto(AppUser user,List<Vehicle> vehicles,List<Charger> chargers)
+        private UserDetailsDto BuildUserDetailsDto(AppUser user, List<Vehicle> vehicles, List<Charger> chargers)
         {
             var result = _mapper.Map<UserDetailsDto>(user);
 
@@ -941,11 +956,45 @@ namespace Voltyks.Application.Services.Auth
                 await context.SaveChangesAsync();
             }
         }
-
         public static DateTime GetEgyptTime()
         {
             TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
             return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
         }
+
+
+
+        private const int FcmTokenTtlDays = 30;
+        private string BuildFcmRedisKey(string userId) => $"fcm_tokens:{userId}";
+        private static HashSet<string> ParseCsv(string? csv)
+        {
+            if (string.IsNullOrWhiteSpace(csv)) return new();
+            return new(csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+        private static string ToCsv(HashSet<string> set) => string.Join(',', set);
+        private async Task AddFcmTokenAsync(string userId, string fcmToken)
+        {
+            var key = BuildFcmRedisKey(userId);
+            var csv = await redisService.GetAsync(key);
+            var set = ParseCsv(csv);
+            if (set.Add(fcmToken) || true) // نجدد TTL حتى لو موجود
+                await redisService.SetAsync(key, ToCsv(set), TimeSpan.FromDays(FcmTokenTtlDays));
+        }
+        private async Task RemoveFcmTokenAsync(string userId, string fcmToken)
+        {
+            var key = BuildFcmRedisKey(userId);
+            var csv = await redisService.GetAsync(key);
+            var set = ParseCsv(csv);
+            if (set.Remove(fcmToken))
+                if (set.Count == 0) await redisService.RemoveAsync(key);
+                else await redisService.SetAsync(key, ToCsv(set), TimeSpan.FromDays(FcmTokenTtlDays));
+        }
+        private async Task<List<string>> GetFcmTokensAsync(string userId)
+        {
+            var key = BuildFcmRedisKey(userId);
+            var csv = await redisService.GetAsync(key);
+            return ParseCsv(csv).ToList();
+        }
+
     }
 }

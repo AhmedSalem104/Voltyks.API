@@ -127,104 +127,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
-        //public async Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(List<TransRequest> dtos)
-        //{
-        //    try
-        //    {
-        //        if (dtos == null || dtos.Count == 0)
-        //            return new ApiResponse<List<NotificationResultDto>>(null, "No requests provided", false);
-
-        //        var results = new List<NotificationResultDto>();
-
-        //        foreach (var dto in dtos)
-        //        {
-        //            // نفس دالتك القديمة للطلب الواحد
-        //            var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Rejected);
-        //            if (request == null)
-        //                continue;
-
-        //            // ملاحظة: receiverUserId عندك string، فهنمشي على نفس النوع
-        //            var recipientUserId = request.CarOwner?.Id; // VehicleOwner
-        //            if (string.IsNullOrWhiteSpace(recipientUserId))
-        //                continue;
-
-        //            var title = "Charging Request Rejected ❌";
-        //            var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
-        //            var body = $"Your request to charge at {stationOwnerName}'s station was rejected.";
-        //            var notificationType = "ChargerOwner_RejectRequest";
-
-        //            var sent = await SendAndPersistNotificationAsync(
-        //                receiverUserId: recipientUserId,
-        //                requestId: request.Id,
-        //                title: title,
-        //                body: body,
-        //                notificationType: notificationType,
-        //                userTypeId: 2 // VehicleOwner
-        //            );
-
-        //            if (sent != null)
-        //                results.Add(sent);
-
-
-
-        //        }
-
-        //        return new ApiResponse<List<NotificationResultDto>>(results, "Charging requests processed", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<List<NotificationResultDto>>(null, ex.Message, false);
-        //    }
-        //}
-        //public async Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(int[] requestIds)
-        //{
-        //    try
-        //    {
-        //        if (requestIds == null || requestIds.Length == 0)
-        //            return new ApiResponse<List<NotificationResultDto>>(null, "No requests provided", false);
-
-        //        var results = new List<NotificationResultDto>();
-
-        //        foreach (var dto in dtos)
-        //        {
-        //            // نفس دالتك القديمة للطلب الواحد
-        //            var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Rejected);
-        //            if (request == null)
-        //                continue;
-
-        //            // ملاحظة: receiverUserId عندك string، فهنمشي على نفس النوع
-        //            var recipientUserId = request.CarOwner?.Id; // VehicleOwner
-        //            if (string.IsNullOrWhiteSpace(recipientUserId))
-        //                continue;
-
-        //            var title = "Charging Request Rejected ❌";
-        //            var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
-        //            var body = $"Your request to charge at {stationOwnerName}'s station was rejected.";
-        //            var notificationType = "ChargerOwner_RejectRequest";
-
-        //            var sent = await SendAndPersistNotificationAsync(
-        //                receiverUserId: recipientUserId,
-        //                requestId: request.Id,
-        //                title: title,
-        //                body: body,
-        //                notificationType: notificationType,
-        //                userTypeId: 2 // VehicleOwner
-        //            );
-
-        //            if (sent != null)
-        //                results.Add(sent);
-
-
-
-        //        }
-
-        //        return new ApiResponse<List<NotificationResultDto>>(results, "Charging requests processed", true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<List<NotificationResultDto>>(null, ex.Message, false);
-        //    }
-        //}
         public async Task<ApiResponse<List<NotificationResultDto>>> RejectRequestsAsync(RejectRequestDto dto)
         {
             try
@@ -282,7 +184,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<List<NotificationResultDto>>(null, ex.Message, false);
             }
         }
-
         public async Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto)
         {
             try
@@ -572,7 +473,6 @@ namespace Voltyks.Application.Services.ChargingRequest
             return new ApiResponse<decimal>(req.VoltyksFees, "Fees fetched successfully", true);
         }
 
-        // ➋ ينفّذ التحويل: +UserId ، -RecipientUserId
         public async Task<ApiResponse<object>> TransferVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
         {
             // نجيب UserId, RecipientUserId, Fees
@@ -630,7 +530,6 @@ namespace Voltyks.Application.Services.ChargingRequest
             };
             return new ApiResponse<object>(data, "Wallets updated successfully", true);
         }
-
         private async Task<ChargingRequestEntity?> GetAndUpdateRequestAsync(TransRequest dto, string newStatus)
         {
             var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
@@ -718,7 +617,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 PushSentCount: tokens.Count
             );
         }
-
 
         private string? GetCurrentUserIdRaw()
         {
@@ -898,114 +796,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                 )).FirstOrDefault();
         }
 
-        //private async Task<bool> TryAutoDeleteRequestAndChildrenAsync(int requestId)
-        //{
-        //    // 1) هات الطلبات (للتأكد من الشرط)
-        //    var reqRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
-        //    var requestsToDelete = (await reqRepo.GetAllAsync(
-        //            r => r.RequestedAt != null,  // نتحقق إذا كان التاريخ موجودًا
-        //            trackChanges: true))
-        //        .AsEnumerable()  // إيقاف الترجمة إلى SQL
-        //        .Where(r => (GetEgyptTime() - r.RequestedAt).TotalMinutes >= 5 && r.Status.ToLower() != "pending") // تنفيذ الحساب في الذاكرة
-        //        .ToList();
-
-        //    if (!requestsToDelete.Any()) return false;
-
-        //    // 2) احفظ الـ IDs المرتبطة قبل حذف الطلب
-        //    var notifRepo = _unitOfWork.GetRepository<Notification, int>();
-        //    var relatedNotifIds = (await notifRepo.GetAllAsync(n => n.RelatedRequestId == requestId))
-        //                          .Select(n => n.Id)
-        //                          .ToList();
-
-        //    // 3) احذف الطلبات التي لا تنطبق عليها الشروط
-        //    foreach (var req in requestsToDelete)
-        //    {
-        //        reqRepo.Delete(req); // حذف الطلب
-        //    }
-
-        //    await _unitOfWork.SaveChangesAsync(); // حفظ التغييرات في قاعدة البيانات
-
-        //    // 4) احذف الإشعارات المرتبطة بالطلبات المحذوفة
-        //    if (relatedNotifIds.Count > 0)
-        //    {
-        //        var orphans = await notifRepo.GetAllAsync(n => relatedNotifIds.Contains(n.Id), trackChanges: true);
-        //        foreach (var orphan in orphans)
-        //        {
-        //            notifRepo.Delete(orphan); // حذف الإشعارات التي تم العثور عليها
-        //        }
-
-        //        await _unitOfWork.SaveChangesAsync(); // حفظ التغييرات بعد حذف الإشعارات
-        //    }
-
-        //    return true;
-        //}
-        //private async Task<bool> DeleteUserRequestsAndNotificationsAsync(string userId)
-        //{
-        //    // 1) الحصول على الـ repository الخاص بـ ChargingRequestEntity
-        //    var reqRepo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
-
-        //    // 2) استرجاع جميع الطلبات الخاصة بالمستخدم الحالي
-        //    var userRequests = await reqRepo.GetAllWithIncludeAsync(
-        //        c => c.RecipientUserId == userId,  // تصفية حسب الـ userId
-        //        false,
-        //        c => c.Charger  // يمكنك إضافة أي علاقات إضافية إذا لزم الأمر
-        //    );
-
-        //    // 3) تصفية الطلبات حسب الشرطين: مر عليها أكثر من 5 دقائق والحالة ليست "pending"
-        //    var requestsToDelete = userRequests
-        //        .Where(c => (GetEgyptTime() - c.RequestedAt).TotalMinutes >= 5
-        //                    || c.Status.ToLower() != "pending")
-        //        .ToList();
-
-        //    // إذا لم توجد طلبات تنطبق عليها الشروط، إرجاع false
-        //    if (!requestsToDelete.Any())
-        //        return false;
-
-        //    // 4) حذف الإشعارات المرتبطة بكل طلب
-        //    var notifRepo = _unitOfWork.GetRepository<Notification, int>();
-
-        //    // احصل على IDs الإشعارات المرتبطة بالطلب
-        //    // الحصول على IDs الإشعارات المرتبطة بالطلبات
-
-        //    var relatedNotifIds = (await notifRepo.GetAllAsync(n =>
-        //        requestsToDelete.Select(r => r.Id).ToList().Contains((int)n.RelatedRequestId)))
-        //        .Select(n => n.Id)
-        //        .ToList();
-
-
-        //    // حذف الإشعارات المرتبطة بالطلبات المحذوفة
-        //    if (relatedNotifIds.Any())
-        //    {
-        //        var orphans = await notifRepo.GetAllAsync(n => relatedNotifIds.Contains(n.Id), trackChanges: true);
-        //        foreach (var orphan in orphans)
-        //        {
-        //            notifRepo.Delete(orphan); // حذف الإشعارات التي تم العثور عليها
-        //        }
-
-        //        await _unitOfWork.SaveChangesAsync(); // حفظ التغييرات بعد حذف الإشعارات
-        //    }
-
-        //    // 5) حذف الطلبات التي تم تصفيتها
-        //    foreach (var request in requestsToDelete)
-        //    {
-        //        reqRepo.Delete(request); // حذف الطلب
-        //    }
-
-        //    // حفظ التغييرات في قاعدة البيانات بعد حذف الطلبات
-        //    await _unitOfWork.SaveChangesAsync();
-
-        //    // إرجاع true إذا تم الحذف بنجاح
-        //    return true;
-        //}
         public static DateTime GetEgyptTime()
         {
             TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
             return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
         }
-
-
-
-
         private static decimal ApplyRules(decimal baseAmount, decimal percentage, decimal minimumFee)
         {
             if (baseAmount < 0) baseAmount = 0;

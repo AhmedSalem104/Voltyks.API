@@ -42,6 +42,20 @@ namespace Voltyks.Application.Services.Redis
             var db = _redis.GetDatabase();
             await db.KeyExpireAsync(key, ttl);
         }
+        public async Task<IEnumerable<string>> GetAllKeysAsync(string pattern = "*")
+        {
+            var endpoints = _redis.GetEndPoints();
+            var keys = new List<string>();
+
+            foreach (var endpoint in endpoints)
+            {
+                var server = _redis.GetServer(endpoint);
+                var serverKeys = server.Keys(pattern: pattern);
+                keys.AddRange(serverKeys.Select(k => (string)k));
+            }
+
+            return await Task.FromResult(keys);
+        }
     }
 
 }

@@ -211,8 +211,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                     .Append(charger.User.LastName)
                     .ToString(),
                 PhoneNumber = charger.User.PhoneNumber,
-                Rating = charger.AverageRating,
-                RatingCount = charger.RatingCount,
+                Rating = charger.User.Rating,
+                RatingCount = charger.User.RatingCount,
                 Area = charger.Address?.Area,
                 Street = charger.Address?.Street,
                 BuildingNumber = charger.Address.BuildingNumber,
@@ -323,12 +323,14 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         {
             return deg * (Math.PI / 180);
         }
+   
         private double EstimateTime(double distanceKm)
         {
-            double averageSpeedKmPerMin = 0.1; // 6 كم/ساعة = مشي تقريبًا
-            int minutes = (int)Math.Ceiling(distanceKm / averageSpeedKmPerMin);
+            double averageSpeedKmPerMin = 0.1;
+            double minutes = Math.Ceiling(distanceKm / averageSpeedKmPerMin * 10) / 10; 
             return minutes;
         }
+
         private double EstimatePrice(double sessionDurationHr, decimal pricePerHour)
         {
             return Math.Round((double)pricePerHour * sessionDurationHr, 2);
