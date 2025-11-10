@@ -35,157 +35,6 @@ namespace Voltyks.Core.DTOs.Processes
         }
 
 
-        //public async Task<ApiResponse<object>> ConfirmByVehicleOwnerAsync(ConfirmByVehicleOwnerDto dto, CancellationToken ct = default)
-        //{
-        //    var me = CurrentUserId();
-        //    if (string.IsNullOrEmpty(me))
-        //        return new ApiResponse<object>("Unauthorized", false);
-
-        //    var req = await _ctx.Set<ChargingRequestEntity>()
-        //        .FirstOrDefaultAsync(r => r.Id == dto.ChargerRequestId, ct);
-        //    if (req is null) return new ApiResponse<object>("Charger request not found", false);
-
-        //    // تأكد إن المنفّذ هو صاحب العربية
-        //    if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
-
-        //    // لو已有 Process لنفس الطلب امنع التكرار
-        //    var exists = await _ctx.Set<ProcessEntity>().AnyAsync(p => p.ChargerRequestId == req.Id, ct);
-        //    if (exists) return new ApiResponse<object>("Process already created for this request", false);
-
-        //    // إنشاء Process + تحديث حالة الطلب
-        //    var process = new ProcessEntity
-        //    {
-        //        ChargerRequestId = req.Id,
-        //        VehicleOwnerId = req.UserId,
-        //        ChargerOwnerId = req.RecipientUserId!,
-        //        EstimatedPrice = dto.EstimatedPrice,
-        //        AmountCharged = dto.AmountCharged,
-        //        AmountPaid = dto.AmountPaid,
-        //        Status = ProcessStatus.PendingCompleted
-        //    };
-
-        //    using var tx = await _ctx.Database.BeginTransactionAsync(ct);
-        //    try
-        //    {
-        //        await _ctx.AddAsync(process, ct);
-
-        //        req.Status = "PendingCompleted";
-        //        _ctx.Update(req);
-
-        //        // (اختياري) أضف الـ processId إلى CurrentActivities بعد الحفظ
-        //        await _ctx.SaveChangesAsync(ct);
-
-        //        // بعد SaveChanges الأول (اللي بيولّد process.Id)
-        //        var vo = await _ctx.Set<AppUser>().FindAsync(new object?[] { req.UserId }, ct);
-        //        var co = await _ctx.Set<AppUser>().FindAsync(new object?[] { req.RecipientUserId }, ct);
-
-        //        if (vo != null)
-        //        {
-        //            var list = vo.CurrentActivities.ToList();
-        //            if (!list.Contains(process.Id)) { list.Add(process.Id); vo.CurrentActivities = list; }
-        //            _ctx.Update(vo);
-        //        }
-        //        if (co != null)
-        //        {
-        //            var list = co.CurrentActivities.ToList();
-        //            if (!list.Contains(process.Id)) { list.Add(process.Id); co.CurrentActivities = list; }
-        //            _ctx.Update(co);
-        //        }
-        //        await _ctx.SaveChangesAsync(ct);
-
-        //        await tx.CommitAsync(ct);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        await tx.RollbackAsync(ct);
-        //        return new ApiResponse<object>("Failed to start process", false, new() { ex.Message });
-        //    }
-
-        //    // (اختياري) Notification → لصاحب المحطة بالقيم
-
-        //    return new ApiResponse<object>(new { processId = process.Id }, "Process created & request moved to PendingCompleted", true);
-        //}
-        //public async Task<ApiResponse<object>> ConfirmByVehicleOwnerAsync(ConfirmByVehicleOwnerDto dto, CancellationToken ct = default)
-        //{
-        //    var me = CurrentUserId();
-        //    if (string.IsNullOrEmpty(me))
-        //        return new ApiResponse<object>("Unauthorized", false);
-
-        //    var req = await _ctx.Set<ChargingRequestEntity>()
-        //        .Include(r => r.CarOwner)
-        //        .Include(r => r.Charger).ThenInclude(c => c.User)
-        //        .FirstOrDefaultAsync(r => r.Id == dto.ChargerRequestId, ct);
-        //    if (req is null) return new ApiResponse<object>("Charger request not found", false);
-
-        //    if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
-
-        //    var exists = await _ctx.Set<ProcessEntity>().AnyAsync(p => p.ChargerRequestId == req.Id, ct);
-        //    if (exists) return new ApiResponse<object>("Process already created for this request", false);
-
-        //    var process = new ProcessEntity
-        //    {
-        //        ChargerRequestId = req.Id,
-        //        VehicleOwnerId = req.UserId,
-        //        ChargerOwnerId = req.RecipientUserId!,
-        //        EstimatedPrice = dto.EstimatedPrice,
-        //        AmountCharged = dto.AmountCharged,
-        //        AmountPaid = dto.AmountPaid,
-        //        Status = ProcessStatus.PendingCompleted
-        //    };
-
-        //    using var tx = await _ctx.Database.BeginTransactionAsync(ct);
-        //    try
-        //    {
-        //        await _ctx.AddAsync(process, ct);
-        //        req.Status = "PendingCompleted";
-        //        _ctx.Update(req);
-
-        //        await _ctx.SaveChangesAsync(ct);
-
-        //        var vo = await _ctx.Set<AppUser>().FindAsync(new object?[] { req.UserId }, ct);
-        //        var co = await _ctx.Set<AppUser>().FindAsync(new object?[] { req.RecipientUserId }, ct);
-
-        //        if (vo != null)
-        //        {
-        //            var list = vo.CurrentActivities.ToList();
-        //            if (!list.Contains(process.Id)) { list.Add(process.Id); vo.CurrentActivities = list; }
-        //            _ctx.Update(vo);
-        //        }
-        //        if (co != null)
-        //        {
-        //            var list = co.CurrentActivities.ToList();
-        //            if (!list.Contains(process.Id)) { list.Add(process.Id); co.CurrentActivities = list; }
-        //            _ctx.Update(co);
-        //        }
-        //        await _ctx.SaveChangesAsync(ct);
-        //        await tx.CommitAsync(ct);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        await tx.RollbackAsync(ct);
-        //        return new ApiResponse<object>("Failed to start process", false, new() { ex.Message });
-        //    }
-
-        //    // 🔔 إشعار لصاحب المحطة بالتفاصيل
-        //    var title = "Process confirmation pending";
-        //    var body = $"Amount Charged: {dto.AmountCharged:0.##} | Amount Paid: {dto.AmountPaid:0.##}";
-        //    await SendToUserAsync(process.ChargerOwnerId, title, body, req.Id, "VehicleOwner_ConfirmProcess", ct);
-
-        //    // (اختياري) Notification → لصاحب المحطة بالقيم
-
-        //    return new ApiResponse<object>(
-        //        new
-        //        {
-        //            processId = process.Id,
-        //            chargerRequestId = req.Id
-        //        },
-        //        "Process created & request moved to PendingCompleted",
-        //        true
-        //    );
-
-
-        //    //return new ApiResponse<object>(new { processId = process.Id }, "Process created & request moved to PendingCompleted", true);
-        //}
         public async Task<ApiResponse<object>> ConfirmByVehicleOwnerAsync(ConfirmByVehicleOwnerDto dto, CancellationToken ct = default)
         {
             var me = CurrentUserId();
@@ -241,53 +90,164 @@ namespace Voltyks.Core.DTOs.Processes
                 await _ctx.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
 
-                // جهّز رسالة الإشعار
+                // إشعار لصاحب المحطة
                 var title = "Process confirmation pending";
                 var body = $"Amount Charged: {dto.AmountCharged:0.##} | Amount Paid: {dto.AmountPaid:0.##}";
 
-                // UserTypeId: 1 لصاحب المحطة (ChargerOwner)
                 var notifDto = await SendAndPersistNotificationAsync(
                     receiverUserId: process.ChargerOwnerId,
                     requestId: req.Id,
                     title: title,
-                    processId :process.Id,
+                    processId: process.Id,
                     body: body,
-                    notificationType: NotificationTypes.VehicleOwner_ConfirmProcess,
-                    userTypeId: 1,
+                    notificationType: NotificationTypes.VehicleOwner_CreateProcess, 
+                    userTypeId: 1, // ChargerOwner
                     ct: ct
                 );
 
-                // ارجع نفس الـ payload المطلوب بالظبط
-                return new ApiResponse<object>(notifDto,
-                    "Process created & request moved to PendingCompleted",
-                    true);
+                // Payload بيرجع ProcessId + ChargerRequestId + notification
+                var payload = new
+                {
+                    processId = process.Id,
+                    chargerRequestId = req.Id,
+                    notification = notifDto
+                };
 
+                return new ApiResponse<object>(
+                    payload,
+                    "Process created & request moved to PendingCompleted",
+                    true
+                );
             }
             catch (Exception ex)
             {
                 await tx.RollbackAsync(ct);
                 return new ApiResponse<object>("Failed to start process", false, new() { ex.Message });
             }
-
-            //// جهّز الـ return أولاً
-            //var response = new ApiResponse<object>(
-            //    new
-            //    {
-            //        processId = process.Id,
-            //        chargerRequestId = req.Id
-            //    },
-            //    "Process created & request moved to PendingCompleted",
-            //    true
-            //);
-
-            //// 🔔 إرسال الإشعار بعد تجهيز الـ return
-            //var title = "Process confirmation pending";
-            //var body = $"Amount Charged: {dto.AmountCharged:0.##} | Amount Paid: {dto.AmountPaid:0.##}";
-            //await SendToUserAsync(process.ChargerOwnerId, title, body, req.Id, "VehicleOwner_ConfirmProcess", ct);
-
-            //// رجّع نفس الـ return
-            //return response;
         }
+        public async Task<ApiResponse<object>> UpdateProcessAsync(UpdateProcessDto dto, CancellationToken ct = default)
+        {
+            var me = CurrentUserId();
+            if (string.IsNullOrEmpty(me))
+                return new ApiResponse<object>("Unauthorized", false);
+
+            var process = await _ctx.Set<ProcessEntity>()
+                                    .FirstOrDefaultAsync(p => p.Id == dto.ProcessId, ct);
+            if (process is null)
+                return new ApiResponse<object>("Process not found", false);
+
+            var isChargerOwner = process.ChargerOwnerId == me;
+            var isVehicleOwner = process.VehicleOwnerId == me;
+            if (!isChargerOwner && !isVehicleOwner)
+                return new ApiResponse<object>("Forbidden", false);
+
+            var request = await _ctx.Set<ChargingRequestEntity>()
+                                    .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+            if (request is null)
+                return new ApiResponse<object>("Charger request not found", false);
+
+            string? raw = dto.Status?.Trim();
+            string? decision = null;
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                if (raw.Equals("Process-Completed", StringComparison.OrdinalIgnoreCase)) decision = "completed";
+                else if (raw.Equals("Process-Ended-By-Report", StringComparison.OrdinalIgnoreCase)) decision = "ended-by-report";
+                else if (raw.Equals("Process-Started", StringComparison.OrdinalIgnoreCase)) decision = "started";
+                else if (raw.Equals("Process-Aborted", StringComparison.OrdinalIgnoreCase)) decision = "aborted";
+            }
+
+            using var tx = await _ctx.Database.BeginTransactionAsync(ct);
+            try
+            {
+                // ✅ تحديث الحقول القابلة للتعديل
+                if (dto.EstimatedPrice.HasValue) process.EstimatedPrice = dto.EstimatedPrice;
+                if (dto.AmountCharged.HasValue) process.AmountCharged = dto.AmountCharged;
+                if (dto.AmountPaid.HasValue) process.AmountPaid = dto.AmountPaid;
+
+                // ✅ تحديث الحالة حسب القيم المرسلة
+                if (decision == "completed")
+                {
+                    process.Status = ProcessStatus.Completed;
+                    process.DateCompleted = GetEgyptTime();
+                    request.Status = "Completed";
+                }
+                else if (decision == "started")
+                {
+                    request.Status = "Started";
+                }
+                else if (decision == "aborted" || decision == "ended-by-report")
+                {
+                    process.Status = ProcessStatus.Aborted;
+                    request.Status = "Aborted";
+                }
+
+                _ctx.Update(process);
+                _ctx.Update(request);
+                await _ctx.SaveChangesAsync(ct);
+
+                // ✅ إرسال إشعار من صاحب المركبة → صاحب المحطة
+                var title = "Process updated";
+                var body = "The vehicle owner updated process details.";
+
+                // لو حابب توضح التغييرات داخل النص
+                var changes = new List<string>();
+                if (dto.Status != null) changes.Add($"status: {dto.Status}");
+                if (dto.EstimatedPrice != null) changes.Add($"estimated: {dto.EstimatedPrice:0.##}");
+                if (dto.AmountCharged != null) changes.Add($"charged: {dto.AmountCharged:0.##}");
+                if (dto.AmountPaid != null) changes.Add($"paid: {dto.AmountPaid:0.##}");
+                if (changes.Any())
+                    body = "Updated fields → " + string.Join(", ", changes);
+
+                var notifDto = await SendAndPersistNotificationAsync(
+                    receiverUserId: process.ChargerOwnerId,
+                    requestId: process.ChargerRequestId,
+                    processId: process.Id,
+                    title: title,
+                    body: body,
+                    notificationType: NotificationTypes.VehicleOwner_UpdateProcess, // ← عرفها عندك
+                    userTypeId: 1, // ChargerOwner
+                    ct: ct
+                );
+
+                await tx.CommitAsync(ct);
+
+                // ✅ رجّع العملية بعد التحديث
+                var full = await _ctx.Set<ProcessEntity>()
+                    .AsNoTracking()
+                    .Where(p => p.Id == process.Id)
+                    .Select(p => new
+                    {
+                        p.Id,
+                        p.ChargerRequestId,
+                        p.VehicleOwnerId,
+                        p.ChargerOwnerId,
+                        p.Status,
+                        p.EstimatedPrice,
+                        p.AmountCharged,
+                        p.AmountPaid,
+                        p.VehicleOwnerRating,
+                        p.ChargerOwnerRating,
+                        p.DateCreated,
+                        p.DateCompleted
+                    })
+                    .FirstOrDefaultAsync(ct);
+
+                var payload = new
+                {
+                    process = full,
+                    notification = notifDto
+                };
+
+                return new ApiResponse<object>(payload, "Process updated successfully", true);
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync(ct);
+                return new ApiResponse<object>("Failed to update process", false, new() { ex.Message });
+            }
+        }
+
+
 
         public async Task<ApiResponse<object>> OwnerDecisionAsync(OwnerDecisionDto dto, CancellationToken ct = default)
         {
@@ -315,17 +275,21 @@ namespace Voltyks.Core.DTOs.Processes
                 return new ApiResponse<object>($"Process is {already}.", false);
             }
 
-            var decision = (dto.Decision ?? "Confirm").Trim().ToLowerInvariant();
-            if (decision != "confirm" && decision != "abort" && decision != "report")
-                decision = "confirm"; // الافتراضي
+            // ⚙️ تطبيع القرار على القيم الجديدة
+            var raw = (dto.Decision ?? "Process-Completed").Trim();
+            // نقارن Case-Insensitive
+            var decision = raw.Equals("Process-Completed", StringComparison.OrdinalIgnoreCase) ? "completed"
+                         : raw.Equals("Process-Ended-By-Report", StringComparison.OrdinalIgnoreCase) ? "ended-by-report"
+                         : raw.Equals("Process-Started", StringComparison.OrdinalIgnoreCase) ? "started"
+                         : raw.Equals("Process-Aborted", StringComparison.OrdinalIgnoreCase) ? "aborted"
+                         : "completed"; // الافتراضي
 
             using var tx = await _ctx.Database.BeginTransactionAsync(ct);
             try
             {
-                if (decision == "confirm")
+                if (decision == "completed")
                 {
                     process.Status = ProcessStatus.Completed;
-                    // لو عندك الحقل Nullable خليه يُملأ مرة واحدة
                     if (process.DateCompleted == null)
                         process.DateCompleted = GetEgyptTime();
                     request.Status = "Completed";
@@ -358,7 +322,27 @@ namespace Voltyks.Core.DTOs.Processes
                         );
                     }
                 }
-                else // abort/report
+                else if (decision == "started")
+                {
+                    // بدء العملية: بنعلّم الطلب إنها بدأت
+                    // لو عندك ProcessStatus.Started استخدمه؛ غير كده هنسيب Status زي ما هو ونعلم الطلب
+                    request.Status = "Started";
+                    _ctx.Update(request);
+                    await _ctx.SaveChangesAsync(ct);
+
+                    // إشعار للطرف الآخر ببدء العملية
+                    var receiverId = isChargerOwner ? process.VehicleOwnerId : process.ChargerOwnerId;
+                    var whoStarted = isChargerOwner ? "Charger owner" : "Vehicle owner";
+                    await SendToUserAsync(
+                        receiverId,
+                        "Process started",
+                        $"{whoStarted} started the process.",
+                        request.Id,
+                        "Process_Started",
+                        ct
+                    );
+                }
+                else // ended-by-report | aborted  -> نفس مسار الإنهاء/التبليغ
                 {
                     process.Status = ProcessStatus.Aborted;
                     request.Status = "Aborted";
@@ -400,9 +384,26 @@ namespace Voltyks.Core.DTOs.Processes
             }
 
             var who = isChargerOwner ? "ChargerOwner" : "VehicleOwner";
-            var msg = decision == "confirm" ? "Process confirmed" : "Process reported (aborted)";
+            string msg, statusText;
+
+            if (decision == "completed")
+            {
+                msg = "Process confirmed";
+                statusText = process.Status.ToString();
+            }
+            else if (decision == "started")
+            {
+                msg = "Process started";
+                statusText = request.Status; // "Started"
+            }
+            else
+            {
+                msg = "Process reported (aborted)";
+                statusText = process.Status.ToString();
+            }
+
             return new ApiResponse<object>(
-                new { processId = process.Id, status = process.Status.ToString(), decidedBy = who },
+                new { processId = process.Id, status = statusText, decidedBy = who, decision = raw },
                 msg,
                 true
             );

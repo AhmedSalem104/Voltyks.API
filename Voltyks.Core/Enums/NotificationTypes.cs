@@ -13,8 +13,14 @@ namespace Voltyks.Core.Enums
         public const string ChargerOwner_RejectRequest = "ChargerOwner_RejectRequest";
         public const string VehicleOwner_CompleteProcessSuccessfully = "VehicleOwner_CompleteProcessSuccessfully";
         public const string VehicleOwner_ProcessAbortedAfterPaymentSuccessfully = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
-        public const string VehicleOwner_ConfirmProcess = "VehicleOwner_ConfirmProcess";
+        public const string VehicleOwner_CreateProcess = "VehicleOwner_CreateProcess";
+        public const string VehicleOwner_UpdateProcess = "VehicleOwner_UpdateProcess";
+        public const string Report_ChargerOwnerToVehicleOwner = "Report_ChargerOwnerToVehicleOwner";
+        public const string Report_VehicleOwnerToChargerOwner = "Report_VehicleOwnerToChargerOwner";
+
         
+
+
 
     }
 }

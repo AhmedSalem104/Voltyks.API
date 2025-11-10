@@ -9,6 +9,10 @@ namespace Voltyks.Core.DTOs.Process
     public class OwnerDecisionDto
     {
         public int ProcessId { get; set; }
-        public string Decision { get; set; } = "Confirm"; // "Confirm" | "Report"
+
+        // القيم الجديدة:
+        // “Process-Completed” | “Process-Ended-By-Report” | “Process-Started” | “Process-Aborted”
+        public string Decision { get; set; } = "Process-Completed";
     }
+
 }

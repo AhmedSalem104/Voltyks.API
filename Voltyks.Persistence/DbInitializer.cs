@@ -208,41 +208,114 @@ namespace Voltyks.Persistence
 
 
 
-            // Seeding For Users 
-            if (!_userManager.Users.Any())
-            {
+            //// Seeding For Users 
+            //if (!_userManager.Users.Any())
+            //{
 
-                // التأكد من الأدوار
-                if (!await _roleManager.RoleExistsAsync("Admin"))
-                    await _roleManager.CreateAsync(new IdentityRole("Admin"));
+            //    // التأكد من الأدوار
+            //    if (!await _roleManager.RoleExistsAsync("Admin"))
+            //        await _roleManager.CreateAsync(new IdentityRole("Admin"));
 
                
 
-                // Create User            
-                var adminUser = new AppUser()
+            //    // Create User            
+            //    var adminUser = new AppUser()
+            //    {
+            //        FullName = "VoltyksOwner",
+            //        FirstName = "Voltyks",
+            //        LastName = "Owner",
+            //        Email = "Admin@gmail.com",
+            //        UserName = "Admin",
+            //        PhoneNumber = "01000000000"
+            //    };
+
+            //    var result1 = await _userManager.CreateAsync(adminUser, "Voltyks1041998@");
+            //    if (result1.Succeeded)
+            //        await _userManager.AddToRoleAsync(adminUser, "Admin");
+
+              
+
+            //    // تحقق من الأخطاء إن وجدت
+            //    if (!result1.Succeeded)
+            //        Console.WriteLine($"Admin Errors: {string.Join(", ", result1.Errors.Select(e => e.Description))}");
+
+               
+            //}
+
+
+            // Seeding For Users & Roles
+            if (!_userManager.Users.Any())
+            {
+                // 1) تأكيد الأدوار
+                var roles = new[] { "Admin", "Operator", "Viewer" };
+                foreach (var role in roles)
+                    if (!await _roleManager.RoleExistsAsync(role))
+                        await _roleManager.CreateAsync(new IdentityRole(role));
+
+                // 2) إنشاء Admin
+                var adminUser = new AppUser
                 {
                     FullName = "VoltyksOwner",
                     FirstName = "Voltyks",
                     LastName = "Owner",
                     Email = "Admin@gmail.com",
                     UserName = "Admin",
-                    PhoneNumber = "01000000000"
+                    PhoneNumber = "01000000000",
+                    EmailConfirmed = true,
+                    PhoneNumberConfirmed = true
                 };
 
-                var result1 = await _userManager.CreateAsync(adminUser, "Voltyks1041998@");
-                if (result1.Succeeded)
+                var resultAdmin = await _userManager.CreateAsync(adminUser, "Voltyks1041998@");
+                if (resultAdmin.Succeeded)
+                {
                     await _userManager.AddToRoleAsync(adminUser, "Admin");
+                    // Claims اختيارية لو عايز تميّز الأدمن في الفرونت/اللوغز
+                    await _userManager.AddClaimsAsync(adminUser, new[]
+                    {
+            new System.Security.Claims.Claim("role-level", "admin"),
+            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
+            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+        });
+                }
+                else
+                {
+                    Console.WriteLine($"Admin Errors: {string.Join(", ", resultAdmin.Errors.Select(e => e.Description))}");
+                }
 
-              
+                // 3) إنشاء مستخدم بدور آخر (Operator)
+                var operatorUser = new AppUser
+                {
+                    FullName = "VoltyksOperator",
+                    FirstName = "Voltyks",
+                    LastName = "Operator",
+                    Email = "operator@voltyks.com",
+                    UserName = "operator",
+                    PhoneNumber = "01000000001",
+                    EmailConfirmed = true,
+                    PhoneNumberConfirmed = true
+                };
 
-                // تحقق من الأخطاء إن وجدت
-                if (!result1.Succeeded)
-                    Console.WriteLine($"Admin Errors: {string.Join(", ", result1.Errors.Select(e => e.Description))}");
+                var resultOp = await _userManager.CreateAsync(operatorUser, "Voltyks@Operator");
+                if (resultOp.Succeeded)
+                {
+                    await _userManager.AddToRoleAsync(operatorUser, "Operator");
+                    await _userManager.AddClaimsAsync(operatorUser, new[]
+                    {
+            new System.Security.Claims.Claim("role-level", "operator"),
+            new System.Security.Claims.Claim("can-manage-terms-fees", "false"),
+            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+        });
+                }
+                else
+                {
+                    Console.WriteLine($"Operator Errors: {string.Join(", ", resultOp.Errors.Select(e => e.Description))}");
+                }
 
-               
+                // لو حابب تضيف Viewer كمان
+                // var viewerUser = new AppUser { ... };
+                // await _userManager.CreateAsync(viewerUser, "Strong@Pass1");
+                // await _userManager.AddToRoleAsync(viewerUser, "Viewer");
             }
-
-
 
 
 

@@ -19,6 +19,12 @@ namespace Voltyks.API.Controllers
         public async Task<IActionResult> ConfirmByVehicleOwner([FromBody] ConfirmByVehicleOwnerDto dto, CancellationToken ct)
             => Ok(await _svc.ProcessesService.ConfirmByVehicleOwnerAsync(dto, ct));
 
+     
+        [HttpPost("update-Process")]
+        public async Task<IActionResult> UpdateProcess([FromBody] UpdateProcessDto dto, CancellationToken ct)
+            => Ok(await _svc.ProcessesService.UpdateProcessAsync(dto, ct));
+
+
         [HttpPost("owner-decision")]
         public async Task<IActionResult> OwnerDecision([FromBody] OwnerDecisionDto dto, CancellationToken ct)
             => Ok(await _svc.ProcessesService.OwnerDecisionAsync(dto, ct));
