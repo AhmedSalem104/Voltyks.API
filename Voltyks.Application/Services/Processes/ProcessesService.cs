@@ -34,7 +34,262 @@ namespace Voltyks.Core.DTOs.Processes
             _firebase = firebase;
         }
 
+        //public async Task<ApiResponse<object>> ConfirmByVehicleOwnerAsync(ConfirmByVehicleOwnerDto dto, CancellationToken ct = default)
+        //{
+        //    var me = CurrentUserId();
+        //    if (string.IsNullOrEmpty(me))
+        //        return new ApiResponse<object>("Unauthorized", false);
 
+        //    var req = await _ctx.Set<ChargingRequestEntity>()
+        //        .Include(r => r.CarOwner)
+        //        .Include(r => r.Charger).ThenInclude(c => c.User)
+        //        .FirstOrDefaultAsync(r => r.Id == dto.ChargerRequestId, ct);
+        //    if (req is null) return new ApiResponse<object>("Charger request not found", false);
+
+        //    if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
+
+        //    var exists = await _ctx.Set<ProcessEntity>().AnyAsync(p => p.ChargerRequestId == req.Id, ct);
+        //    if (exists) return new ApiResponse<object>("Process already created for this request", false);
+
+        //    var process = new ProcessEntity
+        //    {
+        //        ChargerRequestId = req.Id,
+        //        VehicleOwnerId = req.UserId,
+        //        ChargerOwnerId = req.RecipientUserId!,
+        //        EstimatedPrice = dto.EstimatedPrice,
+        //        AmountCharged = dto.AmountCharged,
+        //        AmountPaid = dto.AmountPaid,
+        //        Status = ProcessStatus.PendingCompleted
+        //    };
+
+        //    using var tx = await _ctx.Database.BeginTransactionAsync(ct);
+        //    try
+        //    {
+        //        await _ctx.AddAsync(process, ct);
+        //        req.Status = "PendingCompleted";
+        //        _ctx.Update(req);
+
+        //        await _ctx.SaveChangesAsync(ct);
+
+        //        var vo = await _ctx.Set<AppUser>().FindAsync(new object?[] { req.UserId }, ct);
+        //        var co = await _ctx.Set<AppUser>().FindAsync(new object?[] { req.RecipientUserId }, ct);
+
+        //        if (vo != null)
+        //        {
+        //            var list = vo.CurrentActivities.ToList();
+        //            if (!list.Contains(process.Id)) { list.Add(process.Id); vo.CurrentActivities = list; }
+        //            _ctx.Update(vo);
+        //        }
+        //        if (co != null)
+        //        {
+        //            var list = co.CurrentActivities.ToList();
+        //            if (!list.Contains(process.Id)) { list.Add(process.Id); co.CurrentActivities = list; }
+        //            _ctx.Update(co);
+        //        }
+        //        await _ctx.SaveChangesAsync(ct);
+        //        await tx.CommitAsync(ct);
+
+        //        var title = "Process confirmation pending";
+        //        var body = $"Amount Charged: {process.AmountCharged:0.##} | Amount Paid: {process.AmountPaid:0.##}";
+
+        //        // data لإرسالها في الـ FCM (strings)
+        //        var extraData = new Dictionary<string, string>
+        //        {
+        //            ["processId"] = process.Id.ToString(),
+        //            ["estimatedPrice"] = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+        //            ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+        //            ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+        //        };
+
+        //        var notifDto = await SendAndPersistNotificationAsync(
+        //            receiverUserId: process.ChargerOwnerId,
+        //            requestId: req.Id,
+        //            title: title,
+        //            processId: process.Id,
+        //            body: body,
+        //            notificationType: NotificationTypes.VehicleOwner_CreateProcess,
+        //            userTypeId: 1,
+        //            ct: ct,
+        //            extraData: extraData
+        //        );
+
+        //        // ⬇️ شكل notification في الـ response بدون extraData وبأرقام حقيقية
+        //        var notification = new
+        //        {
+        //            notificationId = notifDto.NotificationId,
+        //            requestId = notifDto.RequestId,
+        //            recipientUserId = notifDto.RecipientUserId,
+        //            title = notifDto.Title,
+        //            body = notifDto.Body,
+        //            notificationType = notifDto.NotificationType,
+        //            sentAt = notifDto.SentAt,
+        //            pushSentCount = notifDto.PushSentCount,
+        //            processId = process.Id,
+        //            estimatedPrice = process.EstimatedPrice,
+        //            amountCharged = process.AmountCharged,
+        //            amountPaid = process.AmountPaid
+        //        };
+
+        //        var payload = new
+        //        {
+        //            processId = process.Id,
+        //            chargerRequestId = req.Id,
+        //            notification = notification
+        //        };
+
+        //        return new ApiResponse<object>(payload, "Process created & request moved to PendingCompleted", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        await tx.RollbackAsync(ct);
+        //        return new ApiResponse<object>("Failed to start process", false, new() { ex.Message });
+        //    }
+        //}
+        //public async Task<ApiResponse<object>> UpdateProcessAsync(UpdateProcessDto dto, CancellationToken ct = default)
+        //{
+        //    var me = CurrentUserId();
+        //    if (string.IsNullOrEmpty(me))
+        //        return new ApiResponse<object>("Unauthorized", false);
+
+        //    var process = await _ctx.Set<ProcessEntity>()
+        //                            .FirstOrDefaultAsync(p => p.Id == dto.ProcessId, ct);
+        //    if (process is null)
+        //        return new ApiResponse<object>("Process not found", false);
+
+        //    var isChargerOwner = process.ChargerOwnerId == me;
+        //    var isVehicleOwner = process.VehicleOwnerId == me;
+        //    if (!isChargerOwner && !isVehicleOwner)
+        //        return new ApiResponse<object>("Forbidden", false);
+
+        //    var request = await _ctx.Set<ChargingRequestEntity>()
+        //                            .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+        //    if (request is null)
+        //        return new ApiResponse<object>("Charger request not found", false);
+
+        //    string? raw = dto.Status?.Trim();
+        //    string? decision = null;
+        //    if (!string.IsNullOrWhiteSpace(raw))
+        //    {
+        //        if (raw.Equals("Process-Completed", StringComparison.OrdinalIgnoreCase)) decision = "completed";
+        //        else if (raw.Equals("Process-Ended-By-Report", StringComparison.OrdinalIgnoreCase)) decision = "ended-by-report";
+        //        else if (raw.Equals("Process-Started", StringComparison.OrdinalIgnoreCase)) decision = "started";
+        //        else if (raw.Equals("Process-Aborted", StringComparison.OrdinalIgnoreCase)) decision = "aborted";
+        //    }
+
+        //    using var tx = await _ctx.Database.BeginTransactionAsync(ct);
+        //    try
+        //    {
+        //        // تحديث القيم
+        //        if (dto.EstimatedPrice.HasValue) process.EstimatedPrice = dto.EstimatedPrice;
+        //        if (dto.AmountCharged.HasValue) process.AmountCharged = dto.AmountCharged;
+        //        if (dto.AmountPaid.HasValue) process.AmountPaid = dto.AmountPaid;
+
+        //        // حالة العملية
+        //        if (decision == "completed")
+        //        {
+        //            process.Status = ProcessStatus.Completed;
+        //            process.DateCompleted = GetEgyptTime();
+        //            request.Status = "Completed";
+        //        }
+        //        else if (decision == "started")
+        //        {
+        //            request.Status = "Started";
+        //        }
+        //        else if (decision == "aborted" || decision == "ended-by-report")
+        //        {
+        //            process.Status = ProcessStatus.Aborted;
+        //            request.Status = "Aborted";
+        //        }
+
+        //        _ctx.Update(process);
+        //        _ctx.Update(request);
+        //        await _ctx.SaveChangesAsync(ct);
+
+        //        // نص إشعار
+        //        var title = "Process updated";
+        //        var body = "The vehicle owner updated process details.";
+
+        //        var changes = new List<string>();
+        //        if (dto.Status != null) changes.Add($"status: {dto.Status}");
+        //        if (dto.EstimatedPrice != null) changes.Add($"estimated: {dto.EstimatedPrice:0.##}");
+        //        if (dto.AmountCharged != null) changes.Add($"charged: {dto.AmountCharged:0.##}");
+        //        if (dto.AmountPaid != null) changes.Add($"paid: {dto.AmountPaid:0.##}");
+        //        if (changes.Any()) body = "Updated fields → " + string.Join(", ", changes);
+
+        //        // data للـ FCM
+        //        var extraData = new Dictionary<string, string>
+        //        {
+        //            ["processId"] = process.Id.ToString(),
+        //            ["estimatedPrice"] = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+        //            ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+        //            ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+        //        };
+
+        //        var notifDto = await SendAndPersistNotificationAsync(
+        //            receiverUserId: process.ChargerOwnerId,
+        //            requestId: process.ChargerRequestId,
+        //            processId: process.Id,
+        //            title: title,
+        //            body: body,
+        //            notificationType: NotificationTypes.VehicleOwner_UpdateProcess,
+        //            userTypeId: 1,
+        //            ct: ct,
+        //            extraData: extraData
+        //        );
+
+        //        await tx.CommitAsync(ct);
+
+        //        // notification في الـ response — بدون extraData وبأرقام حقيقية
+        //        var notification = new
+        //        {
+        //            notificationId = notifDto.NotificationId,
+        //            requestId = notifDto.RequestId,
+        //            recipientUserId = notifDto.RecipientUserId,
+        //            title = notifDto.Title,
+        //            body = notifDto.Body,
+        //            notificationType = notifDto.NotificationType,
+        //            sentAt = notifDto.SentAt,
+        //            pushSentCount = notifDto.PushSentCount,
+        //            processId = process.Id,
+        //            estimatedPrice = process.EstimatedPrice,
+        //            amountCharged = process.AmountCharged,
+        //            amountPaid = process.AmountPaid
+        //        };
+
+        //        var full = await _ctx.Set<ProcessEntity>()
+        //            .AsNoTracking()
+        //            .Where(p => p.Id == process.Id)
+        //            .Select(p => new
+        //            {
+        //                p.Id,
+        //                p.ChargerRequestId,
+        //                p.VehicleOwnerId,
+        //                p.ChargerOwnerId,
+        //                p.Status,
+        //                p.EstimatedPrice,
+        //                p.AmountCharged,
+        //                p.AmountPaid,
+        //                p.VehicleOwnerRating,
+        //                p.ChargerOwnerRating,
+        //                p.DateCreated,
+        //                p.DateCompleted
+        //            })
+        //            .FirstOrDefaultAsync(ct);
+
+        //        var payload = new
+        //        {
+        //            process = full,
+        //            notification = notification
+        //        };
+
+        //        return new ApiResponse<object>(payload, "Process updated successfully", true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        await tx.RollbackAsync(ct);
+        //        return new ApiResponse<object>("Failed to update process", false, new() { ex.Message });
+        //    }
+        //}
         public async Task<ApiResponse<object>> ConfirmByVehicleOwnerAsync(ConfirmByVehicleOwnerDto dto, CancellationToken ct = default)
         {
             var me = CurrentUserId();
@@ -49,7 +304,8 @@ namespace Voltyks.Core.DTOs.Processes
 
             if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
 
-            var exists = await _ctx.Set<ProcessEntity>().AnyAsync(p => p.ChargerRequestId == req.Id, ct);
+            var exists = await _ctx.Set<ProcessEntity>()
+                                   .AnyAsync(p => p.ChargerRequestId == req.Id, ct);
             if (exists) return new ApiResponse<object>("Process already created for this request", false);
 
             var process = new ProcessEntity
@@ -78,21 +334,39 @@ namespace Voltyks.Core.DTOs.Processes
                 if (vo != null)
                 {
                     var list = vo.CurrentActivities.ToList();
-                    if (!list.Contains(process.Id)) { list.Add(process.Id); vo.CurrentActivities = list; }
+                    if (!list.Contains(process.Id))
+                    {
+                        list.Add(process.Id);
+                        vo.CurrentActivities = list;
+                    }
                     _ctx.Update(vo);
                 }
+
                 if (co != null)
                 {
                     var list = co.CurrentActivities.ToList();
-                    if (!list.Contains(process.Id)) { list.Add(process.Id); co.CurrentActivities = list; }
+                    if (!list.Contains(process.Id))
+                    {
+                        list.Add(process.Id);
+                        co.CurrentActivities = list;
+                    }
                     _ctx.Update(co);
                 }
+
                 await _ctx.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
 
-                // إشعار لصاحب المحطة
                 var title = "Process confirmation pending";
-                var body = $"Amount Charged: {dto.AmountCharged:0.##} | Amount Paid: {dto.AmountPaid:0.##}";
+                var body = $"Amount Charged: {process.AmountCharged:0.##} | Amount Paid: {process.AmountPaid:0.##}";
+
+                // extraData للـ FCM فقط
+                var extraData = new Dictionary<string, string>
+                {
+                    ["processId"] = process.Id.ToString(),
+                    ["estimatedPrice"] = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                };
 
                 var notifDto = await SendAndPersistNotificationAsync(
                     receiverUserId: process.ChargerOwnerId,
@@ -100,21 +374,31 @@ namespace Voltyks.Core.DTOs.Processes
                     title: title,
                     processId: process.Id,
                     body: body,
-                    notificationType: NotificationTypes.VehicleOwner_CreateProcess, 
-                    userTypeId: 1, // ChargerOwner
-                    ct: ct
+                    notificationType: NotificationTypes.VehicleOwner_CreateProcess,
+                    userTypeId: 1,
+                    ct: ct,
+                    extraData: extraData
                 );
 
-                // Payload بيرجع ProcessId + ChargerRequestId + notification
-                var payload = new
+                // 👇 ده اللي هيروح في data في الـ response
+                var responseData = new
                 {
+                    notificationId = notifDto.NotificationId,
+                    requestId = notifDto.RequestId,
+                    recipientUserId = notifDto.RecipientUserId,
+                    title = notifDto.Title,
+                    body = notifDto.Body,
+                    notificationType = notifDto.NotificationType,
+                    sentAt = notifDto.SentAt,
+                    pushSentCount = notifDto.PushSentCount,
                     processId = process.Id,
-                    chargerRequestId = req.Id,
-                    notification = notifDto
+                    estimatedPrice = process.EstimatedPrice,
+                    amountCharged = process.AmountCharged,
+                    amountPaid = process.AmountPaid
                 };
 
                 return new ApiResponse<object>(
-                    payload,
+                    responseData,
                     "Process created & request moved to PendingCompleted",
                     true
                 );
@@ -125,6 +409,7 @@ namespace Voltyks.Core.DTOs.Processes
                 return new ApiResponse<object>("Failed to start process", false, new() { ex.Message });
             }
         }
+
         public async Task<ApiResponse<object>> UpdateProcessAsync(UpdateProcessDto dto, CancellationToken ct = default)
         {
             var me = CurrentUserId();
@@ -159,12 +444,12 @@ namespace Voltyks.Core.DTOs.Processes
             using var tx = await _ctx.Database.BeginTransactionAsync(ct);
             try
             {
-                // ✅ تحديث الحقول القابلة للتعديل
+                // تحديث القيم (decimals)
                 if (dto.EstimatedPrice.HasValue) process.EstimatedPrice = dto.EstimatedPrice;
                 if (dto.AmountCharged.HasValue) process.AmountCharged = dto.AmountCharged;
                 if (dto.AmountPaid.HasValue) process.AmountPaid = dto.AmountPaid;
 
-                // ✅ تحديث الحالة حسب القيم المرسلة
+                // حالة العملية
                 if (decision == "completed")
                 {
                     process.Status = ProcessStatus.Completed;
@@ -185,11 +470,9 @@ namespace Voltyks.Core.DTOs.Processes
                 _ctx.Update(request);
                 await _ctx.SaveChangesAsync(ct);
 
-                // ✅ إرسال إشعار من صاحب المركبة → صاحب المحطة
                 var title = "Process updated";
                 var body = "The vehicle owner updated process details.";
 
-                // لو حابب توضح التغييرات داخل النص
                 var changes = new List<string>();
                 if (dto.Status != null) changes.Add($"status: {dto.Status}");
                 if (dto.EstimatedPrice != null) changes.Add($"estimated: {dto.EstimatedPrice:0.##}");
@@ -198,47 +481,52 @@ namespace Voltyks.Core.DTOs.Processes
                 if (changes.Any())
                     body = "Updated fields → " + string.Join(", ", changes);
 
+                // extraData للـ FCM فقط
+                var extraData = new Dictionary<string, string>
+                {
+                    ["processId"] = process.Id.ToString(),
+                    ["estimatedPrice"] = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                };
+
                 var notifDto = await SendAndPersistNotificationAsync(
                     receiverUserId: process.ChargerOwnerId,
                     requestId: process.ChargerRequestId,
                     processId: process.Id,
                     title: title,
                     body: body,
-                    notificationType: NotificationTypes.VehicleOwner_UpdateProcess, // ← عرفها عندك
-                    userTypeId: 1, // ChargerOwner
-                    ct: ct
+                    notificationType: NotificationTypes.VehicleOwner_UpdateProcess,
+                    userTypeId: 1,
+                    ct: ct,
+                    extraData: extraData
                 );
 
                 await tx.CommitAsync(ct);
 
-                // ✅ رجّع العملية بعد التحديث
-                var full = await _ctx.Set<ProcessEntity>()
-                    .AsNoTracking()
-                    .Where(p => p.Id == process.Id)
-                    .Select(p => new
-                    {
-                        p.Id,
-                        p.ChargerRequestId,
-                        p.VehicleOwnerId,
-                        p.ChargerOwnerId,
-                        p.Status,
-                        p.EstimatedPrice,
-                        p.AmountCharged,
-                        p.AmountPaid,
-                        p.VehicleOwnerRating,
-                        p.ChargerOwnerRating,
-                        p.DateCreated,
-                        p.DateCompleted
-                    })
-                    .FirstOrDefaultAsync(ct);
-
-                var payload = new
+                // نفس شكل create في الـ response
+                var responseData = new
                 {
-                    process = full,
-                    notification = notifDto
+                    notificationId = notifDto.NotificationId,
+                    requestId = notifDto.RequestId,
+                    recipientUserId = notifDto.RecipientUserId,
+                    title = notifDto.Title,
+                    body = notifDto.Body,
+                    notificationType = notifDto.NotificationType,
+                    sentAt = notifDto.SentAt,
+                    pushSentCount = notifDto.PushSentCount,
+
+                    processId = process.Id,
+                    estimatedPrice = process.EstimatedPrice,
+                    amountCharged = process.AmountCharged,
+                    amountPaid = process.AmountPaid
                 };
 
-                return new ApiResponse<object>(payload, "Process updated successfully", true);
+                return new ApiResponse<object>(
+                    responseData,
+                    "Process updated successfully",
+                    true
+                );
             }
             catch (Exception ex)
             {
@@ -246,7 +534,6 @@ namespace Voltyks.Core.DTOs.Processes
                 return new ApiResponse<object>("Failed to update process", false, new() { ex.Message });
             }
         }
-
 
 
         public async Task<ApiResponse<object>> OwnerDecisionAsync(OwnerDecisionDto dto, CancellationToken ct = default)
@@ -409,10 +696,124 @@ namespace Voltyks.Core.DTOs.Processes
             );
         }
 
+        //public async Task<ApiResponse<object>> SubmitRatingAsync(SubmitRatingDto dto, CancellationToken ct = default)
+        //{
+
+
+        //    var me = CurrentUserId();
+        //    if (string.IsNullOrEmpty(me))
+        //        return new ApiResponse<object>("Unauthorized", false);
+
+        //    var process = await _ctx.Set<ProcessEntity>().FirstOrDefaultAsync(p => p.Id == dto.ProcessId, ct);
+        //    if (process is null) return new ApiResponse<object>("Process not found", false);
+
+        //    if (dto.RatingForOther < 1 || dto.RatingForOther > 5)
+        //        return new ApiResponse<object>("Invalid rating value (1..5)", false);
+
+        //    // مين بيقيّم مين؟
+        //    var raterId = me;
+        //    var rateeId = (process.VehicleOwnerId == me) ? process.ChargerOwnerId
+        //               : (process.ChargerOwnerId == me) ? process.VehicleOwnerId
+        //               : null;
+        //    if (rateeId is null) return new ApiResponse<object>("Forbidden", false);
+
+        //    // منع التقييم المكرر لنفس الشخص على نفس الـ Process
+        //    var already = await _ctx.Set<RatingsHistory>()
+        //        .AnyAsync(x => x.ProcessId == process.Id && x.RaterUserId == raterId, ct);
+        //    if (already) return new ApiResponse<object>("You already rated this process", false);
+
+        //    // خزّن التقييم داخل الـ Process (المصدر المعتمد للعرض)
+        //    if (me == process.VehicleOwnerId)
+        //        process.ChargerOwnerRating = dto.RatingForOther;   // VO يقيّم CO
+        //    else
+        //        process.VehicleOwnerRating = dto.RatingForOther;   // CO يقيّم VO
+
+        //    // توثيق في الـ History (اختياري لكن مفيد للأرشفة)
+        //    await _ctx.AddAsync(new RatingsHistory
+        //    {
+        //        ProcessId = process.Id,
+        //        RaterUserId = raterId,
+        //        RateeUserId = rateeId!,
+        //        Stars = dto.RatingForOther
+        //    }, ct);
+
+        //    // تحديث المتوسط العام للمستخدم المُقَيَّم
+        //    var ratee = await _ctx.Set<AppUser>().FirstOrDefaultAsync(u => u.Id == rateeId, ct);
+        //    ratee!.Rating = ((ratee.Rating * ratee.RatingCount) + dto.RatingForOther) / (ratee.RatingCount + 1);
+        //    ratee.RatingCount += 1;
+
+        //    // لو الاتنين قيّموا، أنهِ العملية
+        //    if (process.VehicleOwnerRating.HasValue && process.ChargerOwnerRating.HasValue)
+        //    {
+        //        process.Status = ProcessStatus.Completed;
+        //        process.DateCompleted = GetEgyptTime();
+
+        //        // (اختياري) شيلها من CurrentActivities
+        //        foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+        //        {
+        //            var u = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+        //            if (u != null)
+        //            {
+        //                var list = u.CurrentActivities.ToList();
+        //                if (list.Contains(process.Id)) { list.Remove(process.Id); u.CurrentActivities = list; _ctx.Update(u); }
+        //            }
+        //        }
+        //    }
+
+        //    await _ctx.SaveChangesAsync(ct);
+        //    // 📣 إرسال إشعار للطرف الآخر بالـ Rating الجديد (بدون تغيير أي لوجك سابق)
+        //    string receiverUserId = rateeId!;
+        //    bool receiverIsChargerOwner = receiverUserId == process.ChargerOwnerId;
+        //    int userTypeId = receiverIsChargerOwner ? 1 : 2; // 1 = ChargerOwner, 2 = VehicleOwner
+
+        //    var title = "New rating received ⭐";
+        //    var body = $"You received a {dto.RatingForOther:0.#}★ rating for process #{process.Id}.";
+        //    var notificationType = receiverIsChargerOwner
+        //        ? "VehicleOwner_SubmitRating"   // VO قيّم CO
+        //        : "ChargerOwner_SubmitRating";  // CO قيّم VO
+
+        //    // لو عندك ChargerRequestId جوه الـ process (منشأ من ConfirmByVehicleOwnerAsync)
+        //    var relatedRequestId = process.ChargerRequestId;
+
+        //    // نفس شكل الـ payload الراجعة من ChargingRequestService.SendAndPersistNotificationAsync
+        //    var ratingNotifDto = await SendAndPersistNotificationAsync(
+        //        receiverUserId: receiverUserId,
+        //        requestId: relatedRequestId,
+        //        processId:process.Id,
+        //        title: title,
+        //        body: body,
+        //        notificationType: notificationType,
+        //        userTypeId: userTypeId,
+        //        ct: ct
+        //    );
+
+
+
+        //    // ⬇️ ارجع التقييمين من جدول Process نفسه
+        //    double? yourRatingForOther;
+        //    double? otherRatingForYou;
+
+        //    if (me == process.VehicleOwnerId)
+        //    {
+        //        yourRatingForOther = process.ChargerOwnerRating;   // انت VO → قيّمْت CO
+        //        otherRatingForYou = process.VehicleOwnerRating;   // تقييم CO ليك (VO)
+        //    }
+        //    else
+        //    {
+        //        yourRatingForOther = process.VehicleOwnerRating;   // انت CO → قيّمْت VO
+        //        otherRatingForYou = process.ChargerOwnerRating;   // تقييم VO ليك (CO)
+        //    }
+
+        //    return new ApiResponse<object>(new
+        //    {
+        //        processId = process.Id,
+        //        processStatus = process.Status.ToString(),
+        //        yourRatingForOther,
+        //        otherRatingForYou // ممكن تكون null لو الطرف الآخر لسه ما قيّمش
+        //    }, "Rating submitted", true);
+        //}
         public async Task<ApiResponse<object>> SubmitRatingAsync(SubmitRatingDto dto, CancellationToken ct = default)
         {
-
-
             var me = CurrentUserId();
             if (string.IsNullOrEmpty(me))
                 return new ApiResponse<object>("Unauthorized", false);
@@ -468,13 +869,19 @@ namespace Voltyks.Core.DTOs.Processes
                     if (u != null)
                     {
                         var list = u.CurrentActivities.ToList();
-                        if (list.Contains(process.Id)) { list.Remove(process.Id); u.CurrentActivities = list; _ctx.Update(u); }
+                        if (list.Contains(process.Id))
+                        {
+                            list.Remove(process.Id);
+                            u.CurrentActivities = list;
+                            _ctx.Update(u);
+                        }
                     }
                 }
             }
 
             await _ctx.SaveChangesAsync(ct);
-            // 📣 إرسال إشعار للطرف الآخر بالـ Rating الجديد (بدون تغيير أي لوجك سابق)
+
+            // 📣 إرسال إشعار للطرف الآخر بالـ Rating الجديد
             string receiverUserId = rateeId!;
             bool receiverIsChargerOwner = receiverUserId == process.ChargerOwnerId;
             int userTypeId = receiverIsChargerOwner ? 1 : 2; // 1 = ChargerOwner, 2 = VehicleOwner
@@ -485,14 +892,12 @@ namespace Voltyks.Core.DTOs.Processes
                 ? "VehicleOwner_SubmitRating"   // VO قيّم CO
                 : "ChargerOwner_SubmitRating";  // CO قيّم VO
 
-            // لو عندك ChargerRequestId جوه الـ process (منشأ من ConfirmByVehicleOwnerAsync)
             var relatedRequestId = process.ChargerRequestId;
 
-            // نفس شكل الـ payload الراجعة من ChargingRequestService.SendAndPersistNotificationAsync
             var ratingNotifDto = await SendAndPersistNotificationAsync(
                 receiverUserId: receiverUserId,
                 requestId: relatedRequestId,
-                processId:process.Id,
+                processId: process.Id,
                 title: title,
                 body: body,
                 notificationType: notificationType,
@@ -500,9 +905,7 @@ namespace Voltyks.Core.DTOs.Processes
                 ct: ct
             );
 
-
-
-            // ⬇️ ارجع التقييمين من جدول Process نفسه
+            // ⬇ ارجع التقييمين من جدول Process نفسه
             double? yourRatingForOther;
             double? otherRatingForYou;
 
@@ -514,19 +917,70 @@ namespace Voltyks.Core.DTOs.Processes
             else
             {
                 yourRatingForOther = process.VehicleOwnerRating;   // انت CO → قيّمْت VO
-                otherRatingForYou = process.ChargerOwnerRating;   // تقييم VO ليك (CO)
+                otherRatingForYou = process.ChargerOwnerRating;  // تقييم VO ليك (CO)
             }
 
-            return new ApiResponse<object>(new
+            // ✅ نفس شكل create/update/report: data = notification + extra fields
+            var responseData = new
             {
+                notificationId = ratingNotifDto.NotificationId,
+                requestId = ratingNotifDto.RequestId,
+                recipientUserId = ratingNotifDto.RecipientUserId,
+                title = ratingNotifDto.Title,
+                body = ratingNotifDto.Body,
+                notificationType = ratingNotifDto.NotificationType,
+                sentAt = ratingNotifDto.SentAt,
+                pushSentCount = ratingNotifDto.PushSentCount,
+
                 processId = process.Id,
                 processStatus = process.Status.ToString(),
                 yourRatingForOther,
-                otherRatingForYou // ممكن تكون null لو الطرف الآخر لسه ما قيّمش
-            }, "Rating submitted", true);
+                otherRatingForYou
+            };
+
+            return new ApiResponse<object>(responseData, "Rating submitted", true);
         }
 
 
+        //public async Task<ApiResponse<object>> GetRatingsSummaryAsync(int Id, CancellationToken ct = default)
+        //{
+        //    var me = CurrentUserId();
+        //    if (string.IsNullOrEmpty(me))
+        //        return new ApiResponse<object>("Unauthorized", false);
+
+        //    var p = await _ctx.Set<ProcessEntity>()
+        //                      .AsNoTracking()
+        //                      .FirstOrDefaultAsync(x => x.Id == Id, ct);
+
+        //    if (p is null)
+        //        return new ApiResponse<object>("Process not found", false);
+
+        //    // Privacy: لازم يكون المستخدم طرف في العملية
+        //    if (p.VehicleOwnerId != me && p.ChargerOwnerId != me)
+        //        return new ApiResponse<object>("Forbidden", false);
+
+        //    double? yourRatingForOther;
+        //    double? otherRatingForYou;
+
+        //    if (p.VehicleOwnerId == me)
+        //    {
+        //        yourRatingForOther = p.VehicleOwnerRating;   // أنت صاحب العربية → تقييمك لصاحب الشاحن
+        //        otherRatingForYou = p.ChargerOwnerRating;   // تقييم صاحب الشاحن ليك
+        //    }
+        //    else
+        //    {
+        //        yourRatingForOther = p.ChargerOwnerRating;   // أنت صاحب الشاحن → تقييمك لصاحب العربية
+        //        otherRatingForYou = p.VehicleOwnerRating;   // تقييم صاحب العربية ليك
+        //    }
+
+        //    return new ApiResponse<object>(new
+        //    {
+        //        Id,
+        //        yourRatingForOther,
+        //        otherRatingForYou,
+        //        hasBoth = yourRatingForOther.HasValue && otherRatingForYou.HasValue
+        //    }, "Ratings summary", true);
+        //}
         public async Task<ApiResponse<object>> GetRatingsSummaryAsync(int Id, CancellationToken ct = default)
         {
             var me = CurrentUserId();
@@ -540,7 +994,7 @@ namespace Voltyks.Core.DTOs.Processes
             if (p is null)
                 return new ApiResponse<object>("Process not found", false);
 
-            // Privacy: لازم يكون المستخدم طرف في العملية
+            // Privacy
             if (p.VehicleOwnerId != me && p.ChargerOwnerId != me)
                 return new ApiResponse<object>("Forbidden", false);
 
@@ -549,13 +1003,17 @@ namespace Voltyks.Core.DTOs.Processes
 
             if (p.VehicleOwnerId == me)
             {
-                yourRatingForOther = p.VehicleOwnerRating;   // أنت صاحب العربية → تقييمك لصاحب الشاحن
-                otherRatingForYou = p.ChargerOwnerRating;   // تقييم صاحب الشاحن ليك
+                // أنت صاحب المركبة → تقييمك للـ ChargerOwner محفوظ في ChargerOwnerRating
+                yourRatingForOther = p.ChargerOwnerRating;
+                // تقييم الآخر لك محفوظ في VehicleOwnerRating
+                otherRatingForYou = p.VehicleOwnerRating;
             }
             else
             {
-                yourRatingForOther = p.ChargerOwnerRating;   // أنت صاحب الشاحن → تقييمك لصاحب العربية
-                otherRatingForYou = p.VehicleOwnerRating;   // تقييم صاحب العربية ليك
+                // أنت صاحب المحطة → تقييمك للـ VehicleOwner محفوظ في VehicleOwnerRating
+                yourRatingForOther = p.VehicleOwnerRating;
+                // تقييم الآخر لك محفوظ في ChargerOwnerRating
+                otherRatingForYou = p.ChargerOwnerRating;
             }
 
             return new ApiResponse<object>(new
@@ -567,31 +1025,6 @@ namespace Voltyks.Core.DTOs.Processes
             }, "Ratings summary", true);
         }
 
-        //public async Task<ApiResponse<object>> GetMyActivitiesAsync(CancellationToken ct = default)
-        //{
-        //    var me = CurrentUserId();
-        //    if (string.IsNullOrEmpty(me))
-        //        return new ApiResponse<object>("Unauthorized", false);
-
-        //    // ابسط شكل: رجّع آخر عمليات للطرف الحالي
-        //    var items = await _ctx.Set<ProcessEntity>()
-        //        .AsNoTracking()
-        //        .Where(p => p.VehicleOwnerId == me || p.ChargerOwnerId == me)
-        //        .OrderByDescending(p => p.DateCreated)
-        //        .Take(50)
-        //        .Select(p => new {
-        //            p.Id,
-        //            p.ChargerRequestId,
-        //            p.Status,
-        //            p.AmountCharged,
-        //            p.AmountPaid,
-        //            p.DateCreated,
-        //            p.DateCompleted
-        //        })
-        //        .ToListAsync(ct);
-
-        //    return new ApiResponse<object>(items, "My activities fetched", true);
-        //}
 
         public async Task<ApiResponse<object>> GetMyActivitiesAsync(CancellationToken ct = default)
         {
@@ -687,21 +1120,28 @@ namespace Voltyks.Core.DTOs.Processes
             await _ctx.SaveChangesAsync(ct);
             return notification;
         }
-
         private async Task<NotificationResultDto> SendAndPersistNotificationAsync(
-            string receiverUserId,
-            int requestId,
-            string title,
-             int processId,
-            string body,
-            string notificationType,
-            int userTypeId,
-            CancellationToken ct)
+      string receiverUserId,
+      int requestId,
+      string title,
+      int processId,
+      string body,
+      string notificationType,
+      int userTypeId,
+      CancellationToken ct,
+      Dictionary<string, string>? extraData = null // NEW
+  )
         {
-            if (string.IsNullOrWhiteSpace(receiverUserId))
-                throw new ArgumentException("receiverUserId is required", nameof(receiverUserId));
+            var data = new Dictionary<string, string>
+            {
+                ["NotificationType"] = notificationType,
+                ["requestId"] = requestId.ToString(),
+                ["processId"] = processId.ToString()
+            };
 
-            // نفس منطق تجميع التوكنز
+            if (extraData != null)
+                foreach (var kv in extraData) data[kv.Key] = kv.Value;
+
             var tokens = await _ctx.Set<DeviceToken>()
                                    .Where(t => t.UserId == receiverUserId && !string.IsNullOrEmpty(t.Token))
                                    .Select(t => t.Token)
@@ -709,21 +1149,18 @@ namespace Voltyks.Core.DTOs.Processes
 
             if (tokens.Count > 0)
             {
-                // إرسال متوازي
                 await Task.WhenAll(tokens.Select(tk =>
-                    _firebase.SendNotificationAsync(tk, title, body, requestId, notificationType)
+                    _firebase.SendNotificationAsync(
+                        tk, title, body, requestId, notificationType, data // ⬅️ مرّر data للـ FCM
+                    )
                 ));
             }
 
             var notification = await AddNotificationAsync(
-                receiverUserId: receiverUserId,
-                relatedRequestId: requestId,
-                title: title,
-                body: body,
-                userTypeId: userTypeId,
-                ct: ct
+                receiverUserId, requestId, title, body, userTypeId, ct
             );
 
+            // ⬅️ خزّن نسخة من الـ data داخل نتيجة الإشعار (اختياري لكنه عملي للديبج)
             return new NotificationResultDto(
                 NotificationId: notification.Id,
                 RequestId: requestId,
@@ -732,9 +1169,11 @@ namespace Voltyks.Core.DTOs.Processes
                 Body: body,
                 NotificationType: notificationType,
                 SentAt: notification.SentAt,
-                PushSentCount: tokens.Count
+                PushSentCount: tokens.Count,
+                ExtraData: data // NEW
             );
         }
+
 
 
 

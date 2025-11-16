@@ -223,6 +223,46 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
+        //public async Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto)
+        //{
+        //    try
+        //    {
+        //        var userId = GetCurrentUserId();
+        //        if (string.IsNullOrEmpty(userId))
+        //            return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
+
+        //        var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Aborted);
+        //        if (request == null)
+        //            return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
+
+        //        if (request.CarOwner?.Id != userId)
+        //            return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
+
+        //        var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
+        //        var title = "Request Aborted ❌";
+        //        var body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
+        //        var notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+
+        //        var result = await SendAndPersistNotificationAsync(
+        //            receiverUserId: recipientUserId!,
+        //            requestId: request.Id,
+        //            title: title,
+        //            body: body,
+        //            notificationType: notificationType,
+        //            userTypeId: 1 // ChargerOwner
+        //        );
+
+
+        //        return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
+
+
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
+        //    }
+        //}
+
         public async Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto)
         {
             try
@@ -231,37 +271,83 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (string.IsNullOrEmpty(userId))
                     return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
 
+                // ✅ تجيب الطلب وتضبط حالته Aborted (نفس اللوجيك القديم)
                 var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Aborted);
                 if (request == null)
                     return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
-                if (request.CarOwner?.Id != userId)
+                // ✅ تحديد مين اللي بينفّذ الـ abort
+                var carOwnerId = request.CarOwner?.Id;
+                var chargerOwnerId = request.Charger?.User?.Id;
+
+                var isVehicleOwner = carOwnerId == userId;
+                var isChargerOwner = chargerOwnerId == userId;
+
+                if (!isVehicleOwner && !isChargerOwner)
                     return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
 
-                var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
-                var title = "Request Aborted ❌";
-                var body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
-                var notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+                // ✅ تجهيز بيانات الإشعار بناءً على الاتجاه
+                string? recipientUserId;
+                string title;
+                string body;
+                string notificationType;
+                int recipientUserTypeId; // 1 = ChargerOwner, 2 = VehicleOwner (المستلم)
 
+                if (isChargerOwner)
+                {
+                    // 🔹 صاحب الشاحن هو اللي عمل abort → تخصم منه Fees + تبلغ صاحب العربية
+                    recipientUserId = carOwnerId;
+
+                    // هنا تحط منطق خصم الرسوم من صاحب الشاحن (محفظة/رصيد/الخ...)
+                    await ApplyAbortFeesForChargerOwnerAsync(request, userId);
+
+                    title = "Charging session aborted";
+                    body = "The station owner aborted your charging request.";
+                    notificationType = "ChargerOwner_ProcessAborted";
+                    recipientUserTypeId = 2; // VehicleOwner
+                }
+                else
+                {
+                    // 🔹 صاحب العربية هو اللي عمل abort → تبلغ صاحب الشاحن فقط
+                    recipientUserId = chargerOwnerId;
+
+                    title = "Request Aborted ❌";
+                    body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
+                    notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+                    recipientUserTypeId = 1; // ChargerOwner
+                }
+
+                if (string.IsNullOrEmpty(recipientUserId))
+                    return new ApiResponse<NotificationResultDto>(null, "Recipient user not found", false);
+
+                // ✅ إرسال + حفظ الإشعار
                 var result = await SendAndPersistNotificationAsync(
                     receiverUserId: recipientUserId!,
                     requestId: request.Id,
                     title: title,
                     body: body,
                     notificationType: notificationType,
-                    userTypeId: 1 // ChargerOwner
+                    userTypeId: recipientUserTypeId
                 );
 
-
                 return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
-
-               
             }
             catch (Exception ex)
             {
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
+        private async Task ApplyAbortFeesForChargerOwnerAsync(ChargingRequestEntity request, string chargerOwnerId)
+        {
+            // TODO:
+            // هنا تحط منطق خصم الرسوم من صاحب الشاحن:
+            // - تجيب Wallet / Balance بتاعه
+            // - تحسب قيمة الـ fees حسب سياستك
+            // - تخصمها وتعمل SaveChanges
+            // حط لوجيك حقيقي لما تجهّز نظام الـ Wallet.
+            await Task.CompletedTask;
+        }
+
         public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
 
         {
