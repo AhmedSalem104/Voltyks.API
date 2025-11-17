@@ -20,6 +20,7 @@ using Voltyks.Core.DTOs.Charger;
 using Voltyks.Core.Enums;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Utilities;
 
 namespace Voltyks.Application.Services.UserReport
 {
@@ -43,217 +44,16 @@ namespace Voltyks.Application.Services.UserReport
             _firebase = firebase;
         }
 
-        // إنشاء تقرير
-        //public async Task<ApiResponse<object>> CreateReportAsync(ReportDto dto, CancellationToken ct = default)
-        //{
-        //    //var report = new UserReportEntity
-        //    //{
-        //    //    ProcessId = dto.ProcessId,
-        //    //    UserId = dto.UserId,
-        //    //    ReportDate = DateTime.UtcNow,
-        //    //    IsResolved = dto.IsResolved
-        //    //};
-
-        //    // إنشاء بيانات اختبارية
-        //    var report = new UserReportEntity
-        //    {
-        //        ProcessId = dto.ProcessId,
-        //        UserId = dto.UserId,
-        //        ReportDate = DateTime.Now,  // سيتم تعيين التاريخ الحالي
-        //        IsResolved = dto.IsResolved,
-        //        User = _ctx.AppUsers.FirstOrDefault(u => u.Id == "878f90b5-e75e-4439-88a0-298636140ba7"),  // ربط المستخدم
-        //        Process = _ctx.Processes.FirstOrDefault(p => p.Id == 100)   // ربط العملية
-
-        //    };
-
-
-        //    await _ctx.UserReports.AddAsync(report, ct);
-        //    await _ctx.SaveChangesAsync(ct);
-
-        //    return new ApiResponse<object>(new { message = "Report created successfully", reportId = report.Id });
-        //}
-        //public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
-        //{
-
-        //    // التحقق من وجود المستخدم في قاعدة البيانات
-        //    var user = await GetCurrentUserAsync();
-        //   // var user = await _ctx.AppUsers.FirstOrDefaultAsync(u => u.Id == dto.UserId, cancellationToken: ct);
-        //    if (user == null)
-        //    {
-        //        return new ApiResponse<object>(new { message = "User not found" });
-        //    }
-
-        //    // التحقق من وجود العملية في قاعدة البيانات
-        //    var repo = _unitOfWork.GetRepository<Process, int>();
-
-        //    // التحقق من وجود العملية في قاعدة البيانات باستخدام GetAsync
-        //    var process = await _unitOfWork.GetRepository<Process, int>().GetAsync(dto.ProcessId);
-
-        //    if (process == null)
-        //    {
-        //        return new ApiResponse<object>(new { message = "Process not found" });
-        //    }
-
-
-        //    var data = _mapper.Map<IEnumerable<ReportDto>>(dto);
-        //    // إنشاء التقرير مع ربط المستخدمين والعمليات
-        //    var report = new UserReportEntity
-        //    {
-        //        ProcessId = dto.ProcessId,
-        //        UserId = user.Id,
-        //        ReportDate = DateTime.UtcNow,  // استخدام التوقيت العالمي الموحد
-        //        ReportContent = dto.ReportContent,
-        //        IsResolved = false,
-        //        User = user,  // ربط المستخدم
-        //        Process = process  // ربط العملية
-        //    };
-
-        //    // إضافة التقرير إلى قاعدة البيانات
-        //    await _ctx.UserReports.AddAsync(report, ct);
-        //    await _ctx.SaveChangesAsync(ct);
-
-        //    // إرجاع استجابة بنجاح التقرير
-        //    return new ApiResponse<object>(new { message = "Report created successfully", reportId = report.Id });
-        //}
-        //public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
-        //{
-        //    // التحقق من وجود المستخدم في قاعدة البيانات
-        //    var user = await GetCurrentUserAsync();
-        //    if (user == null)
-        //    {
-        //        return new ApiResponse<object>(new { message = "User not found" });
-        //    }
-
-        //    // التحقق من وجود العملية في قاعدة البيانات
-        //    var process = await _unitOfWork.GetRepository<Process, int>().GetAsync(dto.ProcessId);
-
-        //    if (process == null)
-        //    {
-        //        return new ApiResponse<object>(new { message = "Process not found" });
-        //    }
-
-        //    // تحويل ReportDataDto إلى ReportDto باستخدام AutoMapper
-        //    //var reportDto = _mapper.Map<ReportDto>(dto);
-
-        //    // إنشاء التقرير مع ربط المستخدمين والعمليات
-        //    var report = new UserReportEntity
-        //    {
-        //        ProcessId = dto.ProcessId,
-        //        UserId = user.Id,
-        //        ReportDate = DateTime.UtcNow,  // استخدام التوقيت العالمي الموحد
-        //        ReportContent = dto.ReportContent,
-        //        IsResolved = false,
-        //        User = user,  // ربط المستخدم
-        //        Process = process  // ربط العملية
-        //    };
-
-        //    // إضافة التقرير إلى قاعدة البيانات
-        //    await _ctx.UserReports.AddAsync(report, ct);
-        //    await _ctx.SaveChangesAsync(ct);
-
-        //    // إرجاع استجابة بنجاح التقرير
-        //    return new ApiResponse<object>(new { message = "Report created successfully", reportId = report.Id });
-        //}
-
-
-
-        //public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
-        //{
-        //    // التحقق من وجود المستخدم في قاعدة البيانات
-        //    var user = await GetCurrentUserAsync();
-        //    if (user == null)
-        //    {
-        //        return new ApiResponse<object>(new { message = "User not found" });
-        //    }
-
-        //    // التحقق من وجود العملية في قاعدة البيانات
-        //    var process = await _unitOfWork.GetRepository<Process, int>().GetAsync(dto.ProcessId);
-        //    if (process == null)
-        //    {
-        //        return new ApiResponse<object>(new { message = "Process not found" });
-        //    }
-
-        //    // إنشاء التقرير وربطه بالمستخدم والعملية
-        //    var report = new UserReportEntity
-        //    {
-        //        ProcessId = dto.ProcessId,
-        //        UserId = user.Id,
-        //        ReportDate = DateTime.UtcNow,
-        //        ReportContent = dto.ReportContent,
-        //        IsResolved = false,
-        //        User = user,
-        //        Process = process
-        //    };
-
-        //    // إضافة التقرير إلى قاعدة البيانات
-        //    await _ctx.UserReports.AddAsync(report, ct);
-        //    await _ctx.SaveChangesAsync(ct);
-
-        //    // إرسال إشعارات في الاتجاهين
-        //    try
-        //    {
-        //        string title = "New Report Submitted 📝";
-        //        string body = $"Report Content: {dto.ReportContent}";
-
-        //        // تحديد الاتجاه الأول (من صاحب المركبة إلى صاحب المحطة)
-        //        var notif1 = await SendAndPersistNotificationAsync(
-        //            receiverUserId: process.ChargerOwnerId,
-        //            requestId: process.ChargerRequestId,
-        //            title: title,
-        //            processId: process.Id,
-        //            body: body,
-        //            notificationType: NotificationTypes.Report_VehicleOwnerToChargerOwner, // أول اتجاه
-        //            userTypeId: 1, // ChargerOwner
-        //            ct: ct
-        //        );
-
-        //        // الاتجاه الثاني (من صاحب المحطة إلى صاحب المركبة)
-        //        var notif2 = await SendAndPersistNotificationAsync(
-        //            receiverUserId: process.VehicleOwnerId,
-        //            requestId: process.ChargerRequestId,
-        //            title: title,
-        //            processId: process.Id,
-        //            body: body,
-        //            notificationType: NotificationTypes.Report_ChargerOwnerToVehicleOwner, // الاتجاه العكسي
-        //            userTypeId: 2, // VehicleOwner
-        //            ct: ct
-        //        );
-
-        //        // إرجاع النتيجة مع الإشعارات
-        //        var payload = new
-        //        {
-        //            message = "Report created successfully",
-        //            reportId = report.Id,
-        //            notifications = new
-        //            {
-        //                toChargerOwner = notif1,
-        //                toVehicleOwner = notif2
-        //            }
-        //        };
-
-        //        return new ApiResponse<object>(payload, true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return new ApiResponse<object>(
-        //            new { message = "Report created but notification failed", error = ex.Message },
-        //            false
-        //        );
-        //    }
-        //}
         public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
         {
-            // التحقق من وجود المستخدم في قاعدة البيانات
             var user = await GetCurrentUserAsync();
             if (user == null)
                 return new ApiResponse<object>(new { message = "User not found" }, "User not found", false);
 
-            // التحقق من وجود العملية في قاعدة البيانات
             var process = await _unitOfWork.GetRepository<Process, int>().GetAsync(dto.ProcessId);
             if (process == null)
                 return new ApiResponse<object>(new { message = "Process not found" }, "Process not found", false);
 
-            // إنشاء التقرير وربطه بالمستخدم والعملية
             var report = new UserReportEntity
             {
                 ProcessId = dto.ProcessId,
@@ -265,60 +65,63 @@ namespace Voltyks.Application.Services.UserReport
                 Process = process
             };
 
-            // إضافة التقرير إلى قاعدة البيانات
             await _ctx.UserReports.AddAsync(report, ct);
             await _ctx.SaveChangesAsync(ct);
 
-            try
+            // ===== إشعار للطرف المقابل فقط بعنوان ديناميكي =====
+            var reporterName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName
+                             : !string.IsNullOrWhiteSpace(user.UserName) ? user.UserName
+                             : "Someone";
+
+            var isReporterVehicleOwner = process.VehicleOwnerId == user.Id;
+            var receiverUserId = isReporterVehicleOwner ? process.ChargerOwnerId : process.VehicleOwnerId;
+
+            var notificationType = isReporterVehicleOwner
+                ? NotificationTypes.Report_VehicleOwnerToChargerOwner
+                : NotificationTypes.Report_ChargerOwnerToVehicleOwner;
+
+            var title = $"{reporterName} filed a report against you";
+            var body = "Open the process to review the report details.";
+
+            // data الإضافية داخل الـ push
+            var extraData = new Dictionary<string, string>
             {
-                // 🔔 إرسال إشعارات في الاتجاهين
-                string title = "New Report Submitted 📝";
-                string body = $"Report Content: {dto.ReportContent}";
+                ["reportId"] = report.Id.ToString(),
+                ["reporterId"] = user.Id,
+                ["reporterName"] = reporterName
+            };
 
-                // الاتجاه الأول: من صاحب المركبة → صاحب المحطة
-                var notif1 = await SendAndPersistNotificationAsync(
-                    receiverUserId: process.ChargerOwnerId,
-                    requestId: process.ChargerRequestId,
-                    title: title,
-                    processId: process.Id,
-                    body: body,
-                    notificationType: NotificationTypes.Report_VehicleOwnerToChargerOwner,
-                    userTypeId: 1,
-                    ct: ct
-                );
+            var notifDto = await SendAndPersistNotificationAsync(
+                receiverUserId: receiverUserId,
+                requestId: process.ChargerRequestId,
+                title: title,
+                processId: process.Id,
+                body: body,
+                notificationType: notificationType,
+                userTypeId: isReporterVehicleOwner ? 1 : 2, // 1=ChargerOwner, 2=VehicleOwner (المستلم)
+                ct: ct,
+                extraData: extraData
+            );
 
-                // الاتجاه الثاني: من صاحب المحطة → صاحب المركبة
-                var notif2 = await SendAndPersistNotificationAsync(
-                    receiverUserId: process.VehicleOwnerId,
-                    requestId: process.ChargerRequestId,
-                    title: title,
-                    processId: process.Id,
-                    body: body,
-                    notificationType: NotificationTypes.Report_ChargerOwnerToVehicleOwner,
-                    userTypeId: 2,
-                    ct: ct
-                );
-
-                // ✅ إرجاع الاستجابة النهائية بصيغة صحيحة مع ApiResponse
-                var payload = new
-                {
-                    message = "Report created successfully",
-                    reportId = report.Id,
-                    notifications = new
-                    {
-                        toChargerOwner = notif1,
-                        toVehicleOwner = notif2
-                    }
-                };
-
-                return new ApiResponse<object>(payload, "Report created successfully", true);
-            }
-            catch (Exception ex)
+            // ✅ نفس شكل create & update: data = notification + شوية فيلدز زيادة
+            var responseData = new
             {
-                // في حالة فشل إرسال الإشعارات فقط
-                var payload = new { message = "Report created but notification failed", error = ex.Message };
-                return new ApiResponse<object>(payload, "Report created but notification failed", false, new() { ex.Message });
-            }
+                notificationId = notifDto.NotificationId,
+                requestId = notifDto.RequestId,
+                recipientUserId = notifDto.RecipientUserId,
+                title = notifDto.Title,
+                body = notifDto.Body,
+                notificationType = notifDto.NotificationType,
+                sentAt = notifDto.SentAt,
+                pushSentCount = notifDto.PushSentCount,
+
+                processId = process.Id,
+                reportId = report.Id,
+                reporterId = user.Id,
+                reporterName = reporterName
+            };
+
+            return new ApiResponse<object>(responseData, "Report created successfully", true);
         }
 
 
@@ -408,10 +211,11 @@ namespace Voltyks.Application.Services.UserReport
                 Title = title,
                 Body = body,
                 IsRead = false,
-                SentAt = GetEgyptTime(),
+                SentAt = DateTimeHelper.GetEgyptTime(),
                 UserId = receiverUserId,
                 RelatedRequestId = relatedRequestId,
                 UserTypeId = userTypeId
+
             };
 
             await _ctx.AddAsync(notification, ct);
@@ -419,40 +223,37 @@ namespace Voltyks.Application.Services.UserReport
             return notification;
         }
         private async Task<NotificationResultDto> SendAndPersistNotificationAsync(
-           string receiverUserId,
-           int requestId,
-           string title,
-            int processId,
-           string body,
-           string notificationType,
-           int userTypeId,
-           CancellationToken ct)
+      string receiverUserId,
+      int requestId,
+      string title,
+      int processId,
+      string body,
+      string notificationType,
+      int userTypeId,
+      CancellationToken ct,
+      Dictionary<string, string>? extraData = null // NEW
+  )
         {
-            if (string.IsNullOrWhiteSpace(receiverUserId))
-                throw new ArgumentException("receiverUserId is required", nameof(receiverUserId));
+            var data = new Dictionary<string, string>
+            {
+                ["NotificationType"] = notificationType,
+                ["requestId"] = requestId.ToString(),
+                ["processId"] = processId.ToString()
+            };
+            if (extraData != null)
+                foreach (var kv in extraData) data[kv.Key] = kv.Value;
 
-            // نفس منطق تجميع التوكنز
             var tokens = await _ctx.Set<DeviceToken>()
                                    .Where(t => t.UserId == receiverUserId && !string.IsNullOrEmpty(t.Token))
                                    .Select(t => t.Token)
                                    .ToListAsync(ct);
 
             if (tokens.Count > 0)
-            {
-                // إرسال متوازي
                 await Task.WhenAll(tokens.Select(tk =>
-                    _firebase.SendNotificationAsync(tk, title, body, requestId, notificationType)
+                    _firebase.SendNotificationAsync(tk, title, body, requestId, notificationType, data)
                 ));
-            }
 
-            var notification = await AddNotificationAsync(
-                receiverUserId: receiverUserId,
-                relatedRequestId: requestId,
-                title: title,
-                body: body,
-                userTypeId: userTypeId,
-                ct: ct
-            );
+            var notification = await AddNotificationAsync(receiverUserId, requestId, title, body, userTypeId, ct);
 
             return new NotificationResultDto(
                 NotificationId: notification.Id,
@@ -464,12 +265,6 @@ namespace Voltyks.Application.Services.UserReport
                 SentAt: notification.SentAt,
                 PushSentCount: tokens.Count
             );
-        }
-
-        public static DateTime GetEgyptTime()
-        {
-            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
         }
     }
 

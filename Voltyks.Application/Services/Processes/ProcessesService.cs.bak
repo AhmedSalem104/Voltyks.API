@@ -1,15 +1,15 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Processes;
-using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.DTOs.Process;
 using Voltyks.Core.Enums;
@@ -27,13 +27,11 @@ namespace Voltyks.Core.DTOs.Processes
         private readonly VoltyksDbContext _ctx;
         private readonly IHttpContextAccessor _http;
         private readonly IFirebaseService _firebase;
-        private readonly ILogger<ProcessesService> _logger;
 
-        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger)
+        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase)
         {
-            _ctx = ctx; _http = http;
+            _ctx = ctx; _http = http; 
             _firebase = firebase;
-            _logger = logger;
         }
 
         public async Task<ApiResponse<object>> ConfirmByVehicleOwnerAsync(ConfirmByVehicleOwnerDto dto, CancellationToken ct = default)
@@ -51,7 +49,6 @@ namespace Voltyks.Core.DTOs.Processes
             if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
 
             var exists = await _ctx.Set<ProcessEntity>()
-                                   .AsNoTracking()
                                    .AnyAsync(p => p.ChargerRequestId == req.Id, ct);
             if (exists) return new ApiResponse<object>("Process already created for this request", false);
 
@@ -200,7 +197,7 @@ namespace Voltyks.Core.DTOs.Processes
                 if (decision == "completed")
                 {
                     process.Status = ProcessStatus.Completed;
-                    process.DateCompleted = DateTimeHelper.GetEgyptTime();
+                    process.DateCompleted = GetEgyptTime();
                     request.Status = "Completed";
                 }
                 else if (decision == "started")
@@ -325,7 +322,7 @@ namespace Voltyks.Core.DTOs.Processes
                 {
                     process.Status = ProcessStatus.Completed;
                     if (process.DateCompleted == null)
-                        process.DateCompleted = DateTimeHelper.GetEgyptTime();
+                        process.DateCompleted = GetEgyptTime();
                     request.Status = "Completed";
 
                     _ctx.Update(process);
@@ -447,6 +444,120 @@ namespace Voltyks.Core.DTOs.Processes
         {
             var me = CurrentUserId();
             if (string.IsNullOrEmpty(me))
+        //        return new ApiResponse<object>("Unauthorized", false);
+
+        //    var process = await _ctx.Set<ProcessEntity>().FirstOrDefaultAsync(p => p.Id == dto.ProcessId, ct);
+        //    if (process is null) return new ApiResponse<object>("Process not found", false);
+
+        //    if (dto.RatingForOther < 1 || dto.RatingForOther > 5)
+        //        return new ApiResponse<object>("Invalid rating value (1..5)", false);
+
+        //    // مين بيقيّم مين؟
+        //    var raterId = me;
+        //    var rateeId = (process.VehicleOwnerId == me) ? process.ChargerOwnerId
+        //               : (process.ChargerOwnerId == me) ? process.VehicleOwnerId
+        //               : null;
+        //    if (rateeId is null) return new ApiResponse<object>("Forbidden", false);
+
+        //    // منع التقييم المكرر لنفس الشخص على نفس الـ Process
+        //    var already = await _ctx.Set<RatingsHistory>()
+        //        .AnyAsync(x => x.ProcessId == process.Id && x.RaterUserId == raterId, ct);
+        //    if (already) return new ApiResponse<object>("You already rated this process", false);
+
+        //    // خزّن التقييم داخل الـ Process (المصدر المعتمد للعرض)
+        //    if (me == process.VehicleOwnerId)
+        //        process.ChargerOwnerRating = dto.RatingForOther;   // VO يقيّم CO
+        //    else
+        //        process.VehicleOwnerRating = dto.RatingForOther;   // CO يقيّم VO
+
+        //    // توثيق في الـ History (اختياري لكن مفيد للأرشفة)
+        //    await _ctx.AddAsync(new RatingsHistory
+        //    {
+        //        ProcessId = process.Id,
+        //        RaterUserId = raterId,
+        //        RateeUserId = rateeId!,
+        //        Stars = dto.RatingForOther
+        //    }, ct);
+
+        //    // تحديث المتوسط العام للمستخدم المُقَيَّم
+        //    var ratee = await _ctx.Set<AppUser>().FirstOrDefaultAsync(u => u.Id == rateeId, ct);
+        //    ratee!.Rating = ((ratee.Rating * ratee.RatingCount) + dto.RatingForOther) / (ratee.RatingCount + 1);
+        //    ratee.RatingCount += 1;
+
+        //    // لو الاتنين قيّموا، أنهِ العملية
+        //    if (process.VehicleOwnerRating.HasValue && process.ChargerOwnerRating.HasValue)
+        //    {
+        //        process.Status = ProcessStatus.Completed;
+        //        process.DateCompleted = GetEgyptTime();
+
+        //        // (اختياري) شيلها من CurrentActivities
+        //        foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+        //        {
+        //            var u = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+        //            if (u != null)
+        //            {
+        //                var list = u.CurrentActivities.ToList();
+        //                if (list.Contains(process.Id)) { list.Remove(process.Id); u.CurrentActivities = list; _ctx.Update(u); }
+        //            }
+        //        }
+        //    }
+
+        //    await _ctx.SaveChangesAsync(ct);
+        //    // 📣 إرسال إشعار للطرف الآخر بالـ Rating الجديد (بدون تغيير أي لوجك سابق)
+        //    string receiverUserId = rateeId!;
+        //    bool receiverIsChargerOwner = receiverUserId == process.ChargerOwnerId;
+        //    int userTypeId = receiverIsChargerOwner ? 1 : 2; // 1 = ChargerOwner, 2 = VehicleOwner
+
+        //    var title = "New rating received ⭐";
+        //    var body = $"You received a {dto.RatingForOther:0.#}★ rating for process #{process.Id}.";
+        //    var notificationType = receiverIsChargerOwner
+        //        ? "VehicleOwner_SubmitRating"   // VO قيّم CO
+        //        : "ChargerOwner_SubmitRating";  // CO قيّم VO
+
+        //    // لو عندك ChargerRequestId جوه الـ process (منشأ من ConfirmByVehicleOwnerAsync)
+        //    var relatedRequestId = process.ChargerRequestId;
+
+        //    // نفس شكل الـ payload الراجعة من ChargingRequestService.SendAndPersistNotificationAsync
+        //    var ratingNotifDto = await SendAndPersistNotificationAsync(
+        //        receiverUserId: receiverUserId,
+        //        requestId: relatedRequestId,
+        //        processId:process.Id,
+        //        title: title,
+        //        body: body,
+        //        notificationType: notificationType,
+        //        userTypeId: userTypeId,
+        //        ct: ct
+        //    );
+
+
+
+        //    // ⬇️ ارجع التقييمين من جدول Process نفسه
+        //    double? yourRatingForOther;
+        //    double? otherRatingForYou;
+
+        //    if (me == process.VehicleOwnerId)
+        //    {
+        //        yourRatingForOther = process.ChargerOwnerRating;   // انت VO → قيّمْت CO
+        //        otherRatingForYou = process.VehicleOwnerRating;   // تقييم CO ليك (VO)
+        //    }
+        //    else
+        //    {
+        //        yourRatingForOther = process.VehicleOwnerRating;   // انت CO → قيّمْت VO
+        //        otherRatingForYou = process.ChargerOwnerRating;   // تقييم VO ليك (CO)
+        //    }
+
+        //    return new ApiResponse<object>(new
+        //    {
+        //        processId = process.Id,
+        //        processStatus = process.Status.ToString(),
+        //        yourRatingForOther,
+        //        otherRatingForYou // ممكن تكون null لو الطرف الآخر لسه ما قيّمش
+        //    }, "Rating submitted", true);
+        //}
+        public async Task<ApiResponse<object>> SubmitRatingAsync(SubmitRatingDto dto, CancellationToken ct = default)
+        {
+            var me = CurrentUserId();
+            if (string.IsNullOrEmpty(me))
                 return new ApiResponse<object>("Unauthorized", false);
 
             var process = await _ctx.Set<ProcessEntity>().FirstOrDefaultAsync(p => p.Id == dto.ProcessId, ct);
@@ -464,7 +575,6 @@ namespace Voltyks.Core.DTOs.Processes
 
             // منع التقييم المكرر لنفس الشخص على نفس الـ Process
             var already = await _ctx.Set<RatingsHistory>()
-                .AsNoTracking()
                 .AnyAsync(x => x.ProcessId == process.Id && x.RaterUserId == raterId, ct);
             if (already) return new ApiResponse<object>("You already rated this process", false);
 
@@ -483,7 +593,7 @@ namespace Voltyks.Core.DTOs.Processes
                 Stars = dto.RatingForOther
             }, ct);
 
-            // تحديث المتوسط العام للمستخدم المُقَيَّم
+            // تحديث المتوسط العام للمستخدم المُقَيَّم
             var ratee = await _ctx.Set<AppUser>().FirstOrDefaultAsync(u => u.Id == rateeId, ct);
             ratee!.Rating = ((ratee.Rating * ratee.RatingCount) + dto.RatingForOther) / (ratee.RatingCount + 1);
             ratee.RatingCount += 1;
@@ -492,7 +602,7 @@ namespace Voltyks.Core.DTOs.Processes
             if (process.VehicleOwnerRating.HasValue && process.ChargerOwnerRating.HasValue)
             {
                 process.Status = ProcessStatus.Completed;
-                process.DateCompleted = DateTimeHelper.GetEgyptTime();
+                process.DateCompleted = GetEgyptTime();
 
                 // (اختياري) شيلها من CurrentActivities
                 foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
@@ -670,7 +780,6 @@ namespace Voltyks.Core.DTOs.Processes
         private async Task SendToUserAsync(string userId, string title, string body, int relatedRequestId, string notificationType, CancellationToken ct)
         {
             var tokens = await _ctx.Set<DeviceToken>()
-                                   .AsNoTracking()
                                    .Where(t => t.UserId == userId && !string.IsNullOrEmpty(t.Token))
                                    .Select(t => t.Token)
                                    .ToListAsync(ct);
@@ -678,11 +787,17 @@ namespace Voltyks.Core.DTOs.Processes
             foreach (var tk in tokens)
             {
                 try { await _firebase.SendNotificationAsync(tk, title, body, relatedRequestId, notificationType); }
-                catch (Exception ex) { _logger.LogError(ex, "Failed to send notification to token {Token}", tk); }
+                catch { /* سجل لو حابب */ }
             }
         }
         private string CurrentUserId()
            => _http.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+        public static DateTime GetEgyptTime()
+        {
+            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
+        }
 
         private async Task<Notification> AddNotificationAsync(
     string receiverUserId,
@@ -697,7 +812,7 @@ namespace Voltyks.Core.DTOs.Processes
                 Title = title,
                 Body = body,
                 IsRead = false,
-                SentAt = DateTimeHelper.GetEgyptTime(),
+                SentAt = GetEgyptTime(),
                 UserId = receiverUserId,
                 RelatedRequestId = relatedRequestId,
                 UserTypeId = userTypeId
@@ -730,7 +845,6 @@ namespace Voltyks.Core.DTOs.Processes
                 foreach (var kv in extraData) data[kv.Key] = kv.Value;
 
             var tokens = await _ctx.Set<DeviceToken>()
-                                   .AsNoTracking()
                                    .Where(t => t.UserId == receiverUserId && !string.IsNullOrEmpty(t.Token))
                                    .Select(t => t.Token)
                                    .ToListAsync(ct);
@@ -739,7 +853,7 @@ namespace Voltyks.Core.DTOs.Processes
             {
                 await Task.WhenAll(tokens.Select(tk =>
                     _firebase.SendNotificationAsync(
-                        tk, title, body, requestId, notificationType, data // ⬅️ مرّض data للـ FCM
+                        tk, title, body, requestId, notificationType, data // ⬅️ مرّر data للـ FCM
                     )
                 ));
             }

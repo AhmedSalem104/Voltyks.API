@@ -54,7 +54,8 @@ namespace Voltyks.Application.ServicesManager
         ,IOptions<PaymobOptions> _opt
         ,ILogger<PaymobService> _log
         , IPaymobAuthTokenProvider tokenProvider,
-    IFeesConfigService feesConfigService) : IServiceManager
+    IFeesConfigService feesConfigService,
+    ILogger<ProcessesService> processesLogger) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context, vehicleService);
@@ -63,11 +64,11 @@ namespace Voltyks.Application.ServicesManager
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
-        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context);
+        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory);
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
         public ITermsService TermsService { get; } = new TermsService(context);
-        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService);
+        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger);
         public IUserReportService UserReportService  { get; } = new UserReportService(context,mapper,unitOfWork, httpContextAccessor,firebaseService);
 
 

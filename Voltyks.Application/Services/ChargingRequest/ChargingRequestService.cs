@@ -9,6 +9,7 @@ using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.Enums;
@@ -30,10 +31,11 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly IVehicleService _vehicleService ;
         private readonly IFeesConfigService _feesConfigService;
         private readonly VoltyksDbContext _db;
+        private readonly IHttpClientFactory _httpClientFactory;
 
 
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
@@ -41,6 +43,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             _vehicleService = vehicleService;
             _feesConfigService = feesConfigService;
             _db = db;
+            _httpClientFactory = httpClientFactory;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -137,17 +140,17 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 var results = new List<NotificationResultDto>();
 
-                foreach (var reqDto in requestIds)
+                // Fix N+1 query problem: fetch all requests in one query
+                var ids = requestIds.Select(r => r.RequestId).ToList();
+                var requests = await _db.Set<ChargingRequestEntity>()
+                    .Include(r => r.CarOwner)
+                    .Include(r => r.Charger)
+                        .ThenInclude(c => c.User)
+                    .Where(r => ids.Contains(r.Id))
+                    .ToListAsync();
+
+                foreach (var request in requests)
                 {
-                    var request = await _db.Set<ChargingRequestEntity>()
-                        .Include(r => r.CarOwner)
-                        .Include(r => r.Charger)
-                            .ThenInclude(c => c.User)
-                        .FirstOrDefaultAsync(r => r.Id == reqDto.RequestId);
-
-                    if (request == null)
-                        continue;
-
                     // Update request status to rejected
                     request.Status = "Rejected";
                     _db.Entry(request).Property(r => r.Status).IsModified = true;
@@ -223,6 +226,46 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
+        //public async Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto)
+        //{
+        //    try
+        //    {
+        //        var userId = GetCurrentUserId();
+        //        if (string.IsNullOrEmpty(userId))
+        //            return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
+
+        //        var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Aborted);
+        //        if (request == null)
+        //            return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
+
+        //        if (request.CarOwner?.Id != userId)
+        //            return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
+
+        //        var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
+        //        var title = "Request Aborted ❌";
+        //        var body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
+        //        var notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+
+        //        var result = await SendAndPersistNotificationAsync(
+        //            receiverUserId: recipientUserId!,
+        //            requestId: request.Id,
+        //            title: title,
+        //            body: body,
+        //            notificationType: notificationType,
+        //            userTypeId: 1 // ChargerOwner
+        //        );
+
+
+        //        return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
+
+
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
+        //    }
+        //}
+
         public async Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto)
         {
             try
@@ -231,37 +274,83 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (string.IsNullOrEmpty(userId))
                     return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
 
+                // ✅ تجيب الطلب وتضبط حالته Aborted (نفس اللوجيك القديم)
                 var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Aborted);
                 if (request == null)
                     return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
-                if (request.CarOwner?.Id != userId)
+                // ✅ تحديد مين اللي بينفّذ الـ abort
+                var carOwnerId = request.CarOwner?.Id;
+                var chargerOwnerId = request.Charger?.User?.Id;
+
+                var isVehicleOwner = carOwnerId == userId;
+                var isChargerOwner = chargerOwnerId == userId;
+
+                if (!isVehicleOwner && !isChargerOwner)
                     return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
 
-                var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
-                var title = "Request Aborted ❌";
-                var body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
-                var notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+                // ✅ تجهيز بيانات الإشعار بناءً على الاتجاه
+                string? recipientUserId;
+                string title;
+                string body;
+                string notificationType;
+                int recipientUserTypeId; // 1 = ChargerOwner, 2 = VehicleOwner (المستلم)
 
+                if (isChargerOwner)
+                {
+                    // 🔹 صاحب الشاحن هو اللي عمل abort → تخصم منه Fees + تبلغ صاحب العربية
+                    recipientUserId = carOwnerId;
+
+                    // هنا تحط منطق خصم الرسوم من صاحب الشاحن (محفظة/رصيد/الخ...)
+                    await ApplyAbortFeesForChargerOwnerAsync(request, userId);
+
+                    title = "Charging session aborted";
+                    body = "The station owner aborted your charging request.";
+                    notificationType = "ChargerOwner_ProcessAborted";
+                    recipientUserTypeId = 2; // VehicleOwner
+                }
+                else
+                {
+                    // 🔹 صاحب العربية هو اللي عمل abort → تبلغ صاحب الشاحن فقط
+                    recipientUserId = chargerOwnerId;
+
+                    title = "Request Aborted ❌";
+                    body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
+                    notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+                    recipientUserTypeId = 1; // ChargerOwner
+                }
+
+                if (string.IsNullOrEmpty(recipientUserId))
+                    return new ApiResponse<NotificationResultDto>(null, "Recipient user not found", false);
+
+                // ✅ إرسال + حفظ الإشعار
                 var result = await SendAndPersistNotificationAsync(
                     receiverUserId: recipientUserId!,
                     requestId: request.Id,
                     title: title,
                     body: body,
                     notificationType: notificationType,
-                    userTypeId: 1 // ChargerOwner
+                    userTypeId: recipientUserTypeId
                 );
 
-
                 return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
-
-               
             }
             catch (Exception ex)
             {
                 return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
             }
         }
+        private async Task ApplyAbortFeesForChargerOwnerAsync(ChargingRequestEntity request, string chargerOwnerId)
+        {
+            // TODO:
+            // هنا تحط منطق خصم الرسوم من صاحب الشاحن:
+            // - تجيب Wallet / Balance بتاعه
+            // - تحسب قيمة الـ fees حسب سياستك
+            // - تخصمها وتعمل SaveChanges
+            // حط لوجيك حقيقي لما تجهّز نظام الـ Wallet.
+            await Task.CompletedTask;
+        }
+
         public async Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto)
 
         {
@@ -412,52 +501,50 @@ namespace Voltyks.Application.Services.ChargingRequest
             // Nominatim API (مجاني)
             string url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={latitude}&lon={longitude}&addressdetails=1&accept-language=ar";
 
-            using (var client = new HttpClient())
-            {
-                // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
-                client.DefaultRequestHeaders.UserAgent.Clear();
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("YourAppName", "1.0"));
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("(contact@yourdomain.com)"));
+            var client = _httpClientFactory.CreateClient();
+            // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
+            client.DefaultRequestHeaders.UserAgent.Clear();
+            client.DefaultRequestHeaders.UserAgent.Add(
+                new ProductInfoHeaderValue("YourAppName", "1.0"));
+            client.DefaultRequestHeaders.UserAgent.Add(
+                new ProductInfoHeaderValue("(contact@yourdomain.com)"));
 
-                var resp = await client.GetAsync(url);
-                if (!resp.IsSuccessStatusCode)
-                    return ("N/A", "N/A");
+            var resp = await client.GetAsync(url);
+            if (!resp.IsSuccessStatusCode)
+                return ("N/A", "N/A");
 
-                var body = await resp.Content.ReadAsStringAsync();
-                var json = JObject.Parse(body);
-                var address = json["address"] as JObject;
-                if (address == null)
-                    return ("N/A", "N/A");
+            var body = await resp.Content.ReadAsStringAsync();
+            var json = JObject.Parse(body);
+            var address = json["address"] as JObject;
+            if (address == null)
+                return ("N/A", "N/A");
 
-                // نحاول نطلع الشارع
-                // Nominatim ممكن يرجع street تحت مفاتيح مختلفة (road, pedestrian, footway...)
-                string street =
-                    (string)address["road"] ??
-                    (string)address["pedestrian"] ??
-                    (string)address["footway"] ??
-                    (string)address["path"] ??
-                    (string)address["residential"] ??
-                    (string)address["neighbourhood"] ??
-                    "N/A";
+            // نحاول نطلع الشارع
+            // Nominatim ممكن يرجع street تحت مفاتيح مختلفة (road, pedestrian, footway...)
+            string street =
+                (string)address["road"] ??
+                (string)address["pedestrian"] ??
+                (string)address["footway"] ??
+                (string)address["path"] ??
+                (string)address["residential"] ??
+                (string)address["neighbourhood"] ??
+                "N/A";
 
-                // نحاول نطلع المنطقة/الحَي/المدينة
-                // بنستخدم fallback ذكي حسب المتاح
-                string area =
-                    (string)address["suburb"] ??
-                    (string)address["neighbourhood"] ??
-                    (string)address["city_district"] ??
-                    (string)address["city"] ??
-                    (string)address["town"] ??
-                    (string)address["village"] ??
-                    (string)address["county"] ??
-                    (string)address["state_district"] ??
-                    (string)address["state"] ??
-                    "N/A";
+            // نحاول نطلع المنطقة/الحَي/المدينة
+            // بنستخدم fallback ذكي حسب المتاح
+            string area =
+                (string)address["suburb"] ??
+                (string)address["neighbourhood"] ??
+                (string)address["city_district"] ??
+                (string)address["city"] ??
+                (string)address["town"] ??
+                (string)address["village"] ??
+                (string)address["county"] ??
+                (string)address["state_district"] ??
+                (string)address["state"] ??
+                "N/A";
 
-                return (area, street);
-            }
+            return (area, street);
         }
         public async Task<ApiResponse<decimal>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
         {
@@ -475,7 +562,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
         public async Task<ApiResponse<object>> TransferVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
         {
-            // نجيب UserId, RecipientUserId, Fees
+            // نجيب UserId, RecipientUserId, Fees (read-only to get the data for wallet update)
             var req = await _db.Set<ChargingRequestEntity>()
                 .AsNoTracking()
                 .Where(r => r.Id == dto.RequestId)
@@ -535,7 +622,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             var request = (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
                             .GetAllWithIncludeAsync(
                                 r => r.Id == dto.RequestId,
-                                false,
+                                true, // trackChanges = true because we update the entity
                                 r => r.Charger, r => r.Charger.User, r => r.CarOwner)) // include car owner
                             .FirstOrDefault();
 
@@ -543,7 +630,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return null;
 
             request.Status = newStatus;
-            request.RespondedAt = GetEgyptTime();
+            request.RespondedAt = DateTimeHelper.GetEgyptTime();
 
             _unitOfWork.GetRepository<ChargingRequestEntity, int>().Update(request);
             await _unitOfWork.SaveChangesAsync();
@@ -563,7 +650,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 Title = title,
                 Body = body,
                 IsRead = false,
-                SentAt = GetEgyptTime(),
+                SentAt = DateTimeHelper.GetEgyptTime(),
                 UserId = receiverUserId,
                 RelatedRequestId = relatedRequestId,
                 UserTypeId = userTypeId
@@ -571,7 +658,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
             await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
             await _unitOfWork.SaveChangesAsync(); // مهم
-                                                 
+
             //await TryAutoDeleteRequestAndChildrenAsync(relatedRequestId);
 
             return notification;
@@ -670,7 +757,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             {
                 UserId = userId,
                 ChargerId = chargerId,
-                RequestedAt = GetEgyptTime(),
+                RequestedAt = DateTimeHelper.GetEgyptTime(),
                 Status = "pending",
                 KwNeeded = KwNeeded,
                 CurrentBatteryPercentage = CurrentBatteryPercentage,
@@ -717,7 +804,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (existing.UserId != userId)
                     existing.UserId = userId;
 
-                existing.RegisteredAt = GetEgyptTime();
+                existing.RegisteredAt = DateTimeHelper.GetEgyptTime();
                 repo.Update(existing);
             }
             else
@@ -728,7 +815,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     Token = token,
                     UserId = userId,
                     RoleContext = "Owner",
-                    RegisteredAt = GetEgyptTime(),
+                    RegisteredAt = DateTimeHelper.GetEgyptTime(),
                 });
             }
 
@@ -746,7 +833,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (again.UserId != userId)
                     again.UserId = userId;
 
-                again.RegisteredAt = GetEgyptTime();
+                again.RegisteredAt = DateTimeHelper.GetEgyptTime();
                 repo.Update(again);
                 await _unitOfWork.SaveChangesAsync();
                 return true;
@@ -785,7 +872,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             return (await _unitOfWork.GetRepository<ChargingRequestEntity, int>()
                 .GetAllWithIncludeAsync(
                     r => r.Id == requestId,
-                    false,
+                    true, // AsNoTracking = true for read-only query
                     r => r.CarOwner,
                     r => r.Charger,
                     r => r.Charger.User,
@@ -794,12 +881,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                     r => r.Charger.Capacity,
                     r => r.Charger.PriceOption
                 )).FirstOrDefault();
-        }
-
-        public static DateTime GetEgyptTime()
-        {
-            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
         }
         private static decimal ApplyRules(decimal baseAmount, decimal percentage, decimal minimumFee)
         {

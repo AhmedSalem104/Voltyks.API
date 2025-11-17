@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Voltyks.Application\Voltyks.Application.csproj" />
     <ProjectReference Include="..\Voltyks.Persistence\Voltyks.Persistence.csproj" />
+    <ProjectReference Include="..\Voltyks.AdminControlDashboard\Voltyks.AdminControlDashboard.csproj" />
   </ItemGroup>
 
   <ItemGroup>

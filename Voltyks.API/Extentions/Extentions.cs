@@ -34,6 +34,7 @@ using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Services.FeesConfig;
 using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Application.Services.Terms;
+using Voltyks.AdminControlDashboard;
 
 
 namespace Voltyks.API.Extentions
@@ -55,6 +56,7 @@ namespace Voltyks.API.Extentions
             services.Configure<SmsEgyptSettings>(configuration.GetSection("SmsSettings"));
             services.AddSingleton<SqlConnectionFactory>();
             services.AddAutoMapper(typeof(MappingProfile).Assembly);
+            services.AddHttpClient();
             services.AddHttpClient<PaymobService>();
             services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
             services.AddScoped<PaymobService>();
@@ -209,6 +211,9 @@ namespace Voltyks.API.Extentions
 
             // إضافة ServiceManager إذا كان مطلوبًا
             services.AddScoped<IServiceManager, ServiceManager>();
+
+            // إضافة AdminServiceManager
+            services.AddScoped<IAdminServiceManager, AdminServiceManager>();
 
             // إضافة وحدة العمل (UnitOfWork)
             services.AddScoped<IUnitOfWork, UnitOfWork>();
