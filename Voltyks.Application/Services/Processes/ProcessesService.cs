@@ -104,8 +104,6 @@ namespace Voltyks.Core.DTOs.Processes
             if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
 
             var exists = await _ctx.Set<ProcessEntity>()
-                                   .AnyAsync(p => p.ChargerRequestId == req.Id, ct);
-            var exists = await _ctx.Set<ProcessEntity>()
                                    .AsNoTracking()
                                    .AnyAsync(p => p.ChargerRequestId == req.Id, ct);
             if (exists) return new ApiResponse<object>("Process already created for this request", false);
@@ -159,16 +157,6 @@ namespace Voltyks.Core.DTOs.Processes
                 await tx.CommitAsync(ct);
 
                 var title = "Process confirmation pending";
-                var body = $"Amount Charged: {process.AmountCharged:0.##} | Amount Paid: {process.AmountPaid:0.##}";
-
-                // extraData للـ FCM فقط
-                var extraData = new Dictionary<string, string>
-                {
-                    ["processId"] = process.Id.ToString(),
-                    ["estimatedPrice"] = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                    ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                    ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
-                };
                 var body = $"Amount Charged: {process.AmountCharged:0.##} | Amount Paid: {process.AmountPaid:0.##}";
 
                 // extraData للـ FCM فقط
@@ -691,15 +679,6 @@ namespace Voltyks.Core.DTOs.Processes
                     }
                 }
             }
-                        if (list.Contains(process.Id))
-                        {
-                            list.Remove(process.Id);
-                            u.CurrentActivities = list;
-                            _ctx.Update(u);
-                        }
-                    }
-                }
-            }
 
             await _ctx.SaveChangesAsync(ct);
 
@@ -929,10 +908,7 @@ namespace Voltyks.Core.DTOs.Processes
             {
                 await Task.WhenAll(tokens.Select(tk =>
                     _firebase.SendNotificationAsync(
-                        tk, title, body, requestId, notificationType, data // ⬅️ مرّر data للـ FCM
-                    )
-                    _firebase.SendNotificationAsync(
-                        tk, title, body, requestId, notificationType, data // ⬅️ مرّض data للـ FCM
+                        tk, title, body, requestId, notificationType, data
                     )
                 ));
             }
