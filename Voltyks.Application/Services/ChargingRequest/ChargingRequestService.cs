@@ -187,46 +187,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<List<NotificationResultDto>>(null, ex.Message, false);
             }
         }
-        public async Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto)
-        {
-            try
-            {
-                var userId = GetCurrentUserId();
-                if (string.IsNullOrEmpty(userId))
-                    return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
-
-                var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Confirmed);
-                if (request == null)
-                    return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
-
-                if (request.CarOwner?.Id != userId)
-                    return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
-
-                var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
-                var title = "Request Confirmed ✅";
-                var body = $"The driver {request.CarOwner?.FullName} confirmed the charging session at your station.";
-                var notificationType = "VehicleOwner_CompleteProcessSuccessfully";
-
-                var result = await SendAndPersistNotificationAsync(
-                    receiverUserId: recipientUserId!,
-                    requestId: request.Id,
-                    title: title,
-                    body: body,
-                    notificationType: notificationType,
-                    userTypeId: 1 // ChargerOwner
-                );
-
-
-                return new ApiResponse<NotificationResultDto>(result, "Charging request confirmed", true);
-
-              
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
-            }
-        }
-        //public async Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto)
+        //public async Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto)
         //{
         //    try
         //    {
@@ -234,7 +195,7 @@ namespace Voltyks.Application.Services.ChargingRequest
         //        if (string.IsNullOrEmpty(userId))
         //            return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
 
-        //        var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Aborted);
+        //        var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Confirmed);
         //        if (request == null)
         //            return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
@@ -242,9 +203,9 @@ namespace Voltyks.Application.Services.ChargingRequest
         //            return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
 
         //        var recipientUserId = request.Charger?.User?.Id; // ChargerOwner
-        //        var title = "Request Aborted ❌";
-        //        var body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
-        //        var notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+        //        var title = "Request Confirmed ✅";
+        //        var body = $"The driver {request.CarOwner?.FullName} confirmed the charging session at your station.";
+        //        var notificationType = "VehicleOwner_CompleteProcessSuccessfully";
 
         //        var result = await SendAndPersistNotificationAsync(
         //            receiverUserId: recipientUserId!,
@@ -256,7 +217,7 @@ namespace Voltyks.Application.Services.ChargingRequest
         //        );
 
 
-        //        return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
+        //        return new ApiResponse<NotificationResultDto>(result, "Charging request confirmed", true);
 
 
         //    }
@@ -265,6 +226,46 @@ namespace Voltyks.Application.Services.ChargingRequest
         //        return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
         //    }
         //}
+        public async Task<ApiResponse<NotificationResultDto>> ConfirmRequestAsync(TransRequest dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(userId))
+                    return new ApiResponse<NotificationResultDto>(null, "Unauthorized", false);
+
+                // جلب وتحديث الطلب إلى حالة "Confirmed"
+                var request = await GetAndUpdateRequestAsync(dto, RequestStatuses.Confirmed);
+                if (request == null)
+                    return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
+
+                // التأكد أن المستخدم هو الـ ChargerOwner
+                if (request.Charger?.User?.Id != userId)
+                    return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
+
+                // إذا تم التحقق بنجاح، إرسال الإشعار إلى الـ Vehicle Owner
+                var recipientUserId = request.CarOwner?.Id; // VehicleOwner
+                var title = "Charging Request Confirmed ✅";
+                var body = $"The charger {request.Charger?.User?.FullName} confirmed the charging session for your vehicle.";
+                var notificationType = "Charger_ConfirmedProcessSuccessfully";
+
+                // إرسال الإشعار
+                var result = await SendAndPersistNotificationAsync(
+                    receiverUserId: recipientUserId!,
+                    requestId: request.Id,
+                    title: title,
+                    body: body,
+                    notificationType: notificationType,
+                    userTypeId: 2 // VehicleOwner
+                );
+
+                return new ApiResponse<NotificationResultDto>(result, "Charging request confirmed", true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<NotificationResultDto>(null, ex.Message, false);
+            }
+        }
 
         public async Task<ApiResponse<NotificationResultDto>> AbortRequestAsync(TransRequest dto)
         {
