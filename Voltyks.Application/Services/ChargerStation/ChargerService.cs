@@ -323,13 +323,31 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         {
             return deg * (Math.PI / 180);
         }
-   
+
+        //private double EstimateTime(double distanceKm)
+        //{
+        //    double averageSpeedKmPerMin = 0.1;
+        //    double minutes = Math.Ceiling(distanceKm / averageSpeedKmPerMin * 10) / 10; 
+        //    return minutes;
+        //}
+
         private double EstimateTime(double distanceKm)
         {
-            double averageSpeedKmPerMin = 0.1;
-            double minutes = Math.Ceiling(distanceKm / averageSpeedKmPerMin * 10) / 10; 
-            return minutes;
+            // Base speed increases with longer distances
+            double speedKmPerHour = 30 + (distanceKm * 1.2);
+
+            // Upper limit (realistic)
+            if (speedKmPerHour > 90)
+                speedKmPerHour = 90;
+
+            // Convert to minutes
+            double timeMinutes = (distanceKm / speedKmPerHour) * 60;
+
+            return Math.Round(timeMinutes);
         }
+
+
+
 
         private double EstimatePrice(double sessionDurationHr, decimal pricePerHour)
         {
