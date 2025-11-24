@@ -10,5 +10,7 @@ namespace Voltyks.AdminControlDashboard
         IAdminProtocolService AdminProtocolService { get; }
         IAdminReportsService AdminReportsService { get; }
         IAdminBrandsService AdminBrandsService { get; }
+        IAdminChargersService AdminChargersService { get; }
+        IAdminVehiclesService AdminVehiclesService { get; }
     }
 }
