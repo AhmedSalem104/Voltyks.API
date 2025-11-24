@@ -44,7 +44,7 @@ namespace Voltyks.API.Controllers.Admin
         /// </summary>
         [HttpPost]
         public async Task<IActionResult> CreateCharger(
-            [FromBody] CreateChargerDto dto,
+            [FromBody] AdminCreateChargerDto dto,
             CancellationToken ct = default)
         {
             var result = await _adminServiceManager.AdminChargersService.CreateChargerAsync(dto, ct);
@@ -57,7 +57,7 @@ namespace Voltyks.API.Controllers.Admin
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateCharger(
             int id,
-            [FromBody] UpdateChargerDto dto,
+            [FromBody] AdminUpdateChargerDto dto,
             CancellationToken ct = default)
         {
             var result = await _adminServiceManager.AdminChargersService.UpdateChargerAsync(id, dto, ct);

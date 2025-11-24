@@ -1,12 +1,12 @@
 namespace Voltyks.AdminControlDashboard.Dtos.Vehicles
 {
-    public class UpdateVehicleDto
+    public class AdminUpdateVehicleDto
     {
-        public string Color { get; set; }
-        public string Plate { get; set; }
+        public string Color { get; set; } = "";
+        public string Plate { get; set; } = "";
         public int Year { get; set; }
         public int BrandId { get; set; }
         public int ModelId { get; set; }
-        public string UserId { get; set; }
+        public string UserId { get; set; } = "";
     }
 }

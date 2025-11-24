@@ -111,7 +111,7 @@ namespace Voltyks.AdminControlDashboard.Services
             }
         }
 
-        public async Task<ApiResponse<AdminVehicleDto>> CreateVehicleAsync(CreateVehicleDto dto, CancellationToken ct = default)
+        public async Task<ApiResponse<AdminVehicleDto>> CreateVehicleAsync(AdminCreateVehicleDto dto, CancellationToken ct = default)
         {
             try
             {
@@ -206,7 +206,7 @@ namespace Voltyks.AdminControlDashboard.Services
             }
         }
 
-        public async Task<ApiResponse<AdminVehicleDto>> UpdateVehicleAsync(int id, UpdateVehicleDto dto, CancellationToken ct = default)
+        public async Task<ApiResponse<AdminVehicleDto>> UpdateVehicleAsync(int id, AdminUpdateVehicleDto dto, CancellationToken ct = default)
         {
             try
             {

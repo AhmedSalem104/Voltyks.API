@@ -7,8 +7,8 @@ namespace Voltyks.AdminControlDashboard.Interfaces
     {
         Task<ApiResponse<List<AdminVehicleDto>>> GetVehiclesAsync(string? userId = null, CancellationToken ct = default);
         Task<ApiResponse<AdminVehicleDto>> GetVehicleByIdAsync(int id, CancellationToken ct = default);
-        Task<ApiResponse<AdminVehicleDto>> CreateVehicleAsync(CreateVehicleDto dto, CancellationToken ct = default);
-        Task<ApiResponse<AdminVehicleDto>> UpdateVehicleAsync(int id, UpdateVehicleDto dto, CancellationToken ct = default);
+        Task<ApiResponse<AdminVehicleDto>> CreateVehicleAsync(AdminCreateVehicleDto dto, CancellationToken ct = default);
+        Task<ApiResponse<AdminVehicleDto>> UpdateVehicleAsync(int id, AdminUpdateVehicleDto dto, CancellationToken ct = default);
         Task<ApiResponse<object>> DeleteVehicleAsync(int id, CancellationToken ct = default);
     }
 }

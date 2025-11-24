@@ -132,7 +132,7 @@ namespace Voltyks.AdminControlDashboard.Services
             }
         }
 
-        public async Task<ApiResponse<AdminChargerDto>> CreateChargerAsync(CreateChargerDto dto, CancellationToken ct = default)
+        public async Task<ApiResponse<AdminChargerDto>> CreateChargerAsync(AdminCreateChargerDto dto, CancellationToken ct = default)
         {
             try
             {
@@ -240,7 +240,7 @@ namespace Voltyks.AdminControlDashboard.Services
             }
         }
 
-        public async Task<ApiResponse<AdminChargerDto>> UpdateChargerAsync(int id, UpdateChargerDto dto, CancellationToken ct = default)
+        public async Task<ApiResponse<AdminChargerDto>> UpdateChargerAsync(int id, AdminUpdateChargerDto dto, CancellationToken ct = default)
         {
             try
             {

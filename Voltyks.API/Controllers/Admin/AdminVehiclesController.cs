@@ -44,7 +44,7 @@ namespace Voltyks.API.Controllers.Admin
         /// </summary>
         [HttpPost]
         public async Task<IActionResult> CreateVehicle(
-            [FromBody] CreateVehicleDto dto,
+            [FromBody] AdminCreateVehicleDto dto,
             CancellationToken ct = default)
         {
             var result = await _adminServiceManager.AdminVehiclesService.CreateVehicleAsync(dto, ct);
@@ -57,7 +57,7 @@ namespace Voltyks.API.Controllers.Admin
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateVehicle(
             int id,
-            [FromBody] UpdateVehicleDto dto,
+            [FromBody] AdminUpdateVehicleDto dto,
             CancellationToken ct = default)
         {
             var result = await _adminServiceManager.AdminVehiclesService.UpdateVehicleAsync(id, dto, ct);
