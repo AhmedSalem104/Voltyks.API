@@ -12,5 +12,6 @@ namespace Voltyks.AdminControlDashboard
         IAdminBrandsService AdminBrandsService { get; }
         IAdminChargersService AdminChargersService { get; }
         IAdminVehiclesService AdminVehiclesService { get; }
+        IAdminProcessService AdminProcessService { get; }
     }
 }
