@@ -31,6 +31,10 @@ namespace Voltyks.Application.Interfaces.Auth
 
         Task<ApiResponse<double?>> GetMyWalletAsync(CancellationToken ct = default);
 
+        Task<ApiResponse<double?>> ResetMyWalletAsync(CancellationToken ct = default);
+
+        Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default);
+
     }
 
 

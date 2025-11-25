@@ -555,6 +555,100 @@ namespace Voltyks.Application.Services.Auth
             );
         }
 
+        public async Task<ApiResponse<double?>> ResetMyWalletAsync(CancellationToken ct = default)
+        {
+            var userId =
+                httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<double?>("Unauthorized", status: false,
+                    errors: new() { "No current user context." });
+
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null)
+                return new ApiResponse<double?>("User not found", status: false);
+
+            user.Wallet = 0;
+            var result = await userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                var errs = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<double?>("Failed to reset wallet", status: false, errors: errs);
+            }
+
+            return new ApiResponse<double?>(
+                data: 0,
+                message: "Wallet reset to 0 successfully",
+                status: true
+            );
+        }
+
+        public async Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default)
+        {
+            // 1. Get the charging request
+            var chargingRequest = await context.Set<ChargingRequestEntity>()
+                .FirstOrDefaultAsync(r => r.Id == requestId, ct);
+
+            if (chargingRequest is null)
+                return new ApiResponse<object>("Charging request not found", status: false);
+
+            // 2. Get the user (car owner)
+            var user = await userManager.FindByIdAsync(chargingRequest.UserId);
+            if (user is null)
+                return new ApiResponse<object>("User not found", status: false);
+
+            // 3. Get the fees
+            var fees = (double)chargingRequest.VoltyksFees;
+            var currentWallet = user.Wallet ?? 0;
+
+            // 4. Calculate the deduction
+            double deductedAmount;
+            double newWallet;
+
+            if (currentWallet >= fees)
+            {
+                // Wallet has enough - deduct only the fees
+                deductedAmount = fees;
+                newWallet = currentWallet - fees;
+            }
+            else
+            {
+                // Wallet doesn't have enough - deduct all available (reset to 0)
+                deductedAmount = currentWallet;
+                newWallet = 0;
+            }
+
+            // 5. Update the wallet
+            user.Wallet = newWallet;
+            var result = await userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                var errs = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<object>("Failed to update wallet", status: false, errors: errs);
+            }
+
+            return new ApiResponse<object>(
+                data: new
+                {
+                    RequestId = requestId,
+                    UserId = user.Id,
+                    UserName = user.FullName,
+                    FeesAmount = fees,
+                    PreviousWallet = currentWallet,
+                    DeductedAmount = deductedAmount,
+                    NewWallet = newWallet,
+                    IsFullyDeducted = deductedAmount >= fees
+                },
+                message: currentWallet >= fees
+                    ? "Fees deducted successfully"
+                    : $"Partial deduction: Only {deductedAmount:F2} deducted (wallet insufficient)",
+                status: true
+            );
+        }
+
         // ---------- Private Methods ----------
         private async Task CleanupOldRequestsForUserAsync(string userId)
         {

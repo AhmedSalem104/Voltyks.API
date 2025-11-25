@@ -199,9 +199,15 @@ namespace Voltyks.Presentation
            => Ok(await serviceManager.AuthService.ToggleCurrentUserBanAsync(ct));
         [HttpGet("wallet")]
         public async Task<IActionResult> GetMyWallet(CancellationToken ct)
-      => Ok(await serviceManager.AuthService.GetMyWalletAsync(ct));
+            => Ok(await serviceManager.AuthService.GetMyWalletAsync(ct));
 
+        [HttpPut("wallet/reset")]
+        public async Task<IActionResult> ResetMyWallet(CancellationToken ct)
+            => Ok(await serviceManager.AuthService.ResetMyWalletAsync(ct));
 
+        [HttpPost("wallet/deduct-fees/{requestId}")]
+        public async Task<IActionResult> DeductFeesFromWallet(int requestId, CancellationToken ct)
+            => Ok(await serviceManager.AuthService.DeductFeesFromWalletAsync(requestId, ct));
 
     }
 }
