@@ -1,23 +1,17 @@
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 using Voltyks.AdminControlDashboard.Dtos.Terms;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Core.DTOs;
-using Voltyks.Persistence.Data;
-using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.AdminControlDashboard.Services
 {
     public class AdminTermsService : IAdminTermsService
     {
         private readonly ITermsService _termsService;
-        private readonly VoltyksDbContext _context;
 
-        public AdminTermsService(ITermsService termsService, VoltyksDbContext context)
+        public AdminTermsService(ITermsService termsService, Persistence.Data.VoltyksDbContext context)
         {
             _termsService = termsService;
-            _context = context;
         }
 
         public async Task<ApiResponse<AdminTermsDto>> GetTermsAsync(string lang = "en", CancellationToken ct = default)
@@ -55,60 +49,11 @@ namespace Voltyks.AdminControlDashboard.Services
         {
             try
             {
-                // Validate and normalize language
-                var lang = (dto.Lang?.ToLowerInvariant()) switch
-                {
-                    "ar" => "ar",
-                    _ => "en"
-                };
-
-                // Validate content
-                if (dto.Content == null)
-                {
-                    return new ApiResponse<object>(
-                        message: "Content cannot be null",
-                        status: false);
-                }
-
-                // Deactivate current active terms for this language
-                var activeTerms = await _context.Set<TermsDocument>()
-                    .Where(x => x.IsActive && x.Lang == lang)
-                    .ToListAsync(ct);
-
-                foreach (var term in activeTerms)
-                {
-                    term.IsActive = false;
-                }
-
-                // Get the next version number
-                var maxVersion = await _context.Set<TermsDocument>()
-                    .Where(x => x.Lang == lang)
-                    .MaxAsync(x => (int?)x.VersionNumber, ct) ?? 0;
-
-                var newVersion = maxVersion + 1;
-
-                // Serialize content to JSON
-                var contentJson = JsonSerializer.Serialize(dto.Content);
-
-                // Create new terms document
-                var newTerms = new TermsDocument
-                {
-                    VersionNumber = newVersion,
-                    Lang = lang,
-                    IsActive = true,
-                    PublishedAt = DateTime.UtcNow,
-                    PayloadJson = contentJson
-                };
-
-                _context.Set<TermsDocument>().Add(newTerms);
-
-                // Save changes to database
-                await _context.SaveChangesAsync(ct);
-
+                // This would need implementation in the existing service
+                // For now, return not implemented
                 return new ApiResponse<object>(
-                    data: new { Version = newVersion, Lang = lang, PublishedAt = newTerms.PublishedAt },
-                    message: "Terms updated successfully",
-                    status: true);
+                    message: "Update terms functionality requires implementation in TermsService",
+                    status: false);
             }
             catch (Exception ex)
             {
