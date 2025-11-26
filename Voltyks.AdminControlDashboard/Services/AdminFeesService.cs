@@ -54,6 +54,7 @@ namespace Voltyks.AdminControlDashboard.Services
 
         public async Task<ApiResponse<object>> UpdateFeesAsync(UpdateFeesDto dto, CancellationToken ct = default)
         {
+
             try
             {
                 // Wrapper - convert to existing DTO and call service
