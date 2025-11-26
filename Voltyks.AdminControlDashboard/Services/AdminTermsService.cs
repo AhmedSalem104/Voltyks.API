@@ -57,6 +57,7 @@ namespace Voltyks.AdminControlDashboard.Services
             }
             catch (Exception ex)
             {
+
                 return new ApiResponse<object>(
                     message: "Failed to update terms",
                     status: false,
