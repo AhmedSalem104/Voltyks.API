@@ -1,4 +1,5 @@
 using Voltyks.AdminControlDashboard.Interfaces;
+using Voltyks.AdminControlDashboard.Interfaces.Complaints;
 
 namespace Voltyks.AdminControlDashboard
 {
@@ -14,5 +15,6 @@ namespace Voltyks.AdminControlDashboard
         IAdminVehiclesService AdminVehiclesService { get; }
         IAdminProcessService AdminProcessService { get; }
         IAdminComplaintCategoriesService AdminComplaintCategoriesService { get; }
+        IAdminComplaintsService AdminComplaintsService { get; }
     }
 }

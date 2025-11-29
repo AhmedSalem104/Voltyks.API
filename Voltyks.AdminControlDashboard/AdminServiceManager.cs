@@ -1,7 +1,9 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Voltyks.AdminControlDashboard.Interfaces;
+using Voltyks.AdminControlDashboard.Interfaces.Complaints;
 using Voltyks.AdminControlDashboard.Services;
+using Voltyks.AdminControlDashboard.Services.Complaints;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
@@ -27,6 +29,7 @@ namespace Voltyks.AdminControlDashboard
             AdminVehiclesService = new AdminVehiclesService(context);
             AdminProcessService = new AdminProcessService(context);
             AdminComplaintCategoriesService = new AdminComplaintCategoriesService(context);
+            AdminComplaintsService = new AdminComplaintsService(context);
         }
 
         public IAdminUsersService AdminUsersService { get; }
@@ -39,5 +42,6 @@ namespace Voltyks.AdminControlDashboard
         public IAdminVehiclesService AdminVehiclesService { get; }
         public IAdminProcessService AdminProcessService { get; }
         public IAdminComplaintCategoriesService AdminComplaintCategoriesService { get; }
+        public IAdminComplaintsService AdminComplaintsService { get; }
     }
 }
