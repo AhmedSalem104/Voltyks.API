@@ -127,5 +127,33 @@ namespace Voltyks.AdminControlDashboard.Services
                     errors: new List<string> { ex.Message });
             }
         }
+
+        public async Task<ApiResponse<object>> UpdateReportStatusAsync(int reportId, bool isResolved, CancellationToken ct = default)
+        {
+            try
+            {
+                var report = await _context.Set<Voltyks.Persistence.Entities.Main.UserReport>()
+                    .FirstOrDefaultAsync(r => r.Id == reportId, ct);
+
+                if (report is null)
+                    return new ApiResponse<object>("Report not found", status: false);
+
+                report.IsResolved = isResolved;
+                await _context.SaveChangesAsync(ct);
+
+                return new ApiResponse<object>(
+                    data: new { ReportId = reportId, IsResolved = isResolved },
+                    message: isResolved ? "Report marked as done" : "Report marked as pending",
+                    status: true
+                );
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<object>(
+                    message: "Failed to update report status",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
     }
 }

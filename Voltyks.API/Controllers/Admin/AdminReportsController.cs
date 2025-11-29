@@ -40,5 +40,18 @@ namespace Voltyks.API.Controllers.Admin
             var result = await _adminServiceManager.AdminReportsService.GetReportByIdAsync(id, ct);
             return Ok(result);
         }
+
+        /// <summary>
+        /// PATCH /api/admin/reports/{id}/status - Update report status
+        /// </summary>
+        [HttpPatch("{id}/status")]
+        public async Task<IActionResult> UpdateReportStatus(
+            int id,
+            [FromQuery] bool isResolved,
+            CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminReportsService.UpdateReportStatusAsync(id, isResolved, ct);
+            return Ok(result);
+        }
     }
 }
