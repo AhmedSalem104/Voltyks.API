@@ -652,12 +652,30 @@ namespace Voltyks.Application.Services.Auth
 
         public async Task<ApiResponse<object>> CreateGeneralComplaintAsync(CreateGeneralComplaintDto dto, CancellationToken ct = default)
         {
-            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+            string? userId;
+
+            // Check if UserId is provided in the request
+            if (!string.IsNullOrWhiteSpace(dto.UserId))
+            {
+                // Use the provided UserId
+                userId = dto.UserId;
+
+                // Validate that the user exists
+                var userExists = await userManager.FindByIdAsync(userId);
+                if (userExists is null)
+                    return new ApiResponse<object>("User not found", status: false,
+                        errors: new() { "The specified UserId does not exist." });
+            }
+            else
+            {
+                // Use the currently authenticated user
+                userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
                          ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
 
-            if (string.IsNullOrWhiteSpace(userId))
-                return new ApiResponse<object>("Unauthorized", status: false,
-                    errors: new() { "No current user context." });
+                if (string.IsNullOrWhiteSpace(userId))
+                    return new ApiResponse<object>("Unauthorized", status: false,
+                        errors: new() { "No current user context and no UserId provided." });
+            }
 
             // Validate category exists and not deleted
             var category = await context.ComplaintCategories
