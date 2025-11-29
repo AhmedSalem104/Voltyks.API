@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.Complaints;
 using Voltyks.Persistence.Entities.Identity;
 
 
@@ -34,6 +35,8 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<double?>> ResetMyWalletAsync(CancellationToken ct = default);
 
         Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default);
+
+        Task<ApiResponse<object>> CreateGeneralComplaintAsync(CreateGeneralComplaintDto dto, CancellationToken ct = default);
 
     }
 

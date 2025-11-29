@@ -55,6 +55,9 @@ namespace Voltyks.Persistence.Data
 
         public DbSet<UsersBanned> UsersBanneds { get; set; }
 
+        // Complaint System
+        public DbSet<ComplaintCategory> ComplaintCategories { get; set; }
+        public DbSet<UserGeneralComplaint> UserGeneralComplaints { get; set; }
 
     }
 }

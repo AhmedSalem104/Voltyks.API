@@ -13,6 +13,7 @@ using Voltyks.Application;
 using Voltyks.Persistence.Entities;
 using System.Security.Claims;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.Complaints;
 
 
 
@@ -208,6 +209,15 @@ namespace Voltyks.Presentation
         [HttpPost("wallet/deduct-fees/{requestId}")]
         public async Task<IActionResult> DeductFeesFromWallet(int requestId, CancellationToken ct)
             => Ok(await serviceManager.AuthService.DeductFeesFromWalletAsync(requestId, ct));
+
+        /// <summary>
+        /// POST /api/auth/general-complaints - Submit a general complaint
+        /// </summary>
+        [HttpPost("general-complaints")]
+        public async Task<IActionResult> CreateGeneralComplaint(
+            [FromBody] CreateGeneralComplaintDto dto,
+            CancellationToken ct)
+            => Ok(await serviceManager.AuthService.CreateGeneralComplaintAsync(dto, ct));
 
     }
 }

@@ -26,6 +26,7 @@ namespace Voltyks.AdminControlDashboard
             AdminChargersService = new AdminChargersService(context);
             AdminVehiclesService = new AdminVehiclesService(context);
             AdminProcessService = new AdminProcessService(context);
+            AdminComplaintCategoriesService = new AdminComplaintCategoriesService(context);
         }
 
         public IAdminUsersService AdminUsersService { get; }
@@ -37,5 +38,6 @@ namespace Voltyks.AdminControlDashboard
         public IAdminChargersService AdminChargersService { get; }
         public IAdminVehiclesService AdminVehiclesService { get; }
         public IAdminProcessService AdminProcessService { get; }
+        public IAdminComplaintCategoriesService AdminComplaintCategoriesService { get; }
     }
 }

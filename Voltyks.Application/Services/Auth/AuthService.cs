@@ -27,6 +27,7 @@ using Voltyks.Persistence.Data;
 using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
 using Voltyks.Application.Interfaces;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.Complaints;
 using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 using static System.Net.WebRequestMethods;
@@ -645,6 +646,49 @@ namespace Voltyks.Application.Services.Auth
                 message: currentWallet >= fees
                     ? "Fees deducted successfully"
                     : $"Partial deduction: Only {deductedAmount:F2} deducted (wallet insufficient)",
+                status: true
+            );
+        }
+
+        public async Task<ApiResponse<object>> CreateGeneralComplaintAsync(CreateGeneralComplaintDto dto, CancellationToken ct = default)
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                         ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<object>("Unauthorized", status: false,
+                    errors: new() { "No current user context." });
+
+            // Validate category exists and not deleted
+            var category = await context.ComplaintCategories
+                .FirstOrDefaultAsync(c => c.Id == dto.CategoryId && !c.IsDeleted, ct);
+
+            if (category is null)
+                return new ApiResponse<object>("Category not found or deleted", status: false);
+
+            // Create complaint
+            var complaint = new UserGeneralComplaint
+            {
+                UserId = userId,
+                CategoryId = dto.CategoryId,
+                Content = dto.Content,
+                CreatedAt = DateTime.UtcNow,
+                IsResolved = false
+            };
+
+            context.UserGeneralComplaints.Add(complaint);
+            await context.SaveChangesAsync(ct);
+
+            return new ApiResponse<object>(
+                data: new
+                {
+                    ComplaintId = complaint.Id,
+                    CategoryId = complaint.CategoryId,
+                    CategoryName = category.Name,
+                    Content = complaint.Content,
+                    CreatedAt = complaint.CreatedAt
+                },
+                message: "Complaint submitted successfully",
                 status: true
             );
         }
