@@ -355,13 +355,6 @@ namespace Voltyks.Core.DTOs.Processes
             if (!isChargerOwner && !isVehicleOwner)
                 return new ApiResponse<object>("Forbidden", false);
 
-            // منع القرارات بعد الغلق
-            if (process.Status == ProcessStatus.Completed || process.Status == ProcessStatus.Aborted)
-            {
-                var already = process.Status == ProcessStatus.Completed ? "already completed" : "already aborted";
-                return new ApiResponse<object>($"Process is {already}.", false);
-            }
-
             // ⚙️ تطبيع القرار على القيم الجديدة
             var raw = (dto.Decision ?? "Process-Completed").Trim();
             // نقارن Case-Insensitive

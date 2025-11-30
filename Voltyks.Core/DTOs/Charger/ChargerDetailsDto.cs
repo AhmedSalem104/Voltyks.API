@@ -32,6 +32,11 @@ namespace Voltyks.Core.DTOs.Charger
         public string AdapterAvailability { get; set; }
 
         public double PriceEstimated { get; set; }
+
+        /// <summary>
+        /// Estimated charging time in minutes based on KwNeed and charger capacity
+        /// </summary>
+        public double ChargingEstimatedTime { get; set; }
     }
 
 }

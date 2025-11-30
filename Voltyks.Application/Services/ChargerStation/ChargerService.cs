@@ -306,6 +306,10 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             double sessionDurationHr = kwNeed / chargerCapacity;
             double estimatedCost = EstimatePrice(sessionDurationHr, charger.PriceOption.Value);
             dto.PriceEstimated = estimatedCost;
+
+            // Calculate charging estimated time in minutes
+            double chargingTimeMinutes = sessionDurationHr * 60;
+            dto.ChargingEstimatedTime = Math.Round(chargingTimeMinutes, 1);
         }
         private double CalculateDistanceInKm(double lat1, double lon1, double lat2, double lon2)
         {
