@@ -17,7 +17,7 @@ namespace Voltyks.AdminControlDashboard.Services
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false,
+            WriteIndented = true,
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
@@ -70,7 +70,7 @@ namespace Voltyks.AdminControlDashboard.Services
                 };
 
                 // Validate content
-                if (dto.Content == null)
+                if (dto.Content.ValueKind == JsonValueKind.Undefined)
                 {
                     return new ApiResponse<object>(
                         message: "Content cannot be null",
@@ -84,18 +84,13 @@ namespace Voltyks.AdminControlDashboard.Services
                     .ThenByDescending(x => x.VersionNumber)
                     .FirstOrDefaultAsync(ct);
 
-                // Serialize content - preserve the original JSON structure
-                string contentJson;
-                if (dto.Content is JsonElement jsonElement)
+                // Get the raw JSON and re-serialize with proper formatting
+                using var stream = new MemoryStream();
+                using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
                 {
-                    // If it's already a JsonElement, get the raw JSON string
-                    contentJson = jsonElement.GetRawText();
+                    dto.Content.WriteTo(writer);
                 }
-                else
-                {
-                    // Otherwise serialize with options that preserve structure
-                    contentJson = JsonSerializer.Serialize(dto.Content, _jsonOptions);
-                }
+                string contentJson = System.Text.Encoding.UTF8.GetString(stream.ToArray());
 
                 if (existingTerms != null)
                 {
