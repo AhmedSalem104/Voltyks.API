@@ -84,8 +84,13 @@ namespace Voltyks.AdminControlDashboard.Services
                     .ThenByDescending(x => x.VersionNumber)
                     .FirstOrDefaultAsync(ct);
 
-                // Get raw JSON exactly as received - no transformation
-                string contentJson = dto.Content.GetRawText();
+                // Re-serialize with indentation to store properly formatted JSON
+                var jsonDoc = JsonDocument.Parse(dto.Content.GetRawText());
+                string contentJson = JsonSerializer.Serialize(jsonDoc.RootElement, new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                });
 
                 if (existingTerms != null)
                 {
