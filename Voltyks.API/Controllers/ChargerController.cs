@@ -18,6 +18,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetCapacity")]
+        [ResponseCache(Duration = 3600)] // 1 hour cache
         public async Task<IActionResult> GetCapacity()
         {
             var result = await _serviceManager.ChargerService.GetAllCapacitiesAsync();
@@ -25,6 +26,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetProtocol")]
+        [ResponseCache(Duration = 3600)] // 1 hour cache
         public async Task<IActionResult> GetProtocol()
         {
             var result = await _serviceManager.ChargerService.GetAllProtocolsAsync();
@@ -32,6 +34,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetPrices")]
+        [ResponseCache(Duration = 1800)] // 30 min cache
         public async Task<IActionResult> GetPriceBasedOnCapacity()
         {
             var result = await _serviceManager.ChargerService.GetPriceListAsync();

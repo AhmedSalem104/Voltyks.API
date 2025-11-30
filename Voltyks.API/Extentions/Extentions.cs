@@ -35,6 +35,8 @@ using Voltyks.Application.Services.FeesConfig;
 using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Application.Services.Terms;
 using Voltyks.AdminControlDashboard;
+using Voltyks.Application.Interfaces.Caching;
+using Voltyks.Application.Services.Caching;
 
 
 namespace Voltyks.API.Extentions
@@ -46,6 +48,7 @@ namespace Voltyks.API.Extentions
         {
 
             services.AddBuildInServices();
+            services.AddResponseCaching();
             services.AddSwaggerServices();
             services.AddInfrastructureServices(configuration);
             services.AddIdentityServices();
@@ -167,6 +170,7 @@ namespace Voltyks.API.Extentions
             app.UseStaticFiles();
             app.UseHttpsRedirection();
             app.UseRouting();
+            app.UseResponseCaching();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
@@ -231,6 +235,8 @@ namespace Voltyks.API.Extentions
             services.AddScoped<IVehicleService, VehicleService>();
             services.AddScoped<IPaymobService, PaymobService>();
 
+            // CacheService
+            services.AddScoped<ICacheService, CacheService>();
 
             return services;
 

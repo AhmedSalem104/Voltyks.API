@@ -19,6 +19,7 @@ namespace Voltyks.AdminControlDashboard.Services
         public async Task<ApiResponse<List<AdminProcessDto>>> GetProcessesAsync(CancellationToken ct = default)
         {
             var processes = await _context.Process
+                .AsNoTracking()
                 .Include(p => p.ChargerRequest)
                     .ThenInclude(cr => cr!.Charger)
                         .ThenInclude(c => c.Protocol)
@@ -41,12 +42,14 @@ namespace Voltyks.AdminControlDashboard.Services
 
             // Fetch users
             var users = await _context.Users
+                .AsNoTracking()
                 .Where(u => allUserIds.Contains(u.Id))
                 .Cast<AppUser>()
                 .ToDictionaryAsync(u => u.Id, ct);
 
             // Fetch vehicles for vehicle owners
             var vehiclesList = await _context.Vehicles
+                .AsNoTracking()
                 .Include(v => v.Brand)
                 .Include(v => v.Model)
                 .Where(v => vehicleOwnerIds.Contains(v.UserId) && !v.IsDeleted)

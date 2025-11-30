@@ -10,6 +10,7 @@ namespace Voltyks.API.Controllers
     public class ModelController(IServiceManager _serviceManager) : ControllerBase
     {
         [HttpGet("GetModelsByBrandId")]
+        [ResponseCache(Duration = 3600, VaryByQueryKeys = new[] { "brandId" })] // 1 hour cache per brandId
         public async Task<IActionResult> GetModelsByBrandId(int brandId)
         {
             var response = await _serviceManager.ModelService.GetModelsByBrandIdAsync(brandId);
@@ -17,6 +18,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetYearsByModelId")]
+        [ResponseCache(Duration = 3600, VaryByQueryKeys = new[] { "modelId" })] // 1 hour cache per modelId
         public async Task<IActionResult> GetYearsByModelId(int modelId)
         {
             var response = await _serviceManager.ModelService.GetYearsByModelIdAsync(modelId);

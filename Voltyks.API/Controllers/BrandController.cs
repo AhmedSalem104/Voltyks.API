@@ -15,6 +15,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetAllBrands")]
+        [ResponseCache(Duration = 3600)] // 1 hour cache
         public async Task<IActionResult> GetAll()
         {
             var result = await _service.BrandService.GetAllAsync();

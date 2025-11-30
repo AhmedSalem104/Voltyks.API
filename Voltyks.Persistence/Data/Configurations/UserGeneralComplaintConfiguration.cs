@@ -40,6 +40,13 @@ namespace Voltyks.Persistence.Data.Configurations
                    .WithMany(cat => cat.Complaints)
                    .HasForeignKey(c => c.CategoryId)
                    .OnDelete(DeleteBehavior.Restrict);
+
+            // Performance Indexes
+            builder.HasIndex(c => new { c.UserId, c.IsResolved })
+                   .HasDatabaseName("IX_UserGeneralComplaints_UserId_IsResolved");
+
+            builder.HasIndex(c => c.CategoryId)
+                   .HasDatabaseName("IX_UserGeneralComplaints_CategoryId");
         }
     }
 }

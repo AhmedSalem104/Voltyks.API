@@ -17,6 +17,13 @@ namespace Voltyks.Persistence.Data.Configurations
                    .WithMany(u => u.DeviceTokens)
                    .HasForeignKey(t => t.UserId)
                    .OnDelete(DeleteBehavior.Cascade);
+
+            // Performance Indexes
+            builder.HasIndex(t => t.UserId)
+                   .HasDatabaseName("IX_DeviceTokens_UserId");
+
+            builder.HasIndex(t => t.Token)
+                   .HasDatabaseName("IX_DeviceTokens_Token");
         }
     }
 

@@ -48,6 +48,12 @@ namespace Voltyks.Persistence.Data.Configurations
                    .HasForeignKey(v => v.UserId)
                    .OnDelete(DeleteBehavior.Restrict);
 
+            // Performance Indexes
+            builder.HasIndex(v => new { v.UserId, v.IsDeleted })
+                   .HasDatabaseName("IX_Vehicles_UserId_IsDeleted");
+
+            builder.HasIndex(v => v.Plate)
+                   .HasDatabaseName("IX_Vehicles_Plate");
         }
     }
 }

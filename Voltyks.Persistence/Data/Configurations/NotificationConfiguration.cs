@@ -25,9 +25,10 @@ namespace Voltyks.Persistence.Data.Configurations
                    .OnDelete(DeleteBehavior.SetNull) // المهم
                    .IsRequired(false);
 
-            builder.HasIndex(n => n.RelatedRequestId);
-            builder.HasIndex(n => n.UserId);
+            builder.HasIndex(n => n.RelatedRequestId)
+                   .HasDatabaseName("IX_Notifications_RelatedRequestId");
 
+            // Note: IX_Notifications_UserId_IsRead already exists in database
         }
     }
 

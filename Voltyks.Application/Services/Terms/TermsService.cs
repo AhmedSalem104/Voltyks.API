@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,12 +8,20 @@ using Microsoft.EntityFrameworkCore;
 using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Core.DTOs.Terms;
 using Voltyks.Persistence.Data;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Application.Services.Terms
 {
     public class TermsService : ITermsService
     {
         private readonly VoltyksDbContext _db;
+
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
 
         public TermsService(VoltyksDbContext db)
         {
@@ -26,11 +34,27 @@ namespace Voltyks.Application.Services.Terms
 
             var q = _db.termsDocuments.AsNoTracking();
 
-            var doc = version.HasValue
-                ? await q.FirstOrDefaultAsync(x => x.VersionNumber == version && x.Lang == lang, ct)
-                : await q.Where(x => x.IsActive && x.Lang == lang)
-                         .OrderByDescending(x => x.VersionNumber)
-                         .FirstOrDefaultAsync(ct);
+            TermsDocument? doc;
+
+            if (version.HasValue)
+            {
+                doc = await q.FirstOrDefaultAsync(x => x.VersionNumber == version && x.Lang == lang, ct);
+            }
+            else
+            {
+                // First try to get active terms
+                doc = await q.Where(x => x.IsActive && x.Lang == lang)
+                             .OrderByDescending(x => x.VersionNumber)
+                             .FirstOrDefaultAsync(ct);
+
+                // If no active terms found, get the latest terms regardless of IsActive
+                if (doc is null)
+                {
+                    doc = await q.Where(x => x.Lang == lang)
+                                 .OrderByDescending(x => x.VersionNumber)
+                                 .FirstOrDefaultAsync(ct);
+                }
+            }
 
             if (doc is null) return null;
 
@@ -39,7 +63,7 @@ namespace Voltyks.Application.Services.Terms
                 Version = doc.VersionNumber,
                 Lang = doc.Lang,
                 PublishedAt = doc.PublishedAt,
-                Content = JsonSerializer.Deserialize<object>(doc.PayloadJson)!
+                Content = JsonSerializer.Deserialize<object>(doc.PayloadJson, _jsonOptions)!
             };
         }
     }

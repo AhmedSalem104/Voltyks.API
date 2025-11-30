@@ -128,7 +128,7 @@ namespace Voltyks.Application.Services.UserReport
         // الحصول على جميع التقارير بناءً على الفلترة
         public async Task<ApiResponse<List<ReportDto>>> GetReportsAsync(ReportFilterDto filter, CancellationToken ct = default)
         {
-            var query = _ctx.UserReports.AsQueryable();
+            var query = _ctx.UserReports.AsNoTracking().AsQueryable();
 
             // فلترة حسب المستخدم (اختياري)
             if (!string.IsNullOrEmpty(filter.UserId))
@@ -159,6 +159,7 @@ namespace Voltyks.Application.Services.UserReport
         public async Task<ApiResponse<ReportDto>> GetReportByIdAsync(int reportId, CancellationToken ct = default)
         {
             var report = await _ctx.UserReports
+                .AsNoTracking()
                 .Include(r => r.User)
                 .Include(r => r.Process)
                 .FirstOrDefaultAsync(r => r.Id == reportId, ct);

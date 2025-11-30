@@ -44,8 +44,15 @@ namespace Voltyks.Persistence.Data.Configurations
                    .HasColumnType("decimal(18,2)")
                    .HasDefaultValue(0);
 
+            // Performance Indexes
+            builder.HasIndex(r => r.UserId)
+                   .HasDatabaseName("IX_ChargingRequests_UserId");
 
+            builder.HasIndex(r => r.ChargerId)
+                   .HasDatabaseName("IX_ChargingRequests_ChargerId");
 
+            builder.HasIndex(r => r.RecipientUserId)
+                   .HasDatabaseName("IX_ChargingRequests_RecipientUserId");
         }
     }
 

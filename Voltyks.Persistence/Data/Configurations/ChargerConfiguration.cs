@@ -47,7 +47,15 @@ namespace Voltyks.Persistence.Data.Configurations
                    .HasForeignKey(c => c.AddressId)
                    .OnDelete(DeleteBehavior.Restrict);
 
-          
+            // Performance Indexes
+            builder.HasIndex(c => c.UserId)
+                   .HasDatabaseName("IX_Chargers_UserId");
+
+            builder.HasIndex(c => new { c.IsDeleted, c.IsActive })
+                   .HasDatabaseName("IX_Chargers_IsDeleted_IsActive");
+
+            builder.HasIndex(c => new { c.IsDeleted, c.IsActive, c.ProtocolId })
+                   .HasDatabaseName("IX_Chargers_IsDeleted_IsActive_ProtocolId");
         }
     }
 

@@ -14,6 +14,13 @@ namespace Voltyks.AdminControlDashboard.Services
         private readonly ITermsService _termsService;
         private readonly VoltyksDbContext _context;
 
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+
         public AdminTermsService(ITermsService termsService, VoltyksDbContext context)
         {
             _termsService = termsService;
@@ -87,8 +94,8 @@ namespace Voltyks.AdminControlDashboard.Services
 
                 var newVersion = maxVersion + 1;
 
-                // Serialize content to JSON
-                var contentJson = JsonSerializer.Serialize(dto.Content);
+                // Serialize content to JSON with consistent options
+                var contentJson = JsonSerializer.Serialize(dto.Content, _jsonOptions);
 
                 // Create new terms document
                 var newTerms = new TermsDocument
