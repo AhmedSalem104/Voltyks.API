@@ -84,13 +84,8 @@ namespace Voltyks.AdminControlDashboard.Services
                     .ThenByDescending(x => x.VersionNumber)
                     .FirstOrDefaultAsync(ct);
 
-                // Get the raw JSON and re-serialize with proper formatting
-                using var stream = new MemoryStream();
-                using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
-                {
-                    dto.Content.WriteTo(writer);
-                }
-                string contentJson = System.Text.Encoding.UTF8.GetString(stream.ToArray());
+                // Get raw JSON exactly as received - no transformation
+                string contentJson = dto.Content.GetRawText();
 
                 if (existingTerms != null)
                 {
