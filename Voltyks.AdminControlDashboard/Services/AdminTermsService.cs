@@ -77,49 +77,63 @@ namespace Voltyks.AdminControlDashboard.Services
                         status: false);
                 }
 
-                // Deactivate current active terms for this language
-                var activeTerms = await _context.Set<TermsDocument>()
-                    .Where(x => x.IsActive && x.Lang == lang)
-                    .ToListAsync(ct);
+                // Find existing terms for this language (get the latest/active one)
+                var existingTerms = await _context.Set<TermsDocument>()
+                    .Where(x => x.Lang == lang)
+                    .OrderByDescending(x => x.IsActive)
+                    .ThenByDescending(x => x.VersionNumber)
+                    .FirstOrDefaultAsync(ct);
 
-                foreach (var term in activeTerms)
+                // Serialize content - preserve the original JSON structure
+                string contentJson;
+                if (dto.Content is JsonElement jsonElement)
                 {
-                    term.IsActive = false;
+                    // If it's already a JsonElement, get the raw JSON string
+                    contentJson = jsonElement.GetRawText();
+                }
+                else
+                {
+                    // Otherwise serialize with options that preserve structure
+                    contentJson = JsonSerializer.Serialize(dto.Content, _jsonOptions);
                 }
 
-                // Get the next version number
-                var maxVersion = await _context.Set<TermsDocument>()
-                    .Where(x => x.Lang == lang)
-                    .MaxAsync(x => (int?)x.VersionNumber, ct) ?? 0;
-
-                var newVersion = maxVersion + 1;
-
-                // Serialize content to JSON with consistent options
-                var contentJson = JsonSerializer.Serialize(dto.Content, _jsonOptions);
-
-                // Create new terms document
-                var newTerms = new TermsDocument
+                if (existingTerms != null)
                 {
-                    VersionNumber = newVersion,
-                    Lang = lang,
-                    IsActive = true,
-                    PublishedAt = DateTime.UtcNow,
-                    PayloadJson = contentJson
-                };
+                    // Update existing record
+                    existingTerms.PayloadJson = contentJson;
+                    existingTerms.PublishedAt = DateTime.UtcNow;
+                    existingTerms.IsActive = true;
 
-                _context.Set<TermsDocument>().Add(newTerms);
+                    await _context.SaveChangesAsync(ct);
 
-                // Save changes to database
-                await _context.SaveChangesAsync(ct);
+                    return new ApiResponse<object>(
+                        data: new { Version = existingTerms.VersionNumber, Lang = lang, PublishedAt = existingTerms.PublishedAt },
+                        message: "Terms updated successfully",
+                        status: true);
+                }
+                else
+                {
+                    // Create new terms document only if none exists
+                    var newTerms = new TermsDocument
+                    {
+                        VersionNumber = 1,
+                        Lang = lang,
+                        IsActive = true,
+                        PublishedAt = DateTime.UtcNow,
+                        PayloadJson = contentJson
+                    };
 
-                return new ApiResponse<object>(
-                    data: new { Version = newVersion, Lang = lang, PublishedAt = newTerms.PublishedAt },
-                    message: "Terms updated successfully",
-                    status: true);
+                    _context.Set<TermsDocument>().Add(newTerms);
+                    await _context.SaveChangesAsync(ct);
+
+                    return new ApiResponse<object>(
+                        data: new { Version = newTerms.VersionNumber, Lang = lang, PublishedAt = newTerms.PublishedAt },
+                        message: "Terms created successfully",
+                        status: true);
+                }
             }
             catch (Exception ex)
             {
-
                 return new ApiResponse<object>(
                     message: "Failed to update terms",
                     status: false,
