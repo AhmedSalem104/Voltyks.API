@@ -822,7 +822,11 @@ namespace Voltyks.Core.DTOs.Processes
 
                     // ✅ نوع المستخدم المستهدَف لو هتستخدمه في UI/Badges
                     // 1 = ChargerOwner, 2 = VehicleOwner (لو حابب تلتزم بثوابتك)
-                    MyRoleUserTypeId = (p.ChargerOwnerId == me) ? 1 : 2
+                    MyRoleUserTypeId = (p.ChargerOwnerId == me) ? 1 : 2,
+
+                    // ✅ التقييمات
+                    p.VehicleOwnerRating,
+                    p.ChargerOwnerRating
                 })
                 .ToListAsync(ct);
 
