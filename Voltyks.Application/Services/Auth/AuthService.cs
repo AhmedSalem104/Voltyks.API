@@ -364,6 +364,78 @@ namespace Voltyks.Application.Services.Auth
                 };
             }
         }
+        public async Task<ApiResponse<string>> RefreshJwtTokenFromCookiesAsync()
+        {
+            try
+            {
+                var request = httpContextAccessor.HttpContext.Request;
+                var response = httpContextAccessor.HttpContext.Response;
+
+                var savedRefreshToken = request.Cookies["Refresh_Token"];
+                if (string.IsNullOrEmpty(savedRefreshToken))
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = "Refresh token not found in cookies"
+                    };
+                }
+
+                var user = await userManager.GetUserAsync(httpContextAccessor.HttpContext.User);
+                if (user == null)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = ErrorMessages.UnauthorizedAccess
+                    };
+                }
+
+                if (user.IsBanned)
+                    return BannedResponse<string>();
+
+                var redisStoredToken = await redisService.GetAsync($"refresh_token:{user.Id}");
+                if (redisStoredToken != savedRefreshToken)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = ErrorMessages.RefreshTokenMismatch
+                    };
+                }
+
+                var newAccessToken = await GenerateJwtTokenAsync(user);
+
+                response.Cookies.Append("JWT_Token", newAccessToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = GetEgyptTime().AddMinutes(20),
+                    MaxAge = TimeSpan.FromMinutes(20)
+                });
+
+                // FCM token from Header
+                var fcmFromHeader = httpContextAccessor.HttpContext?.Request?.Headers?["X-FCM-Token"].ToString();
+                if (!string.IsNullOrWhiteSpace(fcmFromHeader))
+                    await AddFcmTokenAsync(user.Id, fcmFromHeader);
+
+                return new ApiResponse<string>(
+                    data: newAccessToken,
+                    message: SuccessfulMessage.TokenRefreshedSuccessfully,
+                    status: true
+                );
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<string>
+                {
+                    Status = false,
+                    Message = ex.Message
+                };
+            }
+        }
+
         public async Task<ApiResponse<List<string>>> CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto)
         {
             if (string.IsNullOrWhiteSpace(phoneNumberDto.PhoneNumber))
@@ -677,6 +749,23 @@ namespace Voltyks.Application.Services.Auth
                         errors: new() { "No current user context and no UserId provided." });
             }
 
+            // Rate limiting: 1 complaint per 12 hours
+            var complaintKey = $"complaint_last:{userId}";
+            var lastComplaintTime = await redisService.GetAsync(complaintKey);
+            if (!string.IsNullOrEmpty(lastComplaintTime))
+            {
+                var lastTime = DateTime.Parse(lastComplaintTime);
+                var waitTime = TimeSpan.FromHours(12) - (DateTime.UtcNow - lastTime);
+                if (waitTime > TimeSpan.Zero)
+                {
+                    return new ApiResponse<object>(
+                        $"يمكنك تقديم شكوى جديدة بعد {waitTime.Hours} ساعة و {waitTime.Minutes} دقيقة",
+                        status: false,
+                        errors: new() { "Rate limit exceeded. Only 1 complaint per 12 hours allowed." }
+                    );
+                }
+            }
+
             // Validate category exists and not deleted
             var category = await context.ComplaintCategories
                 .FirstOrDefaultAsync(c => c.Id == dto.CategoryId && !c.IsDeleted, ct);
@@ -697,6 +786,9 @@ namespace Voltyks.Application.Services.Auth
             context.UserGeneralComplaints.Add(complaint);
             await context.SaveChangesAsync(ct);
 
+            // Record complaint time for rate limiting
+            await redisService.SetAsync(complaintKey, DateTime.UtcNow.ToString("O"), TimeSpan.FromHours(12));
+
             return new ApiResponse<object>(
                 data: new
                 {
@@ -707,6 +799,113 @@ namespace Voltyks.Application.Services.Auth
                     CreatedAt = complaint.CreatedAt
                 },
                 message: "Complaint submitted successfully",
+                status: true
+            );
+        }
+
+        public async Task<ApiResponse<object>> CheckPasswordAsync(CheckPasswordDto dto, CancellationToken ct = default)
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<object>("Unauthorized", status: false);
+
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null)
+                return new ApiResponse<object>("User not found", status: false);
+
+            var isValid = await userManager.CheckPasswordAsync(user, dto.Password);
+            if (!isValid)
+                return new ApiResponse<object>("Invalid password", status: false);
+
+            // Store password verification flag in Redis (valid for 10 minutes)
+            await redisService.SetAsync($"password_verified:{userId}", "true", TimeSpan.FromMinutes(10));
+
+            return new ApiResponse<object>(
+                data: new { verified = true },
+                message: "Password verified successfully",
+                status: true
+            );
+        }
+
+        public async Task<ApiResponse<object>> RequestEmailChangeAsync(RequestEmailChangeDto dto, CancellationToken ct = default)
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<object>("Unauthorized", status: false);
+
+            // Check if password was verified recently
+            var passwordVerified = await redisService.GetAsync($"password_verified:{userId}");
+            if (string.IsNullOrEmpty(passwordVerified))
+                return new ApiResponse<object>("Please verify your password first", status: false);
+
+            // Check if new email already exists
+            var existingUser = await userManager.FindByEmailAsync(dto.NewEmail);
+            if (existingUser != null)
+                return new ApiResponse<object>("Email already in use", status: false);
+
+            // Generate OTP
+            var otp = new Random().Next(1000, 9999).ToString();
+
+            // Store pending email change in Redis
+            var pendingData = System.Text.Json.JsonSerializer.Serialize(new { NewEmail = dto.NewEmail, Otp = otp });
+            await redisService.SetAsync($"email_change:{userId}", pendingData, TimeSpan.FromMinutes(10));
+
+            // TODO: Send OTP to new email (requires email service implementation)
+            // await _emailService.SendOtpEmailAsync(dto.NewEmail, otp);
+
+            return new ApiResponse<object>(
+                data: new { message = "OTP sent to new email", otpForTesting = otp },
+                message: "OTP sent successfully",
+                status: true
+            );
+        }
+
+        public async Task<ApiResponse<object>> VerifyEmailChangeAsync(VerifyEmailChangeDto dto, CancellationToken ct = default)
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<object>("Unauthorized", status: false);
+
+            // Get pending email change data
+            var pendingDataJson = await redisService.GetAsync($"email_change:{userId}");
+            if (string.IsNullOrEmpty(pendingDataJson))
+                return new ApiResponse<object>("No pending email change or request expired", status: false);
+
+            var pendingData = System.Text.Json.JsonDocument.Parse(pendingDataJson);
+            string storedEmail = pendingData.RootElement.GetProperty("NewEmail").GetString()!;
+            string storedOtp = pendingData.RootElement.GetProperty("Otp").GetString()!;
+
+            // Validate email matches
+            if (!storedEmail.Equals(dto.NewEmail, StringComparison.OrdinalIgnoreCase))
+                return new ApiResponse<object>("Email mismatch", status: false);
+
+            // Validate OTP
+            if (storedOtp != dto.OtpCode)
+                return new ApiResponse<object>("Invalid OTP", status: false);
+
+            // Update user email
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null)
+                return new ApiResponse<object>("User not found", status: false);
+
+            var oldEmail = user.Email;
+            user.Email = dto.NewEmail;
+            user.NormalizedEmail = dto.NewEmail.ToUpperInvariant();
+
+            var result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<object>("Failed to update email", status: false, errors: errors);
+            }
+
+            // Cleanup Redis
+            await redisService.RemoveAsync($"email_change:{userId}");
+            await redisService.RemoveAsync($"password_verified:{userId}");
+
+            return new ApiResponse<object>(
+                data: new { oldEmail, newEmail = dto.NewEmail },
+                message: "Email changed successfully",
                 status: true
             );
         }

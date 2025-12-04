@@ -54,14 +54,14 @@ namespace Voltyks.Presentation
             return Ok(result);
         }
 
-        [HttpPost("RefreshToken")]
-        public async Task<IActionResult> RefreshJwtToken([FromBody] RefreshTokenDto refreshTokenDto)
+        [HttpGet("RefreshToken")]
+        public async Task<IActionResult> RefreshJwtToken()
         {
-            var result = await serviceManager.AuthService.RefreshJwtTokenAsync(refreshTokenDto);
+            var result = await serviceManager.AuthService.RefreshJwtTokenFromCookiesAsync();
 
             if (!result.Status)
             {
-                return Unauthorized(result); // أو BadRequest(result) حسب نوع الخطأ الراجع
+                return Unauthorized(result);
             }
 
             return Ok(result);
@@ -218,6 +218,36 @@ namespace Voltyks.Presentation
             [FromBody] CreateGeneralComplaintDto dto,
             CancellationToken ct)
             => Ok(await serviceManager.AuthService.CreateGeneralComplaintAsync(dto, ct));
+
+        /// <summary>
+        /// POST /api/auth/check-password - Step 1: Verify current password before email change
+        /// </summary>
+        [HttpPost("check-password")]
+        [Authorize]
+        public async Task<IActionResult> CheckPassword(
+            [FromBody] CheckPasswordDto dto,
+            CancellationToken ct)
+            => Ok(await serviceManager.AuthService.CheckPasswordAsync(dto, ct));
+
+        /// <summary>
+        /// POST /api/auth/request-email-change - Step 2: Request email change (sends OTP to new email)
+        /// </summary>
+        [HttpPost("request-email-change")]
+        [Authorize]
+        public async Task<IActionResult> RequestEmailChange(
+            [FromBody] RequestEmailChangeDto dto,
+            CancellationToken ct)
+            => Ok(await serviceManager.AuthService.RequestEmailChangeAsync(dto, ct));
+
+        /// <summary>
+        /// POST /api/auth/verify-email-change - Step 3: Verify OTP and change email
+        /// </summary>
+        [HttpPost("verify-email-change")]
+        [Authorize]
+        public async Task<IActionResult> VerifyEmailChange(
+            [FromBody] VerifyEmailChangeDto dto,
+            CancellationToken ct)
+            => Ok(await serviceManager.AuthService.VerifyEmailChangeAsync(dto, ct));
 
     }
 }

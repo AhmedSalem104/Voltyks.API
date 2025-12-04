@@ -21,6 +21,7 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<UserRegisterationResultDto>> RegisterAsync(RegisterDTO model);
         Task<ApiResponse<List<string>>> LogoutAsync(TokenDto tokenDto);
         Task<ApiResponse<string>> RefreshJwtTokenAsync(RefreshTokenDto refreshTokenDto);
+        Task<ApiResponse<string>> RefreshJwtTokenFromCookiesAsync();
         Task<ApiResponse<List<string>>> CheckEmailExistsAsync(EmailDto emailDto);
         Task<ApiResponse<List<string>>> CheckPhoneNumberExistsAsync(PhoneNumberDto phoneNumberDto);
         Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId);
@@ -37,6 +38,10 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default);
 
         Task<ApiResponse<object>> CreateGeneralComplaintAsync(CreateGeneralComplaintDto dto, CancellationToken ct = default);
+
+        Task<ApiResponse<object>> CheckPasswordAsync(CheckPasswordDto dto, CancellationToken ct = default);
+        Task<ApiResponse<object>> RequestEmailChangeAsync(RequestEmailChangeDto dto, CancellationToken ct = default);
+        Task<ApiResponse<object>> VerifyEmailChangeAsync(VerifyEmailChangeDto dto, CancellationToken ct = default);
 
     }
 

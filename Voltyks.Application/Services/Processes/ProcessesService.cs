@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Processes;
+using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.DTOs.Process;
@@ -28,12 +29,14 @@ namespace Voltyks.Core.DTOs.Processes
         private readonly IHttpContextAccessor _http;
         private readonly IFirebaseService _firebase;
         private readonly ILogger<ProcessesService> _logger;
+        private readonly IRedisService _redisService;
 
-        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger)
+        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger, IRedisService redisService)
         {
             _ctx = ctx; _http = http;
             _firebase = firebase;
             _logger = logger;
+            _redisService = redisService;
         }
 
         //        await tx.CommitAsync(ct);
@@ -155,6 +158,10 @@ namespace Voltyks.Core.DTOs.Processes
 
                 await _ctx.SaveChangesAsync(ct);
                 await tx.CommitAsync(ct);
+
+                // Reset complaint rate limit for both vehicle owner and charger owner
+                await _redisService.RemoveAsync($"complaint_last:{process.VehicleOwnerId}");
+                await _redisService.RemoveAsync($"complaint_last:{process.ChargerOwnerId}");
 
                 var title = "Process confirmation pending";
                 var body = $"Amount Charged: {process.AmountCharged:0.##} | Amount Paid: {process.AmountPaid:0.##}";
@@ -826,7 +833,15 @@ namespace Voltyks.Core.DTOs.Processes
 
                     // ✅ التقييمات
                     p.VehicleOwnerRating,
-                    p.ChargerOwnerRating
+                    p.ChargerOwnerRating,
+
+                    // ✅ نوع الشاحن
+                    ChargerProtocolName = p.ChargerRequest != null && p.ChargerRequest.Charger != null && p.ChargerRequest.Charger.Protocol != null
+                        ? p.ChargerRequest.Charger.Protocol.Name
+                        : null,
+                    ChargerCapacityKw = p.ChargerRequest != null && p.ChargerRequest.Charger != null && p.ChargerRequest.Charger.Capacity != null
+                        ? (int?)p.ChargerRequest.Charger.Capacity.kw
+                        : null
                 })
                 .ToListAsync(ct);
 

@@ -68,7 +68,7 @@ namespace Voltyks.Application.ServicesManager
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
         public ITermsService TermsService { get; } = new TermsService(context);
-        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger);
+        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService);
         public IUserReportService UserReportService  { get; } = new UserReportService(context,mapper,unitOfWork, httpContextAccessor,firebaseService);
 
 
