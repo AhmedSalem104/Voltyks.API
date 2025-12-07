@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.ServicesManager.ServicesManager;
+using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Process;
 
 namespace Voltyks.API.Controllers
@@ -34,8 +35,8 @@ namespace Voltyks.API.Controllers
             => Ok(await _svc.ProcessesService.SubmitRatingAsync(dto, ct));
 
         [HttpGet("my-activities")]
-        public async Task<IActionResult> MyActivities(CancellationToken ct)
-            => Ok(await _svc.ProcessesService.GetMyActivitiesAsync(ct));
+        public async Task<IActionResult> MyActivities([FromQuery] PaginationParams? paginationParams, CancellationToken ct)
+            => Ok(await _svc.ProcessesService.GetMyActivitiesAsync(paginationParams, ct));
 
         [HttpPost("Get-Two-Way-Rating")]
         [Authorize]

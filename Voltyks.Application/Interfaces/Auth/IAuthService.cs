@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Complaints;
 using Voltyks.Persistence.Entities.Identity;
 
@@ -27,7 +28,7 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<UserDetailsDto>> GetUserDetailsAsync(string userId);
         Task<ApiResponse<bool>> ToggleUserAvailabilityAsync();
 
-        Task<ApiResponse<List<ChargingRequestDetailsDto>>> GetChargerRequestsAsync();
+        Task<ApiResponse<object>> GetChargerRequestsAsync(PaginationParams? paginationParams = null, CancellationToken ct = default);
 
         Task<ApiResponse<object>> ToggleCurrentUserBanAsync(CancellationToken ct = default);
 

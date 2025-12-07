@@ -13,6 +13,7 @@ using Voltyks.Application;
 using Voltyks.Persistence.Entities;
 using System.Security.Claims;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Complaints;
 
 
@@ -54,7 +55,7 @@ namespace Voltyks.Presentation
             return Ok(result);
         }
 
-        [HttpGet("RefreshToken")]
+        [HttpPost("RefreshToken")]
         public async Task<IActionResult> RefreshJwtToken()
         {
             var result = await serviceManager.AuthService.RefreshJwtTokenFromCookiesAsync();
@@ -189,9 +190,9 @@ namespace Voltyks.Presentation
         }
 
         [HttpGet("getUsersRequests")]
-        public async Task<ActionResult<ApiResponse<List<ChargingRequestDetailsDto>>>> GetUserRequests()
+        public async Task<IActionResult> GetUserRequests([FromQuery] PaginationParams? paginationParams, CancellationToken ct)
         {
-            var resp = await serviceManager.AuthService.GetChargerRequestsAsync();
+            var resp = await serviceManager.AuthService.GetChargerRequestsAsync(paginationParams, ct);
             return Ok(resp);
         }
 
@@ -206,9 +207,9 @@ namespace Voltyks.Presentation
         public async Task<IActionResult> ResetMyWallet(CancellationToken ct)
             => Ok(await serviceManager.AuthService.ResetMyWalletAsync(ct));
 
-        [HttpPost("wallet/deduct-fees/{requestId}")]
-        public async Task<IActionResult> DeductFeesFromWallet(int requestId, CancellationToken ct)
-            => Ok(await serviceManager.AuthService.DeductFeesFromWalletAsync(requestId, ct));
+        [HttpPost("wallet/deduct-fees")]
+        public async Task<IActionResult> DeductFeesFromWallet([FromBody] DeductFeesDto dto, CancellationToken ct)
+            => Ok(await serviceManager.AuthService.DeductFeesFromWalletAsync(dto.RequestId, ct));
 
         /// <summary>
         /// POST /api/auth/general-complaints - Submit a general complaint

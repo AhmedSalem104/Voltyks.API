@@ -15,6 +15,7 @@ using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Application.Interfaces.Processes;
+using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Interfaces.Terms;
@@ -55,7 +56,8 @@ namespace Voltyks.Application.ServicesManager
         ,ILogger<PaymobService> _log
         , IPaymobAuthTokenProvider tokenProvider,
     IFeesConfigService feesConfigService,
-    ILogger<ProcessesService> processesLogger) : IServiceManager
+    ILogger<ProcessesService> processesLogger,
+    IPaginationService paginationService) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context, vehicleService);
@@ -68,7 +70,7 @@ namespace Voltyks.Application.ServicesManager
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
         public ITermsService TermsService { get; } = new TermsService(context);
-        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService);
+        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService, paginationService);
         public IUserReportService UserReportService  { get; } = new UserReportService(context,mapper,unitOfWork, httpContextAccessor,firebaseService);
 
 

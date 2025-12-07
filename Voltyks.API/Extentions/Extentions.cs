@@ -37,6 +37,8 @@ using Voltyks.Application.Services.Terms;
 using Voltyks.AdminControlDashboard;
 using Voltyks.Application.Interfaces.Caching;
 using Voltyks.Application.Services.Caching;
+using Voltyks.Application.Interfaces.Pagination;
+using Voltyks.Application.Services.Pagination;
 
 
 namespace Voltyks.API.Extentions
@@ -237,6 +239,9 @@ namespace Voltyks.API.Extentions
 
             // CacheService
             services.AddScoped<ICacheService, CacheService>();
+
+            // PaginationService
+            services.AddScoped<IPaginationService, PaginationService>();
 
             return services;
 

@@ -8,10 +8,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Process;
 using Voltyks.Core.Enums;
 using Voltyks.Persistence.Data;
@@ -30,13 +32,15 @@ namespace Voltyks.Core.DTOs.Processes
         private readonly IFirebaseService _firebase;
         private readonly ILogger<ProcessesService> _logger;
         private readonly IRedisService _redisService;
+        private readonly IPaginationService _paginationService;
 
-        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger, IRedisService redisService)
+        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger, IRedisService redisService, IPaginationService paginationService)
         {
             _ctx = ctx; _http = http;
             _firebase = firebase;
             _logger = logger;
             _redisService = redisService;
+            _paginationService = paginationService;
         }
 
         //        await tx.CommitAsync(ct);
@@ -787,65 +791,46 @@ namespace Voltyks.Core.DTOs.Processes
         }
 
 
-        public async Task<ApiResponse<object>> GetMyActivitiesAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<object>> GetMyActivitiesAsync(PaginationParams? paginationParams, CancellationToken ct = default)
         {
             var me = CurrentUserId();
             if (string.IsNullOrEmpty(me))
                 return new ApiResponse<object>("Unauthorized", false);
 
-            var items = await _ctx.Set<ProcessEntity>()
+            var query = _ctx.Set<ProcessEntity>()
                 .AsNoTracking()
                 .Where(p => p.VehicleOwnerId == me || p.ChargerOwnerId == me)
                 .OrderByDescending(p => p.DateCreated)
-                .Take(50)
-                .Select(p => new
+                .Select(p => new MyActivityDto
                 {
-                    // الحقول الأصلية
-                    p.Id,
-                    p.ChargerRequestId,
-                    p.Status,
-                    p.AmountCharged,
-                    p.AmountPaid,
-                    p.DateCreated,
-                    p.DateCompleted,
-
-                    // ✅ تمييز دوري في العملية
-                    // true لو أنا صاحب الشاحن في هذه العملية
+                    Id = p.Id,
+                    ChargerRequestId = p.ChargerRequestId,
+                    Status = p.Status.ToString(),
+                    AmountCharged = p.AmountCharged,
+                    AmountPaid = p.AmountPaid,
+                    DateCreated = p.DateCreated,
+                    DateCompleted = p.DateCompleted,
                     IsAsChargerOwner = (p.ChargerOwnerId == me),
-                    // true لو أنا صاحب العربية في هذه العملية
                     IsAsVehicleOwner = (p.VehicleOwnerId == me),
-
-                    // ✅ اتجاه النشاط من منظوري:
-                    // Incoming: جايالي طلب/تفاعل (أنا ChargerOwner)
-                    // Outgoing: أنا اللي بادرت (أنا VehicleOwner)
                     Direction = (p.ChargerOwnerId == me) ? "Incoming" : "Outgoing",
-
-                    // ✅ معلومات الطرف الآخر (اختياري: الاسم)
                     CounterpartyUserId = (p.ChargerOwnerId == me) ? p.VehicleOwnerId : p.ChargerOwnerId,
-                    //CounterpartyName = _ctx.Set<AppUser>()
-                    //                       .Where(u => u.Id == ((p.ChargerOwnerId == me) ? p.VehicleOwnerId : p.ChargerOwnerId))
-                    //                       .Select(u => u.FullName)
-                    //                       .FirstOrDefault(),
-
-                    // ✅ نوع المستخدم المستهدَف لو هتستخدمه في UI/Badges
-                    // 1 = ChargerOwner, 2 = VehicleOwner (لو حابب تلتزم بثوابتك)
                     MyRoleUserTypeId = (p.ChargerOwnerId == me) ? 1 : 2,
-
-                    // ✅ التقييمات
-                    p.VehicleOwnerRating,
-                    p.ChargerOwnerRating,
-
-                    // ✅ نوع الشاحن
+                    VehicleOwnerRating = p.VehicleOwnerRating,
+                    ChargerOwnerRating = p.ChargerOwnerRating,
                     ChargerProtocolName = p.ChargerRequest != null && p.ChargerRequest.Charger != null && p.ChargerRequest.Charger.Protocol != null
                         ? p.ChargerRequest.Charger.Protocol.Name
                         : null,
                     ChargerCapacityKw = p.ChargerRequest != null && p.ChargerRequest.Charger != null && p.ChargerRequest.Charger.Capacity != null
                         ? (int?)p.ChargerRequest.Charger.Capacity.kw
                         : null
-                })
-                .ToListAsync(ct);
+                });
 
-            return new ApiResponse<object>(items, "My activities fetched", true);
+            // Use default pagination if not provided
+            paginationParams ??= new PaginationParams { PageNumber = 1, PageSize = 20 };
+
+            var pagedResult = await _paginationService.PaginateAsync(query, paginationParams, ct);
+
+            return new ApiResponse<object>(pagedResult, "My activities fetched", true);
         }
 
         private async Task SendToUserAsync(string userId, string title, string body, int relatedRequestId, string notificationType, CancellationToken ct)

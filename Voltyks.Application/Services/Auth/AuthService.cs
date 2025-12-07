@@ -27,6 +27,7 @@ using Voltyks.Persistence.Data;
 using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
 using Voltyks.Application.Interfaces;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Complaints;
 using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
@@ -371,31 +372,44 @@ namespace Voltyks.Application.Services.Auth
                 var request = httpContextAccessor.HttpContext.Request;
                 var response = httpContextAccessor.HttpContext.Response;
 
-                var savedRefreshToken = request.Cookies["Refresh_Token"];
-                if (string.IsNullOrEmpty(savedRefreshToken))
+                // Read refresh token from Authorization header (Bearer token)
+                var authHeader = request.Headers["Authorization"].ToString();
+                if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                 {
                     return new ApiResponse<string>
                     {
                         Status = false,
-                        Message = "Refresh token not found in cookies"
+                        Message = "Refresh token not found in Authorization header. Use: Authorization: Bearer {refreshToken}"
                     };
                 }
 
-                var user = await userManager.GetUserAsync(httpContextAccessor.HttpContext.User);
+                var refreshToken = authHeader.Substring("Bearer ".Length).Trim();
+                if (string.IsNullOrEmpty(refreshToken))
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = "Invalid refresh token format"
+                    };
+                }
+
+                // Find user by matching refresh token in Redis
+                // We need to get userId from the token - check all users or use a reverse lookup
+                // For efficiency, we'll get the userId from a claim in the expired JWT if present
+                var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                AppUser user = null;
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    // Verify token matches Redis
+                    var redisStoredToken = await redisService.GetAsync($"refresh_token:{userId}");
+                    if (redisStoredToken == refreshToken)
+                    {
+                        user = await userManager.FindByIdAsync(userId);
+                    }
+                }
+
                 if (user == null)
-                {
-                    return new ApiResponse<string>
-                    {
-                        Status = false,
-                        Message = ErrorMessages.UnauthorizedAccess
-                    };
-                }
-
-                if (user.IsBanned)
-                    return BannedResponse<string>();
-
-                var redisStoredToken = await redisService.GetAsync($"refresh_token:{user.Id}");
-                if (redisStoredToken != savedRefreshToken)
                 {
                     return new ApiResponse<string>
                     {
@@ -403,6 +417,9 @@ namespace Voltyks.Application.Services.Auth
                         Message = ErrorMessages.RefreshTokenMismatch
                     };
                 }
+
+                if (user.IsBanned)
+                    return BannedResponse<string>();
 
                 var newAccessToken = await GenerateJwtTokenAsync(user);
 
@@ -505,36 +522,38 @@ namespace Voltyks.Application.Services.Auth
             return new ApiResponse<List<string>>(SuccessfulMessage.LoggedOutSuccessfully) { Status = true };
 
         }
-        public async Task<ApiResponse<List<ChargingRequestDetailsDto>>> GetChargerRequestsAsync()
+        public async Task<ApiResponse<object>> GetChargerRequestsAsync(PaginationParams? paginationParams = null, CancellationToken ct = default)
         {
-
             var userId = GetCurrentUserId();
 
             if (string.IsNullOrEmpty(userId))
-                return new ApiResponse<List<ChargingRequestDetailsDto>>(
-                    null, "Unauthorized", false);
-
+                return new ApiResponse<object>(null, "Unauthorized", false);
 
             await CleanupOldRequestsForUserAsync(userId);
 
-
-            var repo = _unitOfWork.GetRepository<ChargingRequestEntity, int>();
-            // ✅ نضيف الشرط هنا
             var fiveMinutesAgo = GetEgyptTime().AddMinutes(-5);
 
-            var requests = (await repo.GetAllWithIncludeAsync(
-                c => c.RecipientUserId == userId
-                     && c.Status == "Pending"
-                     && c.RequestedAt >= fiveMinutesAgo,
-                false,
-                c => c.CarOwner,
-                c => c.Charger,
-                c => c.Charger.User,
-                c => c.Charger.Address,
-                c => c.Charger.Protocol,
-                c => c.Charger.Capacity,
-                c => c.Charger.PriceOption
-            )).ToList();
+            // Build base query using DbContext directly for pagination
+            var query = context.Set<ChargingRequestEntity>()
+                .AsNoTracking()
+                .Include(c => c.CarOwner)
+                .Include(c => c.Charger).ThenInclude(ch => ch.User)
+                .Include(c => c.Charger).ThenInclude(ch => ch.Address)
+                .Include(c => c.Charger).ThenInclude(ch => ch.Protocol)
+                .Include(c => c.Charger).ThenInclude(ch => ch.Capacity)
+                .Include(c => c.Charger).ThenInclude(ch => ch.PriceOption)
+                .Where(c => c.RecipientUserId == userId
+                         && c.Status == "Pending"
+                         && c.RequestedAt >= fiveMinutesAgo)
+                .OrderByDescending(c => c.RequestedAt);
+
+            // Get total count for pagination
+            var totalCount = await query.CountAsync(ct);
+
+            // Apply pagination
+            paginationParams ??= new PaginationParams { PageNumber = 1, PageSize = 20 };
+            var skip = (paginationParams.PageNumber - 1) * paginationParams.PageSize;
+            var requests = await query.Skip(skip).Take(paginationParams.PageSize).ToListAsync(ct);
 
             var list = _mapper.Map<List<ChargingRequestDetailsDto>>(requests);
 
@@ -592,12 +611,18 @@ namespace Voltyks.Application.Services.Auth
                     dto.VehiclePlate = vehicle.Plate;
                     dto.VehicleCapacity = vehicle.Capacity;
                 }
-
-
             }
 
-            return new ApiResponse<List<ChargingRequestDetailsDto>>(
+            // Build paginated result
+            var pagedResult = new PagedResult<ChargingRequestDetailsDto>(
                 list,
+                totalCount,
+                paginationParams.PageNumber,
+                paginationParams.PageSize
+            );
+
+            return new ApiResponse<object>(
+                pagedResult,
                 SuccessfulMessage.DataRetrievedSuccessfully,
                 true
             );
