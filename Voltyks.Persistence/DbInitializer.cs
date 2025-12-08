@@ -248,15 +248,16 @@ namespace Voltyks.Persistence
             // Seeding For Users & Roles - wrapped in try-catch for Azure production
             try
             {
-                if (!_userManager.Users.Any())
-                {
-                    // 1) تأكيد الأدوار
-                    var roles = new[] { "Admin", "Operator", "Viewer" };
-                    foreach (var role in roles)
-                        if (!await _roleManager.RoleExistsAsync(role))
-                            await _roleManager.CreateAsync(new IdentityRole(role));
+                // 1) تأكيد الأدوار
+                var roles = new[] { "Admin", "Operator", "Viewer" };
+                foreach (var role in roles)
+                    if (!await _roleManager.RoleExistsAsync(role))
+                        await _roleManager.CreateAsync(new IdentityRole(role));
 
-                    // 2) إنشاء Admin
+                // 2) إنشاء Admin إذا لم يكن موجوداً
+                var existingAdmin = await _userManager.FindByNameAsync("Admin");
+                if (existingAdmin == null)
+                {
                     var adminUser = new AppUser
                     {
                         FullName = "VoltyksOwner",
@@ -286,8 +287,12 @@ namespace Voltyks.Persistence
                             new System.Security.Claims.Claim("can-transfer-fees", "true"),
                         });
                     }
+                }
 
-                    // 3) إنشاء مستخدم بدور آخر (Operator)
+                // 3) إنشاء Operator إذا لم يكن موجوداً
+                var existingOperator = await _userManager.FindByNameAsync("operator");
+                if (existingOperator == null)
+                {
                     var operatorUser = new AppUser
                     {
                         FullName = "VoltyksOperator",
