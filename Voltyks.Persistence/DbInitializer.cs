@@ -37,13 +37,16 @@ namespace Voltyks.Persistence
                     await _context.Database.MigrateAsync();
                 }
 
+                // Base path for seeding files
+                var seedingBasePath = Path.Combine(AppContext.BaseDirectory, "Data", "Seeding");
+
                 //// Data Seeding
                 //// Seeding For Brands Form Json File
                 if (!_context.Brands.Any())
                 {
                     try
                     {
-                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\brands_seed.json";
+                        var seedPath = Path.Combine(seedingBasePath, "brands_seed.json");
                         var brandsData = await File.ReadAllTextAsync(seedPath);
                         var brands = JsonSerializer.Deserialize<List<Brand>>(brandsData);
                         if (brands is not null && brands.Any())
@@ -60,7 +63,7 @@ namespace Voltyks.Persistence
                 {
                     try
                     {
-                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\models_seed.json";
+                        var seedPath = Path.Combine(seedingBasePath, "models_seed.json");
                         var typesData = await File.ReadAllTextAsync(seedPath);
                         var types = JsonSerializer.Deserialize<List<Model>>(typesData);
                         if (types is not null && types.Any())
@@ -77,7 +80,7 @@ namespace Voltyks.Persistence
                 {
                     try
                     {
-                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\protocal_seed.json";
+                        var seedPath = Path.Combine(seedingBasePath, "protocal_seed.json");
                         var ProtocolsData = await File.ReadAllTextAsync(seedPath);
                         var Protocols = JsonSerializer.Deserialize<List<Protocol>>(ProtocolsData);
                         if (Protocols is not null && Protocols.Any())
@@ -94,7 +97,7 @@ namespace Voltyks.Persistence
                 {
                     try
                     {
-                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\priceOption_seed.json";
+                        var seedPath = Path.Combine(seedingBasePath, "priceOption_seed.json");
                         var PriceOptionsData = await File.ReadAllTextAsync(seedPath);
                         var PriceOptions = JsonSerializer.Deserialize<List<PriceOption>>(PriceOptionsData);
                         if (PriceOptions is not null && PriceOptions.Any())
@@ -111,7 +114,7 @@ namespace Voltyks.Persistence
                 {
                     try
                     {
-                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\capacity_seed.json";
+                        var seedPath = Path.Combine(seedingBasePath, "capacity_seed.json");
                         var CapacitiesData = await File.ReadAllTextAsync(seedPath);
                         var Capacities = JsonSerializer.Deserialize<List<Capacity>>(CapacitiesData);
                         if (Capacities is not null && Capacities.Any())
@@ -128,7 +131,7 @@ namespace Voltyks.Persistence
                 {
                     try
                     {
-                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\UserTypes_seed.json";
+                        var seedPath = Path.Combine(seedingBasePath, "UserTypes_seed.json");
                         var UserTypesData = await File.ReadAllTextAsync(seedPath);
                         var UserTypes = JsonSerializer.Deserialize<List<UserType>>(UserTypesData);
                         if (UserTypes is not null && UserTypes.Any())
@@ -146,7 +149,7 @@ namespace Voltyks.Persistence
                 {
                     try
                     {
-                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\TermsDocuments_seed.json";
+                        var seedPath = Path.Combine(seedingBasePath, "TermsDocuments_seed.json");
                         var json = await File.ReadAllTextAsync(seedPath);
                         var docs = JsonSerializer.Deserialize<List<SeedItem>>(json, new JsonSerializerOptions
                         {

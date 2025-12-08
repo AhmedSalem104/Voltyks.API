@@ -23,4 +23,11 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Include Seed Files in Publish Output -->
+  <ItemGroup>
+    <None Update="Data\Seeding\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
