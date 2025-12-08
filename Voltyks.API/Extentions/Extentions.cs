@@ -79,31 +79,31 @@ namespace Voltyks.API.Extentions
                 options.AppId = configuration["Authentication:Facebook:client_id"];
                 options.AppSecret = configuration["Authentication:Facebook:client_secret"];
             });
-            services.AddDbContext<VoltyksDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
-
             // ✅ Firebase Admin Initialization
             if (FirebaseApp.DefaultInstance == null)
             {
-                var firebasePath = Path.Combine(AppContext.BaseDirectory, "Firebase", "service-account-key.json");
-                if (File.Exists(firebasePath))
+                try
                 {
-                    FirebaseApp.Create(new AppOptions()
+                    var firebasePath = Path.Combine(AppContext.BaseDirectory, "Firebase", "service-account-key.json");
+                    if (File.Exists(firebasePath))
                     {
-                        Credential = GoogleCredential.FromFile(firebasePath)
-                    });
+                        FirebaseApp.Create(new AppOptions()
+                        {
+                            Credential = GoogleCredential.FromFile(firebasePath)
+                        });
+                    }
                 }
+                catch { /* Skip Firebase if initialization fails */ }
             }
 
             // Add Interceptor
-            //services.AddSingleton<ChargingRequestCleanupInterceptor>();
             services.AddScoped<ChargingRequestCleanupInterceptor>();
 
+            // Single DbContext registration with interceptor
             services.AddDbContext<VoltyksDbContext>((sp, options) =>
             {
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
                 options.AddInterceptors(sp.GetRequiredService<ChargingRequestCleanupInterceptor>());
-
             });
 
             return services;
