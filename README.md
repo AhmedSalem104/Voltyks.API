@@ -120,18 +120,74 @@ Voltyks.API/
 
 ## Technology Stack
 
-| Category | Technology |
-|----------|------------|
-| **Framework** | ASP.NET Core 8.0 |
-| **Database** | Azure SQL Server |
-| **ORM** | Entity Framework Core 8 |
-| **Caching** | Redis (Upstash) |
-| **Authentication** | JWT + ASP.NET Identity |
-| **Payments** | Paymob API |
-| **SMS Providers** | Twilio, SmsEgypt, BeOn |
-| **Push Notifications** | Firebase Cloud Messaging |
-| **API Documentation** | Swagger / OpenAPI |
-| **Deployment** | Azure App Service (Linux) |
+<table>
+<tr>
+<td align="center" width="96">
+<a href="https://dotnet.microsoft.com/">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/dotnetcore/dotnetcore-original.svg" width="48" height="48" alt=".NET" />
+</a>
+<br><strong>.NET 8</strong>
+</td>
+<td align="center" width="96">
+<a href="https://docs.microsoft.com/en-us/aspnet/core/">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/csharp/csharp-original.svg" width="48" height="48" alt="C#" />
+</a>
+<br><strong>C# 12</strong>
+</td>
+<td align="center" width="96">
+<a href="https://azure.microsoft.com/">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/azure/azure-original.svg" width="48" height="48" alt="Azure" />
+</a>
+<br><strong>Azure</strong>
+</td>
+<td align="center" width="96">
+<a href="https://www.microsoft.com/sql-server">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/microsoftsqlserver/microsoftsqlserver-plain.svg" width="48" height="48" alt="SQL Server" />
+</a>
+<br><strong>SQL Server</strong>
+</td>
+<td align="center" width="96">
+<a href="https://redis.io/">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg" width="48" height="48" alt="Redis" />
+</a>
+<br><strong>Redis</strong>
+</td>
+<td align="center" width="96">
+<a href="https://firebase.google.com/">
+<img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/firebase/firebase-plain.svg" width="48" height="48" alt="Firebase" />
+</a>
+<br><strong>Firebase</strong>
+</td>
+</tr>
+</table>
+
+### Backend & Framework
+![.NET](https://img.shields.io/badge/.NET_8-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+![C#](https://img.shields.io/badge/C%23_12-239120?style=flat-square&logo=csharp&logoColor=white)
+![ASP.NET Core](https://img.shields.io/badge/ASP.NET_Core-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+![Entity Framework](https://img.shields.io/badge/EF_Core_8-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+
+### Database & Caching
+![Azure SQL](https://img.shields.io/badge/Azure_SQL-CC2927?style=flat-square&logo=microsoftsqlserver&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
+![Upstash](https://img.shields.io/badge/Upstash-00E9A3?style=flat-square&logo=upstash&logoColor=black)
+
+### Authentication & Security
+![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
+![Identity](https://img.shields.io/badge/ASP.NET_Identity-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+![Google](https://img.shields.io/badge/Google_OAuth-4285F4?style=flat-square&logo=google&logoColor=white)
+![Facebook](https://img.shields.io/badge/Facebook_OAuth-1877F2?style=flat-square&logo=facebook&logoColor=white)
+
+### Payment & SMS
+![Paymob](https://img.shields.io/badge/Paymob-00C853?style=flat-square&logo=stripe&logoColor=white)
+![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=flat-square&logo=twilio&logoColor=white)
+![SMS](https://img.shields.io/badge/SMS_Egypt-FF6B00?style=flat-square&logo=minutemailer&logoColor=white)
+
+### Cloud & DevOps
+![Azure App Service](https://img.shields.io/badge/Azure_App_Service-0078D4?style=flat-square&logo=microsoftazure&logoColor=white)
+![Firebase FCM](https://img.shields.io/badge/Firebase_FCM-FFCA28?style=flat-square&logo=firebase&logoColor=black)
+![Swagger](https://img.shields.io/badge/Swagger-85EA2D?style=flat-square&logo=swagger&logoColor=black)
+![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white)
 
 ---
 
