@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: voltyks-dqh6fzgwdndrdng7
+  AZURE_WEBAPP_NAME: Voltyks
   AZURE_WEBAPP_PACKAGE_PATH: './publish'
   DOTNET_VERSION: '8.0.x'
 
