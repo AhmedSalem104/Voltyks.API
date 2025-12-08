@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.AdminControlDashboard;
 using Voltyks.Persistence;
+using Voltyks.Persistence.Entities.Identity;
 
 namespace Voltyks.API.Controllers.Admin
 {
@@ -12,11 +14,13 @@ namespace Voltyks.API.Controllers.Admin
     {
         private readonly IAdminServiceManager _adminServiceManager;
         private readonly IDbInitializer _dbInitializer;
+        private readonly UserManager<AppUser> _userManager;
 
-        public AdminProcessController(IAdminServiceManager adminServiceManager, IDbInitializer dbInitializer)
+        public AdminProcessController(IAdminServiceManager adminServiceManager, IDbInitializer dbInitializer, UserManager<AppUser> userManager)
         {
             _adminServiceManager = adminServiceManager;
             _dbInitializer = dbInitializer;
+            _userManager = userManager;
         }
 
         /// <summary>
@@ -38,6 +42,33 @@ namespace Voltyks.API.Controllers.Admin
         {
             await _dbInitializer.ForceSeedAsync();
             return Ok(new { status = true, message = "Data seeded successfully" });
+        }
+
+        /// <summary>
+        /// DELETE /api/admin/process/reset-admin - Delete admin user and reseed
+        /// </summary>
+        [HttpDelete("reset-admin")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetAdmin()
+        {
+            // Delete Admin user
+            var adminUser = await _userManager.FindByNameAsync("Admin");
+            if (adminUser != null)
+            {
+                await _userManager.DeleteAsync(adminUser);
+            }
+
+            // Delete Operator user
+            var operatorUser = await _userManager.FindByNameAsync("operator");
+            if (operatorUser != null)
+            {
+                await _userManager.DeleteAsync(operatorUser);
+            }
+
+            // Reseed identity
+            await _dbInitializer.InitializeIdentityAsync();
+
+            return Ok(new { status = true, message = "Admin users deleted and reseeded successfully" });
         }
     }
 }
