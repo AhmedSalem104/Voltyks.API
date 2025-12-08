@@ -264,7 +264,7 @@ namespace Voltyks.Persistence
                         LastName = "Owner",
                         Email = "Admin@gmail.com",
                         UserName = "Admin",
-                        PhoneNumber = "01000000000",
+                        PhoneNumber = "+201000000000",
                         EmailConfirmed = true,
                         PhoneNumberConfirmed = true,
                         Address = new Address
@@ -295,7 +295,7 @@ namespace Voltyks.Persistence
                         LastName = "Operator",
                         Email = "operator@voltyks.com",
                         UserName = "operator",
-                        PhoneNumber = "01000000001",
+                        PhoneNumber = "+201000000001",
                         EmailConfirmed = true,
                         PhoneNumberConfirmed = true,
                         Address = new Address

@@ -19,7 +19,21 @@
       "Bash(cmd.exe /c \"where az\")",
       "Bash(powershell.exe -Command \"Get-Command az -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\":*)",
       "Bash(powershell.exe -Command \"Test-Path ''C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd''\")",
-      "Bash(powershell.exe:*)"
+      "Bash(powershell.exe:*)",
+      "Bash(dir:*)",
+      "Bash(mkdir:*)",
+      "Bash(cmd.exe /c \"dir /s /b \"\"C:\\Program Files\\*az.cmd\"\" 2>nul\")",
+      "WebFetch(domain:voltyks-dqh6fzgwdndrdng7.scm.canadacentral-01.azurewebsites.net)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh run list:*)",
+      "Bash(timeout /t 60 /nobreak)",
+      "Bash(gh run view:*)",
+      "Bash(gh run:*)",
+      "Bash(gh secret set:*)",
+      "Bash(cat:*)",
+      "Bash(gh secret:*)"
     ],
     "deny": [],
     "ask": []
