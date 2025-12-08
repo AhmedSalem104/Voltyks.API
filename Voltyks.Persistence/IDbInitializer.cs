@@ -10,5 +10,6 @@ namespace Voltyks.Persistence
     {
         Task InitializeAsync();
         Task InitializeIdentityAsync();
+        Task ForceSeedAsync();
     }
 }

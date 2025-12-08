@@ -320,6 +320,110 @@ namespace Voltyks.Persistence
                 }
             }
             catch { /* Skip user seeding if fails - users already exist in production */ }
+        }
+
+        public async Task ForceSeedAsync()
+        {
+            var seedingBasePath = Path.Combine(AppContext.BaseDirectory, "Data", "Seeding");
+
+            // Force Seed Brands
+            try
+            {
+                var seedPath = Path.Combine(seedingBasePath, "brands_seed.json");
+                var brandsData = await File.ReadAllTextAsync(seedPath);
+                var brands = JsonSerializer.Deserialize<List<Brand>>(brandsData);
+                if (brands is not null && brands.Any())
+                {
+                    var existingNames = await _context.Brands.Select(b => b.Name).ToListAsync();
+                    var newBrands = brands.Where(b => !existingNames.Contains(b.Name)).ToList();
+                    if (newBrands.Any())
+                    {
+                        await _context.Brands.AddRangeAsync(newBrands);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
+            catch { }
+
+            // Force Seed Models
+            try
+            {
+                var seedPath = Path.Combine(seedingBasePath, "models_seed.json");
+                var data = await File.ReadAllTextAsync(seedPath);
+                var items = JsonSerializer.Deserialize<List<Model>>(data);
+                if (items is not null && items.Any())
+                {
+                    var existingNames = await _context.Models.Select(m => m.Name).ToListAsync();
+                    var newItems = items.Where(m => !existingNames.Contains(m.Name)).ToList();
+                    if (newItems.Any())
+                    {
+                        await _context.Models.AddRangeAsync(newItems);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
+            catch { }
+
+            // Force Seed Protocols
+            try
+            {
+                var seedPath = Path.Combine(seedingBasePath, "protocal_seed.json");
+                var data = await File.ReadAllTextAsync(seedPath);
+                var items = JsonSerializer.Deserialize<List<Protocol>>(data);
+                if (items is not null && items.Any())
+                {
+                    var existingNames = await _context.Protocols.Select(p => p.Name).ToListAsync();
+                    var newItems = items.Where(p => !existingNames.Contains(p.Name)).ToList();
+                    if (newItems.Any())
+                    {
+                        await _context.Protocols.AddRangeAsync(newItems);
+                        await _context.SaveChangesAsync();
+                    }
+                }
+            }
+            catch { }
+
+            // Force Seed PriceOptions
+            try
+            {
+                var seedPath = Path.Combine(seedingBasePath, "priceOption_seed.json");
+                var data = await File.ReadAllTextAsync(seedPath);
+                var items = JsonSerializer.Deserialize<List<PriceOption>>(data);
+                if (items is not null && items.Any() && !await _context.PriceOptions.AnyAsync())
+                {
+                    await _context.PriceOptions.AddRangeAsync(items);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch { }
+
+            // Force Seed Capacities
+            try
+            {
+                var seedPath = Path.Combine(seedingBasePath, "capacity_seed.json");
+                var data = await File.ReadAllTextAsync(seedPath);
+                var items = JsonSerializer.Deserialize<List<Capacity>>(data);
+                if (items is not null && items.Any() && !await _context.Capacities.AnyAsync())
+                {
+                    await _context.Capacities.AddRangeAsync(items);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch { }
+
+            // Force Seed UserTypes
+            try
+            {
+                var seedPath = Path.Combine(seedingBasePath, "UserTypes_seed.json");
+                var data = await File.ReadAllTextAsync(seedPath);
+                var items = JsonSerializer.Deserialize<List<UserType>>(data);
+                if (items is not null && items.Any() && !await _context.UserTypes.AnyAsync())
+                {
+                    await _context.UserTypes.AddRangeAsync(items);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch { }
 
 
 
