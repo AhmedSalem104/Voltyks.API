@@ -10,7 +10,16 @@
       "Bash(dir /s \"C:\\Users\\B-SMART\\Desktop\\Voltyks.API\\Voltyks.Persistence\")",
       "Bash(grep:*)",
       "Bash(findstr:*)",
-      "Bash(Select-String -Pattern \"error\")"
+      "Bash(Select-String -Pattern \"error\")",
+      "Bash(curl:*)",
+      "WebFetch(domain:voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net)",
+      "Bash(where:*)",
+      "Bash(\"C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd\" account show)",
+      "Bash(\"C:\\Program Files (x86)\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd\" account show)",
+      "Bash(cmd.exe /c \"where az\")",
+      "Bash(powershell.exe -Command \"Get-Command az -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\":*)",
+      "Bash(powershell.exe -Command \"Test-Path ''C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\wbin\\az.cmd''\")",
+      "Bash(powershell.exe:*)"
     ],
     "deny": [],
     "ask": []
