@@ -1,4 +1,5 @@
-﻿using System.Data.Entity.Infrastructure;
+﻿using System.IO;
+using System.Data.Entity.Infrastructure;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -84,10 +85,14 @@ namespace Voltyks.API.Extentions
             // ✅ Firebase Admin Initialization
             if (FirebaseApp.DefaultInstance == null)
             {
-                FirebaseApp.Create(new AppOptions()
+                var firebasePath = Path.Combine(AppContext.BaseDirectory, "Firebase", "service-account-key.json");
+                if (File.Exists(firebasePath))
                 {
-                    Credential = GoogleCredential.FromFile("Firebase/service-account-key.json")
-                });
+                    FirebaseApp.Create(new AppOptions()
+                    {
+                        Credential = GoogleCredential.FromFile(firebasePath)
+                    });
+                }
             }
 
             // Add Interceptor
@@ -159,16 +164,14 @@ namespace Voltyks.API.Extentions
             app.UseGlobalErrorHandling();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            // Enable Swagger in all environments (Development & Production)
+            app.UseSwagger();
+
+            app.UseSwaggerUI(c =>
             {
-                app.UseSwagger();
-                
-                app.UseSwaggerUI(c =>
-                {
-                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
-                    c.DefaultModelsExpandDepth(-1); // ✅ إخفاء قسم Schemas
-                });
-            }
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
+                c.DefaultModelsExpandDepth(-1); // ✅ إخفاء قسم Schemas
+            });
             app.UseStaticFiles();
             app.UseHttpsRedirection();
             app.UseRouting();

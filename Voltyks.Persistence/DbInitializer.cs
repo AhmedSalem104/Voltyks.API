@@ -37,140 +37,139 @@ namespace Voltyks.Persistence
                     await _context.Database.MigrateAsync();
                 }
 
-                //// Data Seeding 
+                //// Data Seeding
                 //// Seeding For Brands Form Json File
                 if (!_context.Brands.Any())
                 {
-                    // 1. Read All Data brands From Json File
-                    var brandsData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\brands_seed.json");
-
-                    // 2. Transform The Data To List<Brands>
-                    var brands = JsonSerializer.Deserialize<List<Brand>>(brandsData);
-
-                    // 3. Add List<Brands> To Database
-                    if (brands is not null && brands.Any())
+                    try
                     {
-                        await _context.Brands.AddRangeAsync(brands);
-                        await _context.SaveChangesAsync();
+                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\brands_seed.json";
+                        var brandsData = await File.ReadAllTextAsync(seedPath);
+                        var brands = JsonSerializer.Deserialize<List<Brand>>(brandsData);
+                        if (brands is not null && brands.Any())
+                        {
+                            await _context.Brands.AddRangeAsync(brands);
+                            await _context.SaveChangesAsync();
+                        }
                     }
+                    catch { /* Skip seeding if file not found - data already exists in production */ }
                 }
 
                 //// Seeding For Models Form Json File
                 if (!_context.Models.Any())
                 {
-                // 1. Read All Data types From Json File
-
-                var typesData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\models_seed.json");
-
-                    // 2. Transform The Data To List<Models>
-                    var types = JsonSerializer.Deserialize<List<Model>>(typesData);
-
-                    // 3. Add List<Models> To Database
-                    if (types is not null && types.Any())
+                    try
                     {
-                        await _context.Models.AddRangeAsync(types);
-                        await _context.SaveChangesAsync();
+                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\models_seed.json";
+                        var typesData = await File.ReadAllTextAsync(seedPath);
+                        var types = JsonSerializer.Deserialize<List<Model>>(typesData);
+                        if (types is not null && types.Any())
+                        {
+                            await _context.Models.AddRangeAsync(types);
+                            await _context.SaveChangesAsync();
+                        }
                     }
+                    catch { /* Skip seeding if file not found */ }
                 }                    
 
                 //// Seeding For Protocols Form Json File
                 if (!_context.Protocols.Any())
                 {
-                    // 1. Read All Data Protocols From Json File
-                    var ProtocolsData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\protocal_seed.json");
-
-                    // 2. Transform The Data To List<Protocols>
-                    var Protocols = JsonSerializer.Deserialize<List<Protocol>>(ProtocolsData);
-
-                    // 3. Add List<Protocols> To Database
-                    if (Protocols is not null && Protocols.Any())
+                    try
                     {
-                        await _context.Protocols.AddRangeAsync(Protocols);
-                        await _context.SaveChangesAsync();
+                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\protocal_seed.json";
+                        var ProtocolsData = await File.ReadAllTextAsync(seedPath);
+                        var Protocols = JsonSerializer.Deserialize<List<Protocol>>(ProtocolsData);
+                        if (Protocols is not null && Protocols.Any())
+                        {
+                            await _context.Protocols.AddRangeAsync(Protocols);
+                            await _context.SaveChangesAsync();
+                        }
                     }
+                    catch { /* Skip seeding if file not found */ }
                 }
 
                 //// Seeding For priceOption Form Json File
                 if (!_context.PriceOptions.Any())
                 {
-                    // 1. Read All Data PriceOptions From Json File
-                    var PriceOptionsData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\priceOption_seed.json");
-
-                    // 2. Transform The Data To List<PriceOptions>
-                    var PriceOptions = JsonSerializer.Deserialize<List<PriceOption>>(PriceOptionsData);
-
-                    // 3. Add List<PriceOptions> To Database
-                    if (PriceOptions is not null && PriceOptions.Any())
+                    try
                     {
-                        await _context.PriceOptions.AddRangeAsync(PriceOptions);
-                        await _context.SaveChangesAsync();
+                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\priceOption_seed.json";
+                        var PriceOptionsData = await File.ReadAllTextAsync(seedPath);
+                        var PriceOptions = JsonSerializer.Deserialize<List<PriceOption>>(PriceOptionsData);
+                        if (PriceOptions is not null && PriceOptions.Any())
+                        {
+                            await _context.PriceOptions.AddRangeAsync(PriceOptions);
+                            await _context.SaveChangesAsync();
+                        }
                     }
+                    catch { /* Skip seeding if file not found */ }
                 }
 
                 //// Seeding For Capacities Form Json File
                 if (!_context.Capacities.Any())
                 {
-                    // 1. Read All Data Capacities From Json File
-                    var CapacitiesData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\capacity_seed.json");
-
-                    // 2. Transform The Data To List<Capacities>
-                    var Capacities = JsonSerializer.Deserialize<List<Capacity>>(CapacitiesData);
-
-                    // 3. Add List<PriceOptions> To Database
-                    if (Capacities is not null && Capacities.Any())
+                    try
                     {
-                        await _context.Capacities.AddRangeAsync(Capacities);
-                        await _context.SaveChangesAsync();
+                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\capacity_seed.json";
+                        var CapacitiesData = await File.ReadAllTextAsync(seedPath);
+                        var Capacities = JsonSerializer.Deserialize<List<Capacity>>(CapacitiesData);
+                        if (Capacities is not null && Capacities.Any())
+                        {
+                            await _context.Capacities.AddRangeAsync(Capacities);
+                            await _context.SaveChangesAsync();
+                        }
                     }
+                    catch { /* Skip seeding if file not found */ }
                 }
 
                 //// Seeding For UserTypes Form Json File
                 if (!_context.UserTypes.Any())
                 {
-                    // 1. Read All Data Capacities From Json File
-                    var UserTypesData = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\UserTypes_seed.json");
-
-                    // 2. Transform The Data To List<UserTypes>
-                    var UserTypes = JsonSerializer.Deserialize<List<UserType>>(UserTypesData);
-
-                    // 3. Add List<UserTypes> To Database
-                    if (UserTypes is not null && UserTypes.Any())
+                    try
                     {
-                        await _context.UserTypes.AddRangeAsync(UserTypes);
-                        await _context.SaveChangesAsync();
+                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\UserTypes_seed.json";
+                        var UserTypesData = await File.ReadAllTextAsync(seedPath);
+                        var UserTypes = JsonSerializer.Deserialize<List<UserType>>(UserTypesData);
+                        if (UserTypes is not null && UserTypes.Any())
+                        {
+                            await _context.UserTypes.AddRangeAsync(UserTypes);
+                            await _context.SaveChangesAsync();
+                        }
                     }
+                    catch { /* Skip seeding if file not found */ }
                 }
 
 
                 //// Seeding For TermsDocuments From Json File
                 if (!_context.termsDocuments.Any())
                 {
-                    // 1) Read all data from Json file
-                    var json = await File.ReadAllTextAsync(@"..\Voltyks.Persistence\Data\Seeding\TermsDocuments_seed.json");
-
-                    // 2) Transform to List<TermsDocument>
-                    var docs = JsonSerializer.Deserialize<List<SeedItem>>(json, new JsonSerializerOptions
+                    try
                     {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    // 3) Add to DB
-                    if (docs is not null && docs.Any())
-                    {
-                        foreach (var d in docs)
+                        var seedPath = @"..\Voltyks.Persistence\Data\Seeding\TermsDocuments_seed.json";
+                        var json = await File.ReadAllTextAsync(seedPath);
+                        var docs = JsonSerializer.Deserialize<List<SeedItem>>(json, new JsonSerializerOptions
                         {
-                            var entity = new TermsDocument
+                            PropertyNameCaseInsensitive = true
+                        });
+                        if (docs is not null && docs.Any())
+                        {
+                            foreach (var d in docs)
                             {
-                                VersionNumber = d.VersionNumber,
-                                Lang = (d.Lang?.ToLowerInvariant()) == "ar" ? "ar" : "en",
-                                IsActive = d.IsActive,
-                                PublishedAt = DateTime.UtcNow,
-                                PayloadJson = d.PayloadJson.GetRawText() // نخزن JSON كما هو string
-                            };
-                            await _context.termsDocuments.AddAsync(entity);
+                                var entity = new TermsDocument
+                                {
+                                    VersionNumber = d.VersionNumber,
+                                    Lang = (d.Lang?.ToLowerInvariant()) == "ar" ? "ar" : "en",
+                                    IsActive = d.IsActive,
+                                    PublishedAt = DateTime.UtcNow,
+                                    PayloadJson = d.PayloadJson.GetRawText()
+                                };
+                                await _context.termsDocuments.AddAsync(entity);
+                            }
+                            await _context.SaveChangesAsync();
                         }
-                        await _context.SaveChangesAsync();
                     }
+                    catch { /* Skip seeding if file not found */ }
                 }
             }
             catch (Exception)
@@ -243,79 +242,81 @@ namespace Voltyks.Persistence
             //}
 
 
-            // Seeding For Users & Roles
-            if (!_userManager.Users.Any())
+            // Seeding For Users & Roles - wrapped in try-catch for Azure production
+            try
             {
-                // 1) تأكيد الأدوار
-                var roles = new[] { "Admin", "Operator", "Viewer" };
-                foreach (var role in roles)
-                    if (!await _roleManager.RoleExistsAsync(role))
-                        await _roleManager.CreateAsync(new IdentityRole(role));
-
-                // 2) إنشاء Admin
-                var adminUser = new AppUser
+                if (!_userManager.Users.Any())
                 {
-                    FullName = "VoltyksOwner",
-                    FirstName = "Voltyks",
-                    LastName = "Owner",
-                    Email = "Admin@gmail.com",
-                    UserName = "Admin",
-                    PhoneNumber = "01000000000",
-                    EmailConfirmed = true,
-                    PhoneNumberConfirmed = true
-                };
+                    // 1) تأكيد الأدوار
+                    var roles = new[] { "Admin", "Operator", "Viewer" };
+                    foreach (var role in roles)
+                        if (!await _roleManager.RoleExistsAsync(role))
+                            await _roleManager.CreateAsync(new IdentityRole(role));
 
-                var resultAdmin = await _userManager.CreateAsync(adminUser, "Voltyks1041998@");
-                if (resultAdmin.Succeeded)
-                {
-                    await _userManager.AddToRoleAsync(adminUser, "Admin");
-                    // Claims اختيارية لو عايز تميّز الأدمن في الفرونت/اللوغز
-                    await _userManager.AddClaimsAsync(adminUser, new[]
+                    // 2) إنشاء Admin
+                    var adminUser = new AppUser
                     {
-            new System.Security.Claims.Claim("role-level", "admin"),
-            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
-            new System.Security.Claims.Claim("can-transfer-fees", "true"),
-        });
-                }
-                else
-                {
-                    Console.WriteLine($"Admin Errors: {string.Join(", ", resultAdmin.Errors.Select(e => e.Description))}");
-                }
+                        FullName = "VoltyksOwner",
+                        FirstName = "Voltyks",
+                        LastName = "Owner",
+                        Email = "Admin@gmail.com",
+                        UserName = "Admin",
+                        PhoneNumber = "01000000000",
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Admin Street"
+                        }
+                    };
 
-                // 3) إنشاء مستخدم بدور آخر (Operator)
-                var operatorUser = new AppUser
-                {
-                    FullName = "VoltyksOperator",
-                    FirstName = "Voltyks",
-                    LastName = "Operator",
-                    Email = "operator@voltyks.com",
-                    UserName = "operator",
-                    PhoneNumber = "01000000001",
-                    EmailConfirmed = true,
-                    PhoneNumberConfirmed = true
-                };
-
-                var resultOp = await _userManager.CreateAsync(operatorUser, "Voltyks@Operator");
-                if (resultOp.Succeeded)
-                {
-                    await _userManager.AddToRoleAsync(operatorUser, "Operator");
-                    await _userManager.AddClaimsAsync(operatorUser, new[]
+                    var resultAdmin = await _userManager.CreateAsync(adminUser, "Voltyks1041998@");
+                    if (resultAdmin.Succeeded)
                     {
-            new System.Security.Claims.Claim("role-level", "operator"),
-            new System.Security.Claims.Claim("can-manage-terms-fees", "false"),
-            new System.Security.Claims.Claim("can-transfer-fees", "true"),
-        });
-                }
-                else
-                {
-                    Console.WriteLine($"Operator Errors: {string.Join(", ", resultOp.Errors.Select(e => e.Description))}");
-                }
+                        await _userManager.AddToRoleAsync(adminUser, "Admin");
+                        await _userManager.AddClaimsAsync(adminUser, new[]
+                        {
+                            new System.Security.Claims.Claim("role-level", "admin"),
+                            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
+                            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+                        });
+                    }
 
-                // لو حابب تضيف Viewer كمان
-                // var viewerUser = new AppUser { ... };
-                // await _userManager.CreateAsync(viewerUser, "Strong@Pass1");
-                // await _userManager.AddToRoleAsync(viewerUser, "Viewer");
+                    // 3) إنشاء مستخدم بدور آخر (Operator)
+                    var operatorUser = new AppUser
+                    {
+                        FullName = "VoltyksOperator",
+                        FirstName = "Voltyks",
+                        LastName = "Operator",
+                        Email = "operator@voltyks.com",
+                        UserName = "operator",
+                        PhoneNumber = "01000000001",
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Operator Street"
+                        }
+                    };
+
+                    var resultOp = await _userManager.CreateAsync(operatorUser, "Voltyks@Operator");
+                    if (resultOp.Succeeded)
+                    {
+                        await _userManager.AddToRoleAsync(operatorUser, "Operator");
+                        await _userManager.AddClaimsAsync(operatorUser, new[]
+                        {
+                            new System.Security.Claims.Claim("role-level", "operator"),
+                            new System.Security.Claims.Claim("can-manage-terms-fees", "false"),
+                            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+                        });
+                    }
+                }
             }
+            catch { /* Skip user seeding if fails - users already exist in production */ }
 
 
 
