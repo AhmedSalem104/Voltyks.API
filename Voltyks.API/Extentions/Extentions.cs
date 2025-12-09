@@ -51,6 +51,18 @@ namespace Voltyks.API.Extentions
         {
 
             services.AddBuildInServices();
+
+            // Add CORS - Allow all origins for API access
+            services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll", policy =>
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+                });
+            });
+
             services.AddResponseCaching();
             services.AddSwaggerServices();
             services.AddInfrastructureServices(configuration);
@@ -174,6 +186,10 @@ namespace Voltyks.API.Extentions
             });
             app.UseStaticFiles();
             app.UseHttpsRedirection();
+
+            // Enable CORS - must be before UseRouting
+            app.UseCors("AllowAll");
+
             app.UseRouting();
             app.UseResponseCaching();
             app.UseAuthentication();
