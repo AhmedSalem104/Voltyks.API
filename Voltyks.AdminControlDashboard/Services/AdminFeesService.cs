@@ -90,11 +90,11 @@ namespace Voltyks.AdminControlDashboard.Services
 
             try
             {
-                // Validate amount
-                if (dto.Amount <= 0)
+                // Validate amount - reject zero only
+                if (dto.Amount == 0)
                 {
                     return new ApiResponse<object>(
-                        message: "Amount must be greater than zero",
+                        message: "Amount cannot be zero",
                         status: false);
                 }
 
@@ -125,13 +125,32 @@ namespace Voltyks.AdminControlDashboard.Services
                         status: false);
                 }
 
-                // Update user wallet
+                // Get current wallet balance
                 var currentWallet = recipientUser.Wallet ?? 0;
+
+                // For negative amounts (deduction), check sufficient balance
+                if (dto.Amount < 0)
+                {
+                    var deductAmount = Math.Abs((double)dto.Amount);
+                    if (currentWallet < deductAmount)
+                    {
+                        return new ApiResponse<object>(
+                            message: "Insufficient wallet balance",
+                            status: false,
+                            errors: new List<string> { $"Current balance: {currentWallet}, Requested deduction: {deductAmount}" });
+                    }
+                }
+
+                // Update user wallet (works for both add and deduct)
                 var newWallet = currentWallet + (double)dto.Amount;
                 recipientUser.Wallet = newWallet;
 
                 // Save changes to database
                 await _context.SaveChangesAsync(ct);
+
+                // Determine operation type for message
+                var operationType = dto.Amount > 0 ? "added to" : "deducted from";
+                var absoluteAmount = Math.Abs(dto.Amount);
 
                 return new ApiResponse<object>(
                     data: new
@@ -139,12 +158,14 @@ namespace Voltyks.AdminControlDashboard.Services
                         recipientUserId = dto.RecipientUserId,
                         recipientName = $"{recipientUser.FirstName} {recipientUser.LastName}",
                         amount = dto.Amount,
+                        absoluteAmount = absoluteAmount,
+                        operationType = dto.Amount > 0 ? "Add" : "Deduct",
                         previousWallet = currentWallet,
                         newWallet = newWallet,
                         notes = dto.Notes,
                         transferredAt = DateTime.UtcNow
                     },
-                    message: "Fees transferred successfully",
+                    message: $"{absoluteAmount} EGP {operationType} wallet successfully",
                     status: true);
             }
 
