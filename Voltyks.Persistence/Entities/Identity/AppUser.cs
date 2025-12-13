@@ -50,6 +50,7 @@ namespace Voltyks.Persistence.Entities.Identity
         public ICollection<DeviceToken> DeviceTokens { get; set; } = new List<DeviceToken>();
         public ICollection<ChargingRequest> ChargingRequests { get; set; } = new List<ChargingRequest>();
         public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+        public ICollection<WalletTransaction> WalletTransactions { get; set; } = new List<WalletTransaction>();
 
     }
 }

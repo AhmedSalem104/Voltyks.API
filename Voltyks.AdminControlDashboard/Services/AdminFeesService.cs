@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Voltyks.AdminControlDashboard.Dtos.Fees;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Application.Interfaces.FeesConfig;
@@ -6,6 +8,7 @@ using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.FeesConfig;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.AdminControlDashboard.Services
 {
@@ -13,11 +16,13 @@ namespace Voltyks.AdminControlDashboard.Services
     {
         private readonly IFeesConfigService _feesConfigService;
         private readonly VoltyksDbContext _context;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AdminFeesService(IFeesConfigService feesConfigService, VoltyksDbContext context)
+        public AdminFeesService(IFeesConfigService feesConfigService, VoltyksDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _feesConfigService = feesConfigService;
             _context = context;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<ApiResponse<AdminFeesDto>> GetFeesAsync(CancellationToken ct = default)
@@ -145,6 +150,23 @@ namespace Voltyks.AdminControlDashboard.Services
                 var newWallet = currentWallet + (double)dto.Amount;
                 recipientUser.Wallet = newWallet;
 
+                // Get current admin ID
+                var adminId = _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                // Log the wallet transaction
+                var transaction = new WalletTransaction
+                {
+                    UserId = dto.RecipientUserId,
+                    Amount = dto.Amount,
+                    TransactionType = dto.Amount > 0 ? "Add" : "Deduct",
+                    Notes = dto.Notes,
+                    PreviousBalance = currentWallet,
+                    NewBalance = newWallet,
+                    CreatedByAdminId = adminId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.WalletTransactions.Add(transaction);
+
                 // Save changes to database
                 await _context.SaveChangesAsync(ct);
 
@@ -173,6 +195,65 @@ namespace Voltyks.AdminControlDashboard.Services
             {
                 return new ApiResponse<object>(
                     message: "Failed to transfer fees",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
+
+        public async Task<ApiResponse<List<WalletTransactionDto>>> GetWalletTransactionsAsync(string userId, CancellationToken ct = default)
+        {
+            try
+            {
+                // Validate userId
+                if (string.IsNullOrWhiteSpace(userId))
+                {
+                    return new ApiResponse<List<WalletTransactionDto>>(
+                        message: "UserId is required",
+                        status: false);
+                }
+
+                // Check if user exists
+                var user = await _context.Set<AppUser>()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.Id == userId, ct);
+
+                if (user == null)
+                {
+                    return new ApiResponse<List<WalletTransactionDto>>(
+                        message: "User not found",
+                        status: false);
+                }
+
+                // Get wallet transactions for user
+                var transactions = await _context.WalletTransactions
+                    .AsNoTracking()
+                    .Where(t => t.UserId == userId)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .Take(50)
+                    .Select(t => new WalletTransactionDto
+                    {
+                        Id = t.Id,
+                        UserId = t.UserId,
+                        UserName = $"{user.FirstName} {user.LastName}",
+                        Amount = t.Amount,
+                        TransactionType = t.TransactionType,
+                        Notes = t.Notes,
+                        PreviousBalance = t.PreviousBalance,
+                        NewBalance = t.NewBalance,
+                        CreatedByAdminId = t.CreatedByAdminId,
+                        CreatedAt = t.CreatedAt
+                    })
+                    .ToListAsync(ct);
+
+                return new ApiResponse<List<WalletTransactionDto>>(
+                    data: transactions,
+                    message: "Wallet transactions retrieved successfully",
+                    status: true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<List<WalletTransactionDto>>(
+                    message: "Failed to retrieve wallet transactions",
                     status: false,
                     errors: new List<string> { ex.Message });
             }

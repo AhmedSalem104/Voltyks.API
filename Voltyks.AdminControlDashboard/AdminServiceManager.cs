@@ -20,7 +20,7 @@ namespace Voltyks.AdminControlDashboard
             IServiceManager serviceManager)
         {
             AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor);
-            AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context);
+            AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context, httpContextAccessor);
             AdminTermsService = new AdminTermsService(serviceManager.TermsService, context);
             AdminProtocolService = new AdminProtocolService(context);
             AdminReportsService = new AdminReportsService(context, mapper, httpContextAccessor);

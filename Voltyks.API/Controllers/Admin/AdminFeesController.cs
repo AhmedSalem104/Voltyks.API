@@ -50,5 +50,17 @@ namespace Voltyks.API.Controllers.Admin
             var result = await _adminServiceManager.AdminFeesService.TransferFeesAsync(dto, ct);
             return Ok(result);
         }
+
+        /// <summary>
+        /// GET /api/admin/fees/wallet-transactions/{userId}
+        /// </summary>
+        [HttpGet("wallet-transactions/{userId}")]
+        public async Task<IActionResult> GetWalletTransactions(
+            string userId,
+            CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminFeesService.GetWalletTransactionsAsync(userId, ct);
+            return Ok(result);
+        }
     }
 }
