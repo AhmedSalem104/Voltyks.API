@@ -250,5 +250,25 @@ namespace Voltyks.Presentation
             CancellationToken ct)
             => Ok(await serviceManager.AuthService.VerifyEmailChangeAsync(dto, ct));
 
+        /// <summary>
+        /// POST /api/auth/change-email - Simple email change (password only, no OTP)
+        /// </summary>
+        [HttpPost("change-email")]
+        [Authorize]
+        public async Task<IActionResult> ChangeEmail(
+            [FromBody] ChangeEmailDto dto,
+            CancellationToken ct)
+            => Ok(await serviceManager.AuthService.ChangeEmailAsync(dto, ct));
+
+        /// <summary>
+        /// POST /api/auth/change-password - Simple password change (current password required, no OTP)
+        /// </summary>
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword(
+            [FromBody] ChangePasswordDto dto,
+            CancellationToken ct)
+            => Ok(await serviceManager.AuthService.ChangePasswordAsync(dto, ct));
+
     }
 }

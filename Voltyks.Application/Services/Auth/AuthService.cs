@@ -935,6 +935,72 @@ namespace Voltyks.Application.Services.Auth
             );
         }
 
+        // ---------- Simple Change Email (No OTP) ----------
+        public async Task<ApiResponse<object>> ChangeEmailAsync(ChangeEmailDto dto, CancellationToken ct = default)
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<object>("Unauthorized", status: false);
+
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null)
+                return new ApiResponse<object>("User not found", status: false);
+
+            // Verify current password
+            var isPasswordValid = await userManager.CheckPasswordAsync(user, dto.CurrentPassword);
+            if (!isPasswordValid)
+                return new ApiResponse<object>("Invalid password", status: false);
+
+            // Check if new email already exists
+            var existingUser = await userManager.FindByEmailAsync(dto.NewEmail);
+            if (existingUser != null && existingUser.Id != userId)
+                return new ApiResponse<object>("Email already in use", status: false);
+
+            // Update email
+            var oldEmail = user.Email;
+            user.Email = dto.NewEmail;
+            user.NormalizedEmail = dto.NewEmail.ToUpperInvariant();
+
+            var result = await userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<object>("Failed to update email", status: false, errors: errors);
+            }
+
+            return new ApiResponse<object>(
+                data: new { oldEmail, newEmail = dto.NewEmail },
+                message: "Email changed successfully",
+                status: true
+            );
+        }
+
+        // ---------- Simple Change Password (No OTP) ----------
+        public async Task<ApiResponse<object>> ChangePasswordAsync(ChangePasswordDto dto, CancellationToken ct = default)
+        {
+            var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<object>("Unauthorized", status: false);
+
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null)
+                return new ApiResponse<object>("User not found", status: false);
+
+            // Change password (ChangePasswordAsync verifies current password internally)
+            var result = await userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<object>("Failed to change password", status: false, errors: errors);
+            }
+
+            return new ApiResponse<object>(
+                data: null,
+                message: "Password changed successfully",
+                status: true
+            );
+        }
+
         // ---------- Private Methods ----------
         private async Task CleanupOldRequestsForUserAsync(string userId)
         {

@@ -44,6 +44,10 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<object>> RequestEmailChangeAsync(RequestEmailChangeDto dto, CancellationToken ct = default);
         Task<ApiResponse<object>> VerifyEmailChangeAsync(VerifyEmailChangeDto dto, CancellationToken ct = default);
 
+        // Simple change email/password (no OTP required)
+        Task<ApiResponse<object>> ChangeEmailAsync(ChangeEmailDto dto, CancellationToken ct = default);
+        Task<ApiResponse<object>> ChangePasswordAsync(ChangePasswordDto dto, CancellationToken ct = default);
+
     }
 
 
