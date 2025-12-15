@@ -388,7 +388,7 @@ namespace Voltyks.Persistence
             }
             catch { }
 
-            // Force Seed PriceOptions - Clear and reseed
+            // Force Seed PriceOptions - Add missing values only
             try
             {
                 var seedPath = Path.Combine(seedingBasePath, "priceOption_seed.json");
@@ -396,16 +396,15 @@ namespace Voltyks.Persistence
                 var items = JsonSerializer.Deserialize<List<PriceOption>>(data);
                 if (items is not null && items.Any())
                 {
-                    // Clear existing PriceOptions
-                    var existing = await _context.PriceOptions.ToListAsync();
-                    if (existing.Any())
+                    // Get existing values
+                    var existingValues = await _context.PriceOptions.Select(p => p.Value).ToListAsync();
+                    // Add only new values that don't exist
+                    var newItems = items.Where(p => !existingValues.Contains(p.Value)).ToList();
+                    if (newItems.Any())
                     {
-                        _context.PriceOptions.RemoveRange(existing);
+                        await _context.PriceOptions.AddRangeAsync(newItems);
                         await _context.SaveChangesAsync();
                     }
-                    // Add new PriceOptions
-                    await _context.PriceOptions.AddRangeAsync(items);
-                    await _context.SaveChangesAsync();
                 }
             }
             catch { }
