@@ -1,9 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Voltyks.AdminControlDashboard;
 using Voltyks.Persistence;
+using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.API.Controllers.Admin
 {
@@ -15,12 +18,14 @@ namespace Voltyks.API.Controllers.Admin
         private readonly IAdminServiceManager _adminServiceManager;
         private readonly IDbInitializer _dbInitializer;
         private readonly UserManager<AppUser> _userManager;
+        private readonly VoltyksDbContext _context;
 
-        public AdminProcessController(IAdminServiceManager adminServiceManager, IDbInitializer dbInitializer, UserManager<AppUser> userManager)
+        public AdminProcessController(IAdminServiceManager adminServiceManager, IDbInitializer dbInitializer, UserManager<AppUser> userManager, VoltyksDbContext context)
         {
             _adminServiceManager = adminServiceManager;
             _dbInitializer = dbInitializer;
             _userManager = userManager;
+            _context = context;
         }
 
         /// <summary>
@@ -69,6 +74,43 @@ namespace Voltyks.API.Controllers.Admin
             await _dbInitializer.InitializeIdentityAsync();
 
             return Ok(new { status = true, message = "Admin users deleted and reseeded successfully" });
+        }
+
+        /// <summary>
+        /// POST /api/admin/process/seed-price-options - Seed PriceOptions with increment of 10 (100-5000)
+        /// </summary>
+        [HttpPost("seed-price-options")]
+        [AllowAnonymous]
+        public async Task<IActionResult> SeedPriceOptions()
+        {
+            try
+            {
+                // Get existing values
+                var existingValues = await _context.PriceOptions.Select(p => p.Value).ToListAsync();
+
+                // Generate values from 100 to 5000 with increment of 10
+                var newPriceOptions = new List<PriceOption>();
+                for (int value = 100; value <= 5000; value += 10)
+                {
+                    if (!existingValues.Contains(value))
+                    {
+                        newPriceOptions.Add(new PriceOption { Value = value });
+                    }
+                }
+
+                if (newPriceOptions.Any())
+                {
+                    await _context.PriceOptions.AddRangeAsync(newPriceOptions);
+                    await _context.SaveChangesAsync();
+                }
+
+                var totalCount = await _context.PriceOptions.CountAsync();
+                return Ok(new { status = true, message = $"Added {newPriceOptions.Count} new price options. Total: {totalCount}", data = new { added = newPriceOptions.Count, total = totalCount } });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { status = false, message = ex.Message });
+            }
         }
     }
 }
