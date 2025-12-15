@@ -92,6 +92,7 @@ namespace Voltyks.API.Controllers
         //}
         [HttpPost("webhook")]
         [AllowAnonymous]
+        [RequestSizeLimit(1_048_576)] // 1 MB limit - prevents DoS attacks
         public async Task<IActionResult> Webhook()
         {
             Request.EnableBuffering();

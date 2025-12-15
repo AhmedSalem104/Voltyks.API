@@ -69,8 +69,13 @@ namespace Voltyks.Application.Services.Paymob
         }
         public async Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req)
         {
-            // (1) Auth-token (مطلوب لاحقًا)
-            var _ = await _tokenProvider.GetAsync(); // مجرد ضمان، الاستخدام الفعلي بيتم داخل الخطوات التالية
+            // (1) Auth-token - validate it's available
+            var authToken = await _tokenProvider.GetAsync();
+            if (string.IsNullOrWhiteSpace(authToken))
+            {
+                _log?.LogError("Failed to obtain Paymob auth token for card checkout");
+                return new ApiResponse<CardCheckoutResponse> { Status = false, Message = "Authentication failed with payment provider" };
+            }
 
             // (2) Service-Order (DB) + (3) Paymob Order
             var currency = ResolveCurrency(req.Currency);
@@ -105,8 +110,13 @@ namespace Voltyks.Application.Services.Paymob
         }
         public async Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutServiceDto req)
         {
-            // (1) Auth-token
-            var _ = await _tokenProvider.GetAsync();
+            // (1) Auth-token - validate it's available
+            var authToken = await _tokenProvider.GetAsync();
+            if (string.IsNullOrWhiteSpace(authToken))
+            {
+                _log?.LogError("Failed to obtain Paymob auth token for wallet checkout");
+                return new ApiResponse<WalletCheckoutResponse> { Status = false, Message = "Authentication failed with payment provider" };
+            }
 
             // (2) Service-Order (DB) + (3) Paymob Order
             var currency = ResolveCurrency(req.Currency);
@@ -668,9 +678,13 @@ namespace Voltyks.Application.Services.Paymob
                     Walk("", doc.RootElement);
                 }
             }
-            catch
+            catch (JsonException ex)
             {
-                // ignore parsing errors
+                _log?.LogWarning(ex, "Failed to parse webhook JSON payload. Processing with available data.");
+            }
+            catch (Exception ex)
+            {
+                _log?.LogWarning(ex, "Unexpected error parsing webhook payload. Processing with available data.");
             }
 
             // --------- 1) early event type detection ----------
@@ -770,7 +784,7 @@ namespace Voltyks.Application.Services.Paymob
             var userId = await ResolveUserIdFromTokenContextAsync(fields);
             if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
             {
-                _log?.LogWarning("CARD_TOKEN missing essentials → userId={userId}, token={token}", userId, cardToken);
+                _log?.LogWarning("CARD_TOKEN missing essentials → userId={userId}", userId);
                 // ACK so PSP doesn't retry forever
                 return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
             }
@@ -810,8 +824,8 @@ namespace Voltyks.Application.Services.Paymob
             try
             {
                 await _uow.SaveChangesAsync();
-                _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, exp={m}/{y}, token={token}",
-                    userId, last4, brand, expMonth, expYear, cardToken);
+                _log?.LogInformation("Saved NEW card → user={userId}, last4={last4}, brand={brand}, exp={m}/{y}",
+                    userId, last4, brand, expMonth, expYear);
                 return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN saved", Data = true };
             }
             catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
@@ -832,13 +846,60 @@ namespace Voltyks.Application.Services.Paymob
 
         private bool VerifyWebhookSignature(HttpRequest req, string rawBody)
         {
-            // Example sketch:
-            // var sigHeader = req.Headers["X-Signature"].FirstOrDefault();
-            // var tsHeader  = req.Headers["X-Timestamp"].FirstOrDefault();
-            // var secret    = _options.WebhookSecret;
-            // var expected  = HmacSha256($"{tsHeader}.{rawBody}", secret);
-            // return TimeSafeEquals(sigHeader, expected) && TsWithinSkew(tsHeader);
-            return true;
+            // Get HMAC from query string (Paymob sends it as ?hmac=...)
+            var hmacFromPaymob = req.Query["hmac"].FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(hmacFromPaymob))
+            {
+                _log?.LogWarning("Webhook received without HMAC signature");
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(_opt.HmacSecret))
+            {
+                _log?.LogError("HMAC secret not configured - cannot verify webhook");
+                return false;
+            }
+
+            try
+            {
+                // Parse the JSON body to extract fields
+                using var doc = JsonDocument.Parse(rawBody);
+                var root = doc.RootElement;
+
+                // Get the obj element (Paymob wraps transaction data in "obj")
+                if (!root.TryGetProperty("obj", out var obj))
+                {
+                    _log?.LogWarning("Webhook payload missing 'obj' element");
+                    return false;
+                }
+
+                // Paymob HMAC fields in exact order (for TRANSACTION webhooks)
+                // Reference: https://docs.paymob.com/docs/hmac-calculation
+                var concatenated = BuildTransactionConcat(obj);
+
+                // Calculate HMAC-SHA512
+                using var hmac = new HMACSHA512(KeyFromHexOrUtf8(_opt.HmacSecret));
+                var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(concatenated));
+                var calculatedHmac = BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+
+                // Time-safe comparison to prevent timing attacks
+                var isValid = CryptographicOperations.FixedTimeEquals(
+                    Encoding.UTF8.GetBytes(hmacFromPaymob.ToLowerInvariant()),
+                    Encoding.UTF8.GetBytes(calculatedHmac));
+
+                if (!isValid)
+                {
+                    _log?.LogWarning("HMAC verification failed for webhook");
+                }
+
+                return isValid;
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError(ex, "Error during HMAC verification");
+                return false;
+            }
         }
 
   
@@ -1044,7 +1105,6 @@ namespace Voltyks.Application.Services.Paymob
 
             // حساب HMAC وتعيينه في الهيدر
             var hmacSignature = CalculateHmac(body, _opt.HmacSecret);
-            Console.WriteLine($"HMAC Signature: {hmacSignature}"); // قم بطباعة التوقيع لمقارنة
 
             req.Headers.Add("X-HMAC-Signature", hmacSignature);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -1069,7 +1129,20 @@ namespace Voltyks.Application.Services.Paymob
             {
                 using var doc = JsonDocument.Parse(raw);
                 var root = doc.RootElement;
-                var clientSecret = root.GetProperty("client_secret").GetString();
+
+                if (!root.TryGetProperty("client_secret", out var clientSecretProp) ||
+                    clientSecretProp.ValueKind != JsonValueKind.String)
+                {
+                    _log?.LogError("Missing or invalid client_secret in Intention response");
+                    return new ApiResponse<IntentionClientSecretDto>
+                    {
+                        Status = false,
+                        Message = "Invalid response - missing client_secret",
+                        Errors = new List<string> { raw }
+                    };
+                }
+
+                var clientSecret = clientSecretProp.GetString();
 
                 return new ApiResponse<IntentionClientSecretDto>
                 {
@@ -1109,42 +1182,38 @@ namespace Voltyks.Application.Services.Paymob
             {
                 using var doc = JsonDocument.Parse(raw);
                 var root = doc.RootElement;
-                return root.GetProperty("token").GetString(); // إرجاع التوكن
+
+                if (!root.TryGetProperty("token", out var tokenProp) ||
+                    tokenProp.ValueKind != JsonValueKind.String)
+                {
+                    _log?.LogError("Missing or invalid token in auth response");
+                    throw new InvalidOperationException("Failed to get auth token from Paymob - invalid response");
+                }
+
+                return tokenProp.GetString()!;
             }
             else
             {
-                // طباعة الخطأ إذا فشل الحصول على التوكن
-                _log.LogError("Failed to get Bearer Token: {Error}", raw);
+                _log?.LogError("Failed to get Bearer Token: {Error}", raw);
                 throw new Exception($"Failed to get Bearer Token: {raw}");
             }
         }
         public string CalculateHmac(object body, string secret)
         {
-
-         
-
             var bodyString = JsonSerializer.Serialize(body);
-            Console.WriteLine("Body String: " + bodyString); // طباعة الـ body الذي سيتم حساب التوقيع عليه
 
-            using var hmac = new System.Security.Cryptography.HMACSHA512(Encoding.UTF8.GetBytes(secret));  // حساب الـ HMAC باستخدام الـ secret
-            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(bodyString)); // حساب التوقيع
+            using var hmac = new HMACSHA512(Encoding.UTF8.GetBytes(secret));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(bodyString));
 
-            var hmacSignature = BitConverter.ToString(hash).Replace("-", "").ToLower(); // تحويل الـ hash إلى String
-            Console.WriteLine("HMAC Signature: " + hmacSignature); // طباعة الـ HMAC Signature
-
-            return hmacSignature;  // إرجاع التوقيع المحسوب
-
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
-        public void CompareHmacSignature(string calculatedSignature, string receivedSignature)
+
+        public bool CompareHmacSignature(string calculatedSignature, string receivedSignature)
         {
-            if (calculatedSignature == receivedSignature)
-            {
-                Console.WriteLine("The signatures match!");
-            }
-            else
-            {
-                Console.WriteLine("The signatures do not match!");
-            }
+            // Use time-safe comparison to prevent timing attacks
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(calculatedSignature.ToLowerInvariant()),
+                Encoding.UTF8.GetBytes(receivedSignature.ToLowerInvariant()));
         }
         public async Task<ApiResponse<TokenizationStartRes>> StartCardTokenizationAsync(long amountCents = 0)
         {
@@ -1528,17 +1597,31 @@ namespace Voltyks.Application.Services.Paymob
         }
         private async Task<HttpResponseMessage> HttpPostJsonWithRetryAsync(string url, object body, int maxRetries = 3, CancellationToken ct = default)
         {
-            for (int attempt = 0; ; attempt++)
+            int attempt = 0;
+            while (attempt <= maxRetries)
             {
                 var res = await _http.PostAsJsonAsync(url, body, ct);
-                if (res.StatusCode != (HttpStatusCode)429) return res;
 
-                if (attempt >= maxRetries) return res;
-                var delay = GetRetryDelay(res, attempt + 1);
-                _log.LogWarning("429 @ {Url} retry in {Delay}s (attempt {Attempt}/{Max})",
-                    url, delay.TotalSeconds, attempt + 1, maxRetries);
+                // Success or non-retryable error
+                if (res.StatusCode != (HttpStatusCode)429)
+                    return res;
+
+                // Max retries reached
+                if (attempt >= maxRetries)
+                {
+                    _log?.LogWarning("Max retries ({MaxRetries}) reached for {Url}", maxRetries, url);
+                    return res;
+                }
+
+                attempt++;
+                var delay = GetRetryDelay(res, attempt);
+                _log?.LogWarning("429 @ {Url} retry in {Delay}s (attempt {Attempt}/{Max})",
+                    url, delay.TotalSeconds, attempt, maxRetries);
                 await Task.Delay(delay, ct);
             }
+
+            // This should never be reached, but return a failed response just in case
+            throw new InvalidOperationException("Retry loop exited unexpectedly");
         }
         private async Task<long> GetOrCreatePaymobOrderIdAsync(string merchantOrderId, long amountCents, string currency)
         {
@@ -1609,9 +1692,25 @@ namespace Voltyks.Application.Services.Paymob
                 tokenize = tokenize ? true : null
             };
             var res = await HttpPostJsonWithRetryAsync($"{_opt.ApiBase}/acceptance/payment_keys", body);
-            //res.EnsureSuccessStatusCode();
+
+            // Validate HTTP response
+            if (!res.IsSuccessStatusCode)
+            {
+                var errorContent = await res.Content.ReadAsStringAsync();
+                _log?.LogError("Payment key creation failed: {Status} - {Body}", res.StatusCode, errorContent);
+                throw new InvalidOperationException($"Failed to create payment key: {res.StatusCode}");
+            }
+
             var data = await res.Content.ReadFromJsonAsync<PaymobPaymentKeyRes>();
-            var key = data!.token;
+
+            // Validate response data
+            if (data?.token == null)
+            {
+                _log?.LogError("Payment key response was null or missing token");
+                throw new InvalidOperationException("Failed to generate payment key - invalid response");
+            }
+
+            var key = data.token;
             order.LastPaymentKey = key;
             order.PaymentKeyExpiresAt = GetEgyptTime().AddSeconds(expirationSeconds);
             order.Status = "Pending";
