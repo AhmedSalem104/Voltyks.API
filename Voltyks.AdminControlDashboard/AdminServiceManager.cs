@@ -30,6 +30,7 @@ namespace Voltyks.AdminControlDashboard
             AdminProcessService = new AdminProcessService(context);
             AdminComplaintCategoriesService = new AdminComplaintCategoriesService(context);
             AdminComplaintsService = new AdminComplaintsService(context);
+            AdminCapacityService = new AdminCapacityService(context);
         }
 
         public IAdminUsersService AdminUsersService { get; }
@@ -43,5 +44,6 @@ namespace Voltyks.AdminControlDashboard
         public IAdminProcessService AdminProcessService { get; }
         public IAdminComplaintCategoriesService AdminComplaintCategoriesService { get; }
         public IAdminComplaintsService AdminComplaintsService { get; }
+        public IAdminCapacityService AdminCapacityService { get; }
     }
 }
