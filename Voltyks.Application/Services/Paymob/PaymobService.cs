@@ -701,11 +701,18 @@ namespace Voltyks.Application.Services.Paymob
 
             if (hasCardTokenKeys) eventType = "CARD_TOKEN";
 
+            // --------- TRANSACTION webhook handling ----------
+            if (eventType == "TRANSACTION" || eventType == "TXN" ||
+                (!hasCardTokenKeys && TryParseLong(fields, "obj.id", "id") > 0))
+            {
+                return await HandleTransactionWebhookAsync(fields);
+            }
+
             if (eventType != "CARD_TOKEN" && eventType != "TOKEN")
             {
-                _log?.LogWarning("No token keys found → not a card-token event. Known keys: {Keys}",
-                    string.Join(", ", fields.Keys.OrderBy(k => k)));
-                return new ApiResponse<bool> { Status = true, Message = "Event processed", Data = true };
+                _log?.LogInformation("Unknown event type: {EventType}. Known keys: {Keys}",
+                    eventType, string.Join(", ", fields.Keys.Take(20).OrderBy(k => k)));
+                return new ApiResponse<bool> { Status = true, Message = "Event acknowledged", Data = true };
             }
 
             // --------- 2) extract card data ---------
@@ -902,7 +909,136 @@ namespace Voltyks.Application.Services.Paymob
             }
         }
 
-  
+        /// <summary>
+        /// Handle TRANSACTION webhooks from Paymob to update payment status
+        /// </summary>
+        private async Task<ApiResponse<bool>> HandleTransactionWebhookAsync(IDictionary<string, string?> fields)
+        {
+            // Extract transaction details
+            var paymobTxId = TryParseLong(fields, "obj.id", "id");
+            var paymobOrderId = TryParseLong(fields, "obj.order.id", "obj.order_id", "order.id", "order_id");
+            var merchantOrderId = FirstValue(fields, "obj.order.merchant_order_id", "obj.merchant_order_id", "merchant_order_id");
+            var amountCents = TryParseLong(fields, "obj.amount_cents", "amount_cents");
+            var currency = FirstValue(fields, "obj.currency", "currency") ?? "EGP";
+
+            // Payment status
+            bool isSuccess = TryParseBool(fields, "obj.success") || TryParseBool(fields, "success");
+            bool isPending = TryParseBool(fields, "obj.pending") || TryParseBool(fields, "pending");
+            bool isVoided = TryParseBool(fields, "obj.is_voided") || TryParseBool(fields, "is_voided");
+            bool isRefunded = TryParseBool(fields, "obj.is_refunded") || TryParseBool(fields, "is_refunded");
+
+            // Determine status string
+            string status;
+            if (isSuccess) status = "Paid";
+            else if (isPending) status = "Pending";
+            else if (isVoided) status = "Voided";
+            else if (isRefunded) status = "Refunded";
+            else status = "Failed";
+
+            _log?.LogInformation("TRANSACTION webhook: txId={TxId}, orderId={OrderId}, merchantOrderId={MerchantOrderId}, status={Status}, success={Success}",
+                paymobTxId, paymobOrderId, merchantOrderId, status, isSuccess);
+
+            // Try to find order by merchant_order_id or paymob_order_id
+            PaymentOrder? order = null;
+
+            if (!string.IsNullOrWhiteSpace(merchantOrderId))
+            {
+                // Try extracting actual orderId from format "uid:xxx|ord:yyy"
+                var match = System.Text.RegularExpressions.Regex.Match(merchantOrderId, @"ord:([A-Za-z0-9_\-]+)");
+                var actualOrderId = match.Success ? match.Groups[1].Value : merchantOrderId;
+
+                order = await PaymentOrders.GetFirstOrDefaultAsync(
+                    o => o.MerchantOrderId == merchantOrderId || o.MerchantOrderId == actualOrderId,
+                    trackChanges: true);
+            }
+
+            if (order == null && paymobOrderId > 0)
+            {
+                order = await PaymentOrders.GetFirstOrDefaultAsync(
+                    o => o.PaymobOrderId == paymobOrderId,
+                    trackChanges: true);
+            }
+
+            if (order == null)
+            {
+                _log?.LogWarning("TRANSACTION webhook: Order not found. merchantOrderId={MerchantOrderId}, paymobOrderId={OrderId}",
+                    merchantOrderId, paymobOrderId);
+                // ACK anyway to prevent retries
+                return new ApiResponse<bool> { Status = true, Message = "Order not found - acknowledged", Data = true };
+            }
+
+            // Update order status
+            order.Status = status;
+            order.UpdatedAt = GetEgyptTime();
+            if (paymobOrderId > 0 && !order.PaymobOrderId.HasValue)
+                order.PaymobOrderId = paymobOrderId;
+
+            PaymentOrders.Update(order);
+
+            // Update or create transaction record
+            var existingTx = paymobTxId > 0
+                ? await PaymentTransactions.GetFirstOrDefaultAsync(t => t.PaymobTransactionId == paymobTxId, trackChanges: true)
+                : null;
+
+            if (existingTx != null)
+            {
+                existingTx.Status = status;
+                existingTx.IsSuccess = isSuccess;
+                existingTx.HmacVerified = true;
+                existingTx.UpdatedAt = GetEgyptTime();
+                PaymentTransactions.Update(existingTx);
+            }
+            else
+            {
+                // Try to find by merchant_order_id
+                var txByOrderId = await PaymentTransactions.GetFirstOrDefaultAsync(
+                    t => t.MerchantOrderId == order.MerchantOrderId,
+                    trackChanges: true);
+
+                if (txByOrderId != null)
+                {
+                    txByOrderId.PaymobTransactionId = paymobTxId > 0 ? paymobTxId : txByOrderId.PaymobTransactionId;
+                    txByOrderId.Status = status;
+                    txByOrderId.IsSuccess = isSuccess;
+                    txByOrderId.HmacVerified = true;
+                    txByOrderId.UpdatedAt = GetEgyptTime();
+                    PaymentTransactions.Update(txByOrderId);
+                }
+                else if (paymobTxId > 0)
+                {
+                    // Create new transaction record
+                    var newTx = new PaymentTransaction
+                    {
+                        PaymobTransactionId = paymobTxId,
+                        PaymobOrderId = paymobOrderId > 0 ? paymobOrderId : null,
+                        MerchantOrderId = order.MerchantOrderId,
+                        AmountCents = amountCents > 0 ? amountCents : order.AmountCents,
+                        Currency = currency,
+                        Status = status,
+                        IsSuccess = isSuccess,
+                        HmacVerified = true,
+                        IntegrationType = "Webhook",
+                        CreatedAt = GetEgyptTime()
+                    };
+                    await PaymentTransactions.AddAsync(newTx);
+                }
+            }
+
+            try
+            {
+                await _uow.SaveChangesAsync();
+                _log?.LogInformation("TRANSACTION webhook processed: order={OrderId} updated to {Status}",
+                    order.MerchantOrderId, status);
+                return new ApiResponse<bool> { Status = true, Message = $"Transaction {status}", Data = true };
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError(ex, "Failed to save transaction webhook changes");
+                // ACK anyway
+                return new ApiResponse<bool> { Status = true, Message = "Error handled", Data = true };
+            }
+        }
+
         private static bool IsUniqueConstraintViolation(DbUpdateException ex)
         {
             // SQL Server: 2601 or 2627
