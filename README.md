@@ -14,7 +14,7 @@
 
 <!-- Animated Badges -->
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-blue?style=for-the-badge&logo=semantic-release" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.1.0-blue?style=for-the-badge&logo=semantic-release" alt="Version" />
   <img src="https://img.shields.io/badge/license-Proprietary-red?style=for-the-badge" alt="License" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 8" />
   <img src="https://img.shields.io/badge/Azure-Deployed-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="Azure" />
@@ -72,16 +72,45 @@
 
 ---
 
+## 🆕 What's New in v2.1.0
+
+<div align="center">
+
+| Category | Updates |
+|:--------:|:--------|
+| 💳 **Payment** | Paymob Intention API, TRANSACTION webhook handling, Saved cards management |
+| 🔒 **Security** | HMAC-SHA512 verification, PCI-compliant logging, Request size limits |
+| 🛡️ **Admin** | Wallet transaction history, Add/Deduct balance with notes |
+| 📋 **Protocols** | Full CRUD operations for charging protocols |
+| 📝 **Docs** | Complete payment flow documentation for frontend integration |
+
+</div>
+
+### Recent Changes
+
+```diff
++ Added TRANSACTION webhook handling for automatic payment status updates
++ Implemented HMAC-SHA512 webhook signature verification
++ Added wallet transaction history with notes tracking
++ Created full CRUD endpoints for Protocols
++ Added payment flow documentation for frontend developers
++ Removed sensitive data from logs (PCI compliance)
++ Fixed retry loop structure for better reliability
++ Added request size limits on webhook endpoints
+```
+
+---
+
 ## ✨ Features
 
 <div align="center">
 
-| 🔋 Core | 🔐 Security | 💳 Payments | 📱 Mobile |
-|:-------:|:-----------:|:-----------:|:---------:|
-| Geolocation Search | JWT + Refresh Tokens | Paymob Integration | Push Notifications |
-| Real-time Requests | OAuth (Google/FB) | Card Tokenization | Device Management |
-| Two-way Ratings | OTP Verification | Mobile Wallets | Deep Linking |
-| Wallet System | Role-based Access | Webhook Handling | Multi-language |
+| 🔋 Core | 🔐 Security | 💳 Payments | 📱 Mobile | 🛡️ Admin |
+|:-------:|:-----------:|:-----------:|:---------:|:--------:|
+| Geolocation Search | JWT + Refresh Tokens | Paymob Intention API | Push Notifications | User Management |
+| Real-time Requests | OAuth (Google/FB) | Card Tokenization | Device Management | Wallet Fees Control |
+| Two-way Ratings | OTP Verification | Saved Cards | Deep Linking | Complaints System |
+| Wallet System | HMAC Webhook Verify | Transaction Webhooks | Multi-language | Transaction History |
 
 </div>
 
@@ -322,11 +351,46 @@ graph TB
 
 | Method | Endpoint | Description | Auth |
 |:------:|:---------|:------------|:----:|
-| `POST` | `/api/payment/intention` | Create payment | 🔑 |
-| `POST` | `/api/payment/webhook` | Paymob webhook | ❌ |
-| `GET` | `/api/payment/GetListOfCards` | Saved cards | 🔑 |
-| `POST` | `/api/payment/payWithSavedCard` | Pay with card | 🔑 |
-| `DELETE` | `/api/payment/delete_Card` | Delete card | 🔑 |
+| `POST` | `/api/payment/intention` | Create payment intention (Paymob SDK) | 🔑 |
+| `POST` | `/api/payment/webhook` | Paymob webhook (TRANSACTION/CARD_TOKEN) | ❌ |
+| `POST` | `/api/payment/getOrderStatus` | Check payment status | 🔑 |
+| `POST` | `/api/payment/tokenization` | Start card tokenization | 🔑 |
+| `GET` | `/api/payment/GetListOfCards` | List saved cards | 🔑 |
+| `POST` | `/api/payment/setDefault_Card` | Set default card | 🔑 |
+| `POST` | `/api/payment/payWithSavedCard` | Pay with saved card | 🔑 |
+| `DELETE` | `/api/payment/delete_Card` | Delete saved card | 🔑 |
+
+📖 **[View Full Payment Flow Documentation](./PAYMENT_FLOW_FRONTEND.md)**
+
+</details>
+
+<details>
+<summary><b>🛡️ Admin API</b></summary>
+
+| Method | Endpoint | Description | Auth |
+|:------:|:---------|:------------|:----:|
+| `GET` | `/api/admin/fees/wallet-transactions` | Get wallet transaction history | 🔑 |
+| `POST` | `/api/admin/fees/transfer` | Add/Deduct wallet balance | 🔑 |
+| `GET` | `/api/admin/complaints` | Get all complaints | 🔑 |
+| `GET` | `/api/admin/complaints/{id}` | Get complaint by ID | 🔑 |
+| `PATCH` | `/api/admin/complaints/{id}/status` | Update complaint status | 🔑 |
+| `GET` | `/api/admin/complaint-categories` | Get complaint categories | 🔑 |
+| `POST` | `/api/admin/complaint-categories` | Create category | 🔑 |
+| `PUT` | `/api/admin/complaint-categories/{id}` | Update category | 🔑 |
+| `DELETE` | `/api/admin/complaint-categories/{id}` | Delete category | 🔑 |
+
+</details>
+
+<details>
+<summary><b>📋 Protocols API</b></summary>
+
+| Method | Endpoint | Description | Auth |
+|:------:|:---------|:------------|:----:|
+| `GET` | `/api/protocol` | Get all protocols | ❌ |
+| `GET` | `/api/protocol/{id}` | Get protocol by ID | ❌ |
+| `POST` | `/api/protocol` | Create protocol | 🔑 |
+| `PUT` | `/api/protocol/{id}` | Update protocol | 🔑 |
+| `DELETE` | `/api/protocol/{id}` | Delete protocol | 🔑 |
 
 </details>
 
@@ -517,14 +581,30 @@ sequenceDiagram
 
 | Feature | Implementation |
 |:-------:|:--------------|
-| 🔐 | JWT tokens with configurable expiration |
-| 🔄 | Refresh tokens stored in Redis |
-| ✅ | HMAC verification for webhooks |
-| 🚫 | Rate limiting for OTP attempts |
-| 🛡️ | User banning system |
+| 🔐 | JWT tokens with configurable expiration (30 days default) |
+| 🔄 | Refresh tokens stored in Redis with secure rotation |
+| ✅ | HMAC-SHA512 webhook verification (Paymob) |
+| 🚫 | Rate limiting for OTP attempts (5 max) |
+| 🛡️ | User banning system with reason tracking |
 | 🔒 | HTTPS enforced in production |
+| 🔑 | OAuth 2.0 (Google, Facebook) integration |
+| 📝 | PCI-compliant card tokenization (no card data stored) |
+| ⏱️ | Request size limits on webhook endpoints (1MB) |
+| 🔍 | Safe JSON parsing with validation |
 
 </div>
+
+### 🔐 Payment Security Features
+
+```
+✅ HMAC-SHA512 Webhook Signature Verification
+✅ Time-safe signature comparison (prevents timing attacks)
+✅ Card tokens stored instead of card numbers
+✅ No sensitive data in logs (PCI compliance)
+✅ Request size limits to prevent DoS attacks
+✅ HTTP response validation before processing
+✅ Bounded retry loops with exponential backoff
+```
 
 ---
 
@@ -534,6 +614,8 @@ sequenceDiagram
 
 | Document | Description |
 |:--------:|:------------|
+| [💳 Payment Flow (Frontend)](./PAYMENT_FLOW_FRONTEND.md) | Complete payment integration guide for mobile/web |
+| [📖 Payment System](./PAYMENT_SYSTEM.md) | Payment system architecture & flows |
 | [📖 PaginationAPI.md](./Docs/PaginationAPI.md) | Pagination implementation guide |
 | [📖 ComplaintSystemAPI.md](./Docs/ComplaintSystemAPI.md) | Complaint system documentation |
 | [📖 Swagger UI](https://voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net/swagger) | Interactive API documentation |
