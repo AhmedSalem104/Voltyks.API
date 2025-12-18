@@ -40,6 +40,7 @@ using Voltyks.Application.Interfaces.Caching;
 using Voltyks.Application.Services.Caching;
 using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Services.Pagination;
+using Voltyks.API.Hubs;
 
 
 namespace Voltyks.API.Extentions
@@ -61,7 +62,19 @@ namespace Voltyks.API.Extentions
                           .AllowAnyMethod()
                           .AllowAnyHeader();
                 });
+
+                // SignalR CORS policy - requires credentials
+                options.AddPolicy("SignalRPolicy", policy =>
+                {
+                    policy.SetIsOriginAllowed(_ => true)
+                          .AllowAnyMethod()
+                          .AllowAnyHeader()
+                          .AllowCredentials();
+                });
             });
+
+            // Add SignalR
+            services.AddSignalR();
 
             services.AddResponseCaching();
             services.AddSwaggerServices();
@@ -195,9 +208,11 @@ namespace Voltyks.API.Extentions
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
-           
 
-
+            // Map SignalR Hubs
+            app.MapHub<ChargingRequestHub>("/hubs/charging-request").RequireCors("SignalRPolicy");
+            app.MapHub<ProcessHub>("/hubs/process").RequireCors("SignalRPolicy");
+            app.MapHub<NotificationHub>("/hubs/notification").RequireCors("SignalRPolicy");
 
             return app;
 
@@ -281,6 +296,17 @@ namespace Voltyks.API.Extentions
                 // ✅ تعديل الرسالة هنا
                 options.Events = new JwtBearerEvents
                 {
+                    // SignalR: Read token from query string for WebSocket connections
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                        {
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = context =>
                     {
                         context.HandleResponse();
