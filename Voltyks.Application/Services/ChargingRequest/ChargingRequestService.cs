@@ -9,6 +9,7 @@ using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
@@ -32,10 +33,11 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly IFeesConfigService _feesConfigService;
         private readonly VoltyksDbContext _db;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly ISignalRService _signalRService;
 
 
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
@@ -44,6 +46,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             _feesConfigService = feesConfigService;
             _db = db;
             _httpClientFactory = httpClientFactory;
+            _signalRService = signalRService;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -77,6 +80,15 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: userTypeId
                 );
+
+                // 4) SignalR Real-time notification
+                await _signalRService.SendNewRequestAsync(chargingRequest.Id, recipientUserId, new
+                {
+                    requestId = chargingRequest.Id,
+                    chargerId = dto.ChargerId,
+                    kwNeeded = dto.KwNeeded,
+                    status = "pending"
+                });
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request sent successfully", true);
             }
@@ -120,7 +132,13 @@ namespace Voltyks.Application.Services.ChargingRequest
                     userTypeId: 2 // VehicleOwner
                 );
 
-
+                // SignalR Real-time notification
+                await _signalRService.SendRequestAcceptedAsync(request.Id, recipientUserId!, new
+                {
+                    requestId = request.Id,
+                    chargerOwnerName = request.Charger?.User?.FullName,
+                    status = "accepted"
+                });
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request accepted", true);
 
@@ -172,6 +190,14 @@ namespace Voltyks.Application.Services.ChargingRequest
                         notificationType: notificationType,
                         userTypeId: 2 // VehicleOwner
                     );
+
+                    // SignalR Real-time notification
+                    await _signalRService.SendRequestRejectedAsync(request.Id, recipientUserId, new
+                    {
+                        requestId = request.Id,
+                        stationOwnerName = stationOwnerName,
+                        status = "rejected"
+                    });
 
                     if (sent != null)
                         results.Add(sent);
@@ -259,6 +285,14 @@ namespace Voltyks.Application.Services.ChargingRequest
                     userTypeId: 2 // VehicleOwner
                 );
 
+                // SignalR Real-time notification
+                await _signalRService.SendRequestConfirmedAsync(request.Id, recipientUserId!, new
+                {
+                    requestId = request.Id,
+                    chargerOwnerName = request.Charger?.User?.FullName,
+                    status = "confirmed"
+                });
+
                 return new ApiResponse<NotificationResultDto>(result, "Charging request confirmed", true);
             }
             catch (Exception ex)
@@ -333,6 +367,14 @@ namespace Voltyks.Application.Services.ChargingRequest
                     notificationType: notificationType,
                     userTypeId: recipientUserTypeId
                 );
+
+                // SignalR Real-time notification
+                await _signalRService.SendRequestAbortedAsync(request.Id, recipientUserId!, new
+                {
+                    requestId = request.Id,
+                    abortedBy = isChargerOwner ? "charger_owner" : "vehicle_owner",
+                    status = "aborted"
+                });
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
             }

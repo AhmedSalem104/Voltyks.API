@@ -41,6 +41,8 @@ using Voltyks.Application.Services.Caching;
 using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Services.Pagination;
 using Voltyks.API.Hubs;
+using Voltyks.Application.Interfaces.SignalR;
+using Voltyks.API.Services;
 
 
 namespace Voltyks.API.Extentions
@@ -276,6 +278,9 @@ namespace Voltyks.API.Extentions
 
             // PaginationService
             services.AddScoped<IPaginationService, PaginationService>();
+
+            // SignalR Service
+            services.AddScoped<ISignalRService, SignalRService>();
 
             return services;
 

@@ -17,6 +17,7 @@ using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Interfaces.Redis;
+using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Application.Interfaces.UserReport;
@@ -57,7 +58,8 @@ namespace Voltyks.Application.ServicesManager
         , IPaymobAuthTokenProvider tokenProvider,
     IFeesConfigService feesConfigService,
     ILogger<ProcessesService> processesLogger,
-    IPaginationService paginationService) : IServiceManager
+    IPaginationService paginationService,
+    ISignalRService signalRService) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context, vehicleService);
@@ -66,11 +68,11 @@ namespace Voltyks.Application.ServicesManager
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
-        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory);
+        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory, signalRService);
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
         public ITermsService TermsService { get; } = new TermsService(context);
-        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService, paginationService);
+        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService, paginationService, signalRService);
         public IUserReportService UserReportService  { get; } = new UserReportService(context,mapper,unitOfWork, httpContextAccessor,firebaseService);
 
 

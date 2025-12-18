@@ -11,6 +11,7 @@ using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.Redis;
+using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.DTOs.Common;
@@ -33,14 +34,16 @@ namespace Voltyks.Core.DTOs.Processes
         private readonly ILogger<ProcessesService> _logger;
         private readonly IRedisService _redisService;
         private readonly IPaginationService _paginationService;
+        private readonly ISignalRService _signalRService;
 
-        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger, IRedisService redisService, IPaginationService paginationService)
+        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger, IRedisService redisService, IPaginationService paginationService, ISignalRService signalRService)
         {
             _ctx = ctx; _http = http;
             _firebase = firebase;
             _logger = logger;
             _redisService = redisService;
             _paginationService = paginationService;
+            _signalRService = signalRService;
         }
 
         //        await tx.CommitAsync(ct);
@@ -191,6 +194,17 @@ namespace Voltyks.Core.DTOs.Processes
                     extraData: extraData
                 );
 
+                // SignalR Real-time notification
+                await _signalRService.SendProcessCreatedAsync(process.Id, process.ChargerOwnerId, new
+                {
+                    processId = process.Id,
+                    requestId = req.Id,
+                    estimatedPrice = process.EstimatedPrice,
+                    amountCharged = process.AmountCharged,
+                    amountPaid = process.AmountPaid,
+                    status = "PendingCompleted"
+                }, ct);
+
                 // 👇 ده اللي هيروح في data في الـ response
                 var responseData = new
                 {
@@ -315,6 +329,42 @@ namespace Voltyks.Core.DTOs.Processes
 
                 await tx.CommitAsync(ct);
 
+                // SignalR Real-time notification based on decision
+                if (decision == "completed")
+                {
+                    await _signalRService.SendPaymentCompletedAsync(process.Id, process.ChargerOwnerId, new
+                    {
+                        processId = process.Id,
+                        status = "Completed"
+                    }, ct);
+                }
+                else if (decision == "aborted" || decision == "ended-by-report")
+                {
+                    await _signalRService.SendPaymentAbortedAsync(process.Id, process.ChargerOwnerId, new
+                    {
+                        processId = process.Id,
+                        status = "Aborted"
+                    }, ct);
+                }
+                else if (decision == "started")
+                {
+                    await _signalRService.SendProcessStartedAsync(process.Id, process.ChargerOwnerId, new
+                    {
+                        processId = process.Id,
+                        status = "Started"
+                    }, ct);
+                }
+                else
+                {
+                    await _signalRService.SendPaymentStatusChangedAsync(process.Id, process.ChargerOwnerId, "updated", new
+                    {
+                        processId = process.Id,
+                        estimatedPrice = process.EstimatedPrice,
+                        amountCharged = process.AmountCharged,
+                        amountPaid = process.AmountPaid
+                    }, ct);
+                }
+
                 // نفس شكل create في الـ response
                 var responseData = new
                 {
@@ -400,6 +450,13 @@ namespace Voltyks.Core.DTOs.Processes
                             "ChargerOwner_ConfirmProcess",
                             ct
                         );
+                        // SignalR Real-time
+                        await _signalRService.SendPaymentCompletedAsync(process.Id, process.VehicleOwnerId, new
+                        {
+                            processId = process.Id,
+                            status = "Completed",
+                            confirmedBy = "charger_owner"
+                        }, ct);
                     }
                     else // Vehicle Owner
                     {
@@ -411,6 +468,13 @@ namespace Voltyks.Core.DTOs.Processes
                             "VehicleOwner_ConfirmProcess",
                             ct
                         );
+                        // SignalR Real-time
+                        await _signalRService.SendPaymentCompletedAsync(process.Id, process.ChargerOwnerId, new
+                        {
+                            processId = process.Id,
+                            status = "Completed",
+                            confirmedBy = "vehicle_owner"
+                        }, ct);
                     }
                 }
                 else if (decision == "started")
@@ -432,6 +496,13 @@ namespace Voltyks.Core.DTOs.Processes
                         "Process_Started",
                         ct
                     );
+                    // SignalR Real-time
+                    await _signalRService.SendProcessStartedAsync(process.Id, receiverId, new
+                    {
+                        processId = process.Id,
+                        status = "Started",
+                        startedBy = isChargerOwner ? "charger_owner" : "vehicle_owner"
+                    }, ct);
                 }
                 else // ended-by-report | aborted  -> نفس مسار الإنهاء/التبليغ
                 {
@@ -452,6 +523,13 @@ namespace Voltyks.Core.DTOs.Processes
                             "ChargerOwner_ReportProcess",
                             ct
                         );
+                        // SignalR Real-time
+                        await _signalRService.SendPaymentAbortedAsync(process.Id, process.VehicleOwnerId, new
+                        {
+                            processId = process.Id,
+                            status = "Aborted",
+                            abortedBy = "charger_owner"
+                        }, ct);
                     }
                     else // Vehicle Owner
                     {
@@ -463,6 +541,13 @@ namespace Voltyks.Core.DTOs.Processes
                             "VehicleOwner_ReportProcess",
                             ct
                         );
+                        // SignalR Real-time
+                        await _signalRService.SendPaymentAbortedAsync(process.Id, process.ChargerOwnerId, new
+                        {
+                            processId = process.Id,
+                            status = "Aborted",
+                            abortedBy = "vehicle_owner"
+                        }, ct);
                     }
                 }
 
