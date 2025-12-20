@@ -50,5 +50,15 @@ namespace Voltyks.API.Controllers.Admin
             var result = await _adminServiceManager.AdminComplaintsService.UpdateComplaintStatusAsync(id, isResolved, ct);
             return Ok(result);
         }
+
+        /// <summary>
+        /// GET /api/admin/complaints/{id}/time-status - Check if complaint is over 12 hours old
+        /// </summary>
+        [HttpGet("{id}/time-status")]
+        public async Task<IActionResult> GetComplaintTimeStatus(int id, CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminComplaintsService.GetComplaintTimeStatusAsync(id, ct);
+            return Ok(result);
+        }
     }
 }

@@ -141,5 +141,46 @@ namespace Voltyks.AdminControlDashboard.Services.Complaints
                 );
             }
         }
+
+        public async Task<ApiResponse<ComplaintTimeStatusDto>> GetComplaintTimeStatusAsync(
+            int id,
+            CancellationToken ct = default)
+        {
+            try
+            {
+                var complaint = await _context.UserGeneralComplaints
+                    .AsNoTracking()
+                    .Where(c => c.Id == id)
+                    .Select(c => new { c.Id, c.CreatedAt })
+                    .FirstOrDefaultAsync(ct);
+
+                if (complaint is null)
+                    return new ApiResponse<ComplaintTimeStatusDto>("Complaint not found", status: false);
+
+                var hoursElapsed = (DateTime.UtcNow - complaint.CreatedAt).TotalHours;
+
+                return new ApiResponse<ComplaintTimeStatusDto>(
+                    data: new ComplaintTimeStatusDto
+                    {
+                        Id = complaint.Id,
+                        CreatedAt = complaint.CreatedAt,
+                        IsOver12Hours = hoursElapsed >= 12,
+                        HoursElapsed = Math.Round(hoursElapsed, 2)
+                    },
+                    message: hoursElapsed >= 12
+                        ? "Complaint is over 12 hours old"
+                        : "Complaint is less than 12 hours old",
+                    status: true
+                );
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<ComplaintTimeStatusDto>(
+                    message: "Failed to get complaint time status",
+                    status: false,
+                    errors: new List<string> { ex.Message }
+                );
+            }
+        }
     }
 }

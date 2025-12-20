@@ -8,5 +8,6 @@ namespace Voltyks.AdminControlDashboard.Interfaces.Complaints
         Task<ApiResponse<List<AdminComplaintDto>>> GetAllComplaintsAsync(bool includeResolved = true, CancellationToken ct = default);
         Task<ApiResponse<AdminComplaintDto>> GetComplaintByIdAsync(int id, CancellationToken ct = default);
         Task<ApiResponse<object>> UpdateComplaintStatusAsync(int id, bool isResolved, CancellationToken ct = default);
+        Task<ApiResponse<ComplaintTimeStatusDto>> GetComplaintTimeStatusAsync(int id, CancellationToken ct = default);
     }
 }
