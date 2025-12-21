@@ -18,9 +18,8 @@ namespace Voltyks.Core.Enums
         public const string Report_ChargerOwnerToVehicleOwner = "Report_ChargerOwnerToVehicleOwner";
         public const string Report_VehicleOwnerToChargerOwner = "Report_VehicleOwnerToChargerOwner";
 
-        
-
-
-
+        // Admin Notifications
+        public const string Admin_Report_Created = "Admin_Report_Created";
+        public const string Admin_Complaint_Created = "Admin_Complaint_Created";
     }
 }

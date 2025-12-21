@@ -21,6 +21,7 @@ using Voltyks.Core.Enums;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Utilities;
+using Voltyks.Application.Interfaces.SignalR;
 
 namespace Voltyks.Application.Services.UserReport
 {
@@ -31,17 +32,16 @@ namespace Voltyks.Application.Services.UserReport
         private readonly IUnitOfWork _unitOfWork;
         private readonly IHttpContextAccessor _httpContext;
         private readonly IFirebaseService _firebase;
+        private readonly ISignalRService _signalRService;
 
-
-
-
-        public UserReportService(VoltyksDbContext ctx, IMapper mapper ,IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase)
+        public UserReportService(VoltyksDbContext ctx, IMapper mapper, IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase, ISignalRService signalRService)
         {
             _ctx = ctx;
             _mapper = mapper;
             _unitOfWork = unitOfWork;
             _httpContext = httpContextAccessor;
             _firebase = firebase;
+            _signalRService = signalRService;
         }
 
         public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
@@ -67,6 +67,39 @@ namespace Voltyks.Application.Services.UserReport
 
             await _ctx.UserReports.AddAsync(report, ct);
             await _ctx.SaveChangesAsync(ct);
+
+            // ===== Admin SignalR Notification (Real-time) =====
+            var adminNotification = new Notification
+            {
+                Title = "بلاغ جديد",
+                Body = $"تم إنشاء بلاغ جديد من {user.FullName ?? user.UserName ?? "مستخدم"}",
+                IsRead = false,
+                SentAt = DateTimeHelper.GetEgyptTime(),
+                UserId = null,
+                Type = NotificationTypes.Admin_Report_Created,
+                OriginalId = report.Id,
+                IsAdminNotification = true,
+                UserTypeId = 0
+            };
+            await _ctx.Notifications.AddAsync(adminNotification, ct);
+            await _ctx.SaveChangesAsync(ct);
+
+            // Broadcast to Admin Dashboard via SignalR
+            await _signalRService.SendBroadcastAsync(
+                "بلاغ جديد",
+                $"تم إنشاء بلاغ جديد من {user.FullName ?? user.UserName ?? "مستخدم"}",
+                new
+                {
+                    id = $"report_{report.Id}",
+                    type = "report",
+                    originalId = report.Id,
+                    title = "بلاغ جديد",
+                    message = $"تم إنشاء بلاغ جديد من {user.FullName ?? user.UserName ?? "مستخدم"}",
+                    userName = user.FullName ?? user.UserName ?? "",
+                    timestamp = adminNotification.SentAt.ToString("O")
+                },
+                ct
+            );
 
             // ===== إشعار للطرف المقابل فقط بعنوان ديناميكي =====
             var reporterName = !string.IsNullOrWhiteSpace(user.FullName) ? user.FullName

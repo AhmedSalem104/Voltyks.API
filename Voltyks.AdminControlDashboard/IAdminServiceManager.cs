@@ -1,5 +1,6 @@
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.AdminControlDashboard.Interfaces.Complaints;
+using Voltyks.AdminControlDashboard.Interfaces.Notifications;
 
 namespace Voltyks.AdminControlDashboard
 {
@@ -17,5 +18,6 @@ namespace Voltyks.AdminControlDashboard
         IAdminComplaintCategoriesService AdminComplaintCategoriesService { get; }
         IAdminComplaintsService AdminComplaintsService { get; }
         IAdminCapacityService AdminCapacityService { get; }
+        IAdminNotificationsService AdminNotificationsService { get; }
     }
 }

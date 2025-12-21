@@ -17,18 +17,23 @@ namespace Voltyks.Persistence.Data.Configurations
             builder.HasOne(n => n.User)
                    .WithMany(u => u.Notifications)
                    .HasForeignKey(n => n.UserId)
-                   .OnDelete(DeleteBehavior.Cascade);
+                   .OnDelete(DeleteBehavior.Cascade)
+                   .IsRequired(false);
 
             builder.HasOne(n => n.RelatedRequest)
                    .WithMany()
                    .HasForeignKey(n => n.RelatedRequestId)
-                   .OnDelete(DeleteBehavior.SetNull) // المهم
+                   .OnDelete(DeleteBehavior.SetNull)
                    .IsRequired(false);
 
             builder.HasIndex(n => n.RelatedRequestId)
                    .HasDatabaseName("IX_Notifications_RelatedRequestId");
 
-            // Note: IX_Notifications_UserId_IsRead already exists in database
+            // Admin notifications index
+            builder.HasIndex(n => n.IsAdminNotification)
+                   .HasDatabaseName("IX_Notifications_IsAdminNotification");
+
+            builder.Property(n => n.Type).HasMaxLength(100);
         }
     }
 

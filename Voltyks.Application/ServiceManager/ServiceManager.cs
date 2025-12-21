@@ -62,7 +62,7 @@ namespace Voltyks.Application.ServicesManager
     ISignalRService signalRService) : IServiceManager
     {
       
-        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService,configuration, mapper, unitOfWork, context, vehicleService);
+        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService);
         public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager);
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
@@ -73,7 +73,7 @@ namespace Voltyks.Application.ServicesManager
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
         public ITermsService TermsService { get; } = new TermsService(context);
         public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService, paginationService, signalRService);
-        public IUserReportService UserReportService  { get; } = new UserReportService(context,mapper,unitOfWork, httpContextAccessor,firebaseService);
+        public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService);
 
 
 

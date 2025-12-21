@@ -32,6 +32,9 @@ using Voltyks.Core.DTOs.Complaints;
 using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 using static System.Net.WebRequestMethods;
+using Voltyks.Application.Interfaces.SignalR;
+using Voltyks.Core.Enums;
+using Voltyks.Application.Utilities;
 
 namespace Voltyks.Application.Services.Auth
 {
@@ -44,6 +47,7 @@ namespace Voltyks.Application.Services.Auth
         , IUnitOfWork _unitOfWork
         , VoltyksDbContext context
         , IVehicleService _vehicleService
+        , ISignalRService signalRService
 
         ) : IAuthService
     {
@@ -813,6 +817,42 @@ namespace Voltyks.Application.Services.Auth
 
             // Record complaint time for rate limiting
             await redisService.SetAsync(complaintKey, DateTime.UtcNow.ToString("O"), TimeSpan.FromHours(12));
+
+            // ===== Admin SignalR Notification (Real-time) =====
+            var user = await userManager.FindByIdAsync(userId);
+            var userName = user?.FullName ?? user?.UserName ?? "مستخدم";
+
+            var adminNotification = new Notification
+            {
+                Title = "شكوى جديدة",
+                Body = $"تم إنشاء شكوى جديدة من {userName}",
+                IsRead = false,
+                SentAt = DateTimeHelper.GetEgyptTime(),
+                UserId = null,
+                Type = NotificationTypes.Admin_Complaint_Created,
+                OriginalId = complaint.Id,
+                IsAdminNotification = true,
+                UserTypeId = 0
+            };
+            context.Notifications.Add(adminNotification);
+            await context.SaveChangesAsync(ct);
+
+            // Broadcast to Admin Dashboard via SignalR
+            await signalRService.SendBroadcastAsync(
+                "شكوى جديدة",
+                $"تم إنشاء شكوى جديدة من {userName}",
+                new
+                {
+                    id = $"complaint_{complaint.Id}",
+                    type = "complaint",
+                    originalId = complaint.Id,
+                    title = "شكوى جديدة",
+                    message = $"تم إنشاء شكوى جديدة من {userName}",
+                    userName = userName,
+                    timestamp = adminNotification.SentAt.ToString("O")
+                },
+                ct
+            );
 
             return new ApiResponse<object>(
                 data: new
