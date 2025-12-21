@@ -30,40 +30,25 @@ jobs:
     - name: Install EF Core tools
       run: dotnet tool install --global dotnet-ef --version 8.0.16
 
-    - name: Ensure Notification columns exist (fix migration)
+    - name: Install SQL tools
+      run: |
+        curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+        curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+        sudo apt-get update
+        sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+        echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> ~/.bashrc
+
+    - name: Fix missing Notification columns
       env:
         DB_SERVER: ${{ secrets.DB_SERVER }}
         DB_NAME: ${{ secrets.DB_NAME }}
         DB_USER: ${{ secrets.DB_USER }}
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       run: |
-        # Install sqlcmd
-        curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-        curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
-        sudo apt-get update
-        sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
         export PATH="$PATH:/opt/mssql-tools18/bin"
-
-        # Run SQL to ensure columns exist
-        sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -Q "
-        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'Type')
-        BEGIN
-            ALTER TABLE Notifications ADD Type NVARCHAR(100) NULL;
-            PRINT 'Added Type column';
-        END
-
-        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'OriginalId')
-        BEGIN
-            ALTER TABLE Notifications ADD OriginalId INT NULL;
-            PRINT 'Added OriginalId column';
-        END
-
-        IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'IsAdminNotification')
-        BEGIN
-            ALTER TABLE Notifications ADD IsAdminNotification BIT NOT NULL DEFAULT 0;
-            PRINT 'Added IsAdminNotification column';
-        END
-        "
+        echo "Checking and adding missing columns..."
+        /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -Q "IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'Type') ALTER TABLE Notifications ADD Type NVARCHAR(100) NULL; IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'OriginalId') ALTER TABLE Notifications ADD OriginalId INT NULL; IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'IsAdminNotification') ALTER TABLE Notifications ADD IsAdminNotification BIT NOT NULL DEFAULT 0;"
+        echo "Done checking columns"
 
     - name: Apply database migrations
       run: dotnet ef database update --project ./Voltyks.Persistence/Voltyks.Persistence.csproj --startup-project ./Voltyks.API/Voltyks.API.csproj
