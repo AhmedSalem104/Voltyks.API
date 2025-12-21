@@ -778,19 +778,19 @@ namespace Voltyks.Application.Services.Auth
                         errors: new() { "No current user context and no UserId provided." });
             }
 
-            // Rate limiting: 1 complaint per 12 hours
+            // Rate limiting: 1 complaint per 2 minutes
             var complaintKey = $"complaint_last:{userId}";
             var lastComplaintTime = await redisService.GetAsync(complaintKey);
             if (!string.IsNullOrEmpty(lastComplaintTime))
             {
                 var lastTime = DateTime.Parse(lastComplaintTime);
-                var waitTime = TimeSpan.FromHours(12) - (DateTime.UtcNow - lastTime);
+                var waitTime = TimeSpan.FromMinutes(2) - (DateTime.UtcNow - lastTime);
                 if (waitTime > TimeSpan.Zero)
                 {
                     return new ApiResponse<object>(
-                        $"يمكنك تقديم شكوى جديدة بعد {waitTime.Hours} ساعة و {waitTime.Minutes} دقيقة",
+                        $"يمكنك تقديم شكوى جديدة بعد {waitTime.Minutes} دقيقة و {waitTime.Seconds} ثانية",
                         status: false,
-                        errors: new() { "Rate limit exceeded. Only 1 complaint per 12 hours allowed." }
+                        errors: new() { "Rate limit exceeded. Only 1 complaint per 2 minutes allowed." }
                     );
                 }
             }
@@ -816,7 +816,7 @@ namespace Voltyks.Application.Services.Auth
             await context.SaveChangesAsync(ct);
 
             // Record complaint time for rate limiting
-            await redisService.SetAsync(complaintKey, DateTime.UtcNow.ToString("O"), TimeSpan.FromHours(12));
+            await redisService.SetAsync(complaintKey, DateTime.UtcNow.ToString("O"), TimeSpan.FromMinutes(2));
 
             // ===== Admin SignalR Notification (Real-time) =====
             var user = await userManager.FindByIdAsync(userId);
@@ -884,7 +884,7 @@ namespace Voltyks.Application.Services.Auth
             }
 
             var lastTime = DateTime.Parse(lastComplaintTime);
-            var waitTime = TimeSpan.FromHours(12) - (DateTime.UtcNow - lastTime);
+            var waitTime = TimeSpan.FromMinutes(2) - (DateTime.UtcNow - lastTime);
 
             if (waitTime <= TimeSpan.Zero)
             {
@@ -899,10 +899,11 @@ namespace Voltyks.Application.Services.Auth
                 data: new CanSubmitComplaintDto
                 {
                     CanSubmit = false,
-                    HoursRemaining = (int)waitTime.TotalHours,
-                    MinutesRemaining = waitTime.Minutes
+                    HoursRemaining = 0,
+                    MinutesRemaining = waitTime.Minutes,
+                    SecondsRemaining = waitTime.Seconds
                 },
-                message: $"يمكنك تقديم شكوى جديدة بعد {(int)waitTime.TotalHours} ساعة و {waitTime.Minutes} دقيقة",
+                message: $"يمكنك تقديم شكوى جديدة بعد {waitTime.Minutes} دقيقة و {waitTime.Seconds} ثانية",
                 status: true
             );
         }

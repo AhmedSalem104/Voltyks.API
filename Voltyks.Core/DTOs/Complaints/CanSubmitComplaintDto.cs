@@ -5,5 +5,6 @@ namespace Voltyks.Core.DTOs.Complaints
         public bool CanSubmit { get; set; }
         public int HoursRemaining { get; set; }
         public int MinutesRemaining { get; set; }
+        public int SecondsRemaining { get; set; }
     }
 }
