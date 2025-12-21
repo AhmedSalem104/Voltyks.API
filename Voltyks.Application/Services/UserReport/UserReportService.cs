@@ -79,7 +79,7 @@ namespace Voltyks.Application.Services.UserReport
                 Type = NotificationTypes.Admin_Report_Created,
                 OriginalId = report.Id,
                 IsAdminNotification = true,
-                UserTypeId = 0
+                UserTypeId = null
             };
             await _ctx.Notifications.AddAsync(adminNotification, ct);
             await _ctx.SaveChangesAsync(ct);

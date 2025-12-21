@@ -17,7 +17,7 @@ namespace Voltyks.Persistence.Entities.Main
         public bool IsRead { get; set; } = false;
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
-        public int UserTypeId { get; set; }
+        public int? UserTypeId { get; set; }
         public UserType? UserType { get; set; }
 
         public int? RelatedRequestId { get; set; }

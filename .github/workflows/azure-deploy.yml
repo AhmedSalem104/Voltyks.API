@@ -38,7 +38,7 @@ jobs:
         sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
         echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> ~/.bashrc
 
-    - name: Fix missing Notification columns
+    - name: Fix Notification table schema
       env:
         DB_SERVER: ${{ secrets.DB_SERVER }}
         DB_NAME: ${{ secrets.DB_NAME }}
@@ -46,7 +46,7 @@ jobs:
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       run: |
         export PATH="$PATH:/opt/mssql-tools18/bin"
-        echo "Adding columns and making UserId nullable..."
+        echo "Fixing Notifications table schema..."
         /opt/mssql-tools18/bin/sqlcmd -S "$DB_SERVER" -d "$DB_NAME" -U "$DB_USER" -P "$DB_PASSWORD" -C -Q "
         IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'Type')
           ALTER TABLE Notifications ADD Type NVARCHAR(100) NULL;
@@ -55,6 +55,7 @@ jobs:
         IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Notifications' AND COLUMN_NAME = 'IsAdminNotification')
           ALTER TABLE Notifications ADD IsAdminNotification BIT NOT NULL DEFAULT 0;
         ALTER TABLE Notifications ALTER COLUMN UserId NVARCHAR(450) NULL;
+        ALTER TABLE Notifications ALTER COLUMN UserTypeId INT NULL;
         "
         echo "Done!"
 

@@ -832,7 +832,7 @@ namespace Voltyks.Application.Services.Auth
                 Type = NotificationTypes.Admin_Complaint_Created,
                 OriginalId = complaint.Id,
                 IsAdminNotification = true,
-                UserTypeId = 0
+                UserTypeId = null
             };
             context.Notifications.Add(adminNotification);
             await context.SaveChangesAsync(ct);
