@@ -828,6 +828,45 @@ namespace Voltyks.Application.Services.Auth
             );
         }
 
+        public async Task<ApiResponse<CanSubmitComplaintDto>> CanSubmitComplaintAsync(CancellationToken ct = default)
+        {
+            var userId = GetCurrentUserId();
+            var complaintKey = $"complaint_last:{userId}";
+            var lastComplaintTime = await redisService.GetAsync(complaintKey);
+
+            if (string.IsNullOrEmpty(lastComplaintTime))
+            {
+                return new ApiResponse<CanSubmitComplaintDto>(
+                    data: new CanSubmitComplaintDto { CanSubmit = true, HoursRemaining = 0, MinutesRemaining = 0 },
+                    message: "يمكنك تقديم شكوى",
+                    status: true
+                );
+            }
+
+            var lastTime = DateTime.Parse(lastComplaintTime);
+            var waitTime = TimeSpan.FromHours(12) - (DateTime.UtcNow - lastTime);
+
+            if (waitTime <= TimeSpan.Zero)
+            {
+                return new ApiResponse<CanSubmitComplaintDto>(
+                    data: new CanSubmitComplaintDto { CanSubmit = true, HoursRemaining = 0, MinutesRemaining = 0 },
+                    message: "يمكنك تقديم شكوى",
+                    status: true
+                );
+            }
+
+            return new ApiResponse<CanSubmitComplaintDto>(
+                data: new CanSubmitComplaintDto
+                {
+                    CanSubmit = false,
+                    HoursRemaining = (int)waitTime.TotalHours,
+                    MinutesRemaining = waitTime.Minutes
+                },
+                message: $"يمكنك تقديم شكوى جديدة بعد {(int)waitTime.TotalHours} ساعة و {waitTime.Minutes} دقيقة",
+                status: true
+            );
+        }
+
         public async Task<ApiResponse<object>> CheckPasswordAsync(CheckPasswordDto dto, CancellationToken ct = default)
         {
             var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);

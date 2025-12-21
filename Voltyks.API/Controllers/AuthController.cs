@@ -221,6 +221,14 @@ namespace Voltyks.Presentation
             => Ok(await serviceManager.AuthService.CreateGeneralComplaintAsync(dto, ct));
 
         /// <summary>
+        /// GET /api/auth/complaints/can-submit - Check if user can submit a complaint (12-hour rate limit)
+        /// </summary>
+        [Authorize]
+        [HttpGet("complaints/can-submit")]
+        public async Task<IActionResult> CanSubmitComplaint(CancellationToken ct)
+            => Ok(await serviceManager.AuthService.CanSubmitComplaintAsync(ct));
+
+        /// <summary>
         /// POST /api/auth/check-password - Step 1: Verify current password before email change
         /// </summary>
         [HttpPost("check-password")]

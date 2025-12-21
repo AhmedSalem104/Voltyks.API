@@ -39,6 +39,7 @@ namespace Voltyks.Application.Interfaces.Auth
         Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default);
 
         Task<ApiResponse<object>> CreateGeneralComplaintAsync(CreateGeneralComplaintDto dto, CancellationToken ct = default);
+        Task<ApiResponse<CanSubmitComplaintDto>> CanSubmitComplaintAsync(CancellationToken ct = default);
 
         Task<ApiResponse<object>> CheckPasswordAsync(CheckPasswordDto dto, CancellationToken ct = default);
         Task<ApiResponse<object>> RequestEmailChangeAsync(RequestEmailChangeDto dto, CancellationToken ct = default);
