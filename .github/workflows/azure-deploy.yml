@@ -27,6 +27,14 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
+    - name: Install EF Core tools
+      run: dotnet tool install --global dotnet-ef
+
+    - name: Apply database migrations
+      run: dotnet ef database update --project ./Voltyks.Persistence/Voltyks.Persistence.csproj --startup-project ./Voltyks.API/Voltyks.API.csproj
+      env:
+        ConnectionStrings__DefaultConnection: ${{ secrets.DB_CONNECTION_STRING }}
+
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
