@@ -62,5 +62,8 @@ namespace Voltyks.Persistence.Data
         // Wallet Transactions
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
 
+        // Mobile App Config
+        public DbSet<MobileAppConfig> MobileAppConfigs { get; set; }
+
     }
 }

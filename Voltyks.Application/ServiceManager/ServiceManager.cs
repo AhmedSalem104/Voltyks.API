@@ -21,6 +21,7 @@ using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Application.Interfaces.UserReport;
+using Voltyks.Application.Interfaces.MobileAppConfig;
 using Voltyks.Application.Services;
 using Voltyks.Application.Services.Auth;
 using Voltyks.Application.Services.ChargingRequest;
@@ -29,6 +30,7 @@ using Voltyks.Application.Services.Paymob;
 using Voltyks.Application.Services.SMSEgypt;
 using Voltyks.Application.Services.Terms;
 using Voltyks.Application.Services.UserReport;
+using Voltyks.Application.Services.MobileAppConfig;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.AuthDTOs;
 using Voltyks.Core.DTOs.Paymob.Options;
@@ -74,6 +76,7 @@ namespace Voltyks.Application.ServicesManager
         public ITermsService TermsService { get; } = new TermsService(context);
         public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService, paginationService, signalRService);
         public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService);
+        public IMobileAppConfigService MobileAppConfigService { get; } = new MobileAppConfigService(unitOfWork);
 
 
 

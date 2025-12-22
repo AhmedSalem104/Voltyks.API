@@ -14,6 +14,7 @@ using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Application.Interfaces.UserReport;
+using Voltyks.Application.Interfaces.MobileAppConfig;
 using Voltyks.Application.Services.ChargingRequest;
 
 namespace Voltyks.Application.ServicesManager.ServicesManager
@@ -32,6 +33,7 @@ namespace Voltyks.Application.ServicesManager.ServicesManager
         ITermsService TermsService { get; }
         IProcessesService ProcessesService  { get; }
         IUserReportService UserReportService { get; }
+        IMobileAppConfigService MobileAppConfigService { get; }
 
     }
 }
