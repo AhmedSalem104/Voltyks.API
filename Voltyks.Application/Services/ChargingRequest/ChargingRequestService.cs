@@ -458,9 +458,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                     decimal baseAmount = request.BaseAmount;
                     if (baseAmount <= 0 && request.Charger?.PriceOption != null && request.Charger.Capacity?.kw > 0)
                     {
-                        baseAmount = request.Charger.PriceOption.Value
-                                   * (decimal)request.KwNeeded
-                                   / (decimal)request.Charger.Capacity.kw;
+                        // حساب زمن الشحن بالساعات = الطاقة المطلوبة ÷ قدرة الشاحن
+                        decimal chargingTimeInHours = (decimal)request.KwNeeded / (decimal)request.Charger.Capacity.kw;
+
+                        // قيمة الشحن = سعر الساعة × زمن الشحن
+                        baseAmount = request.Charger.PriceOption.Value * chargingTimeInHours;
                     }
 
                     // 2) حاول تستخدم VoltyksFee المخزّنة؛ ولو صفر احسبها من الإعدادات
@@ -777,14 +779,15 @@ namespace Voltyks.Application.Services.ChargingRequest
         private async Task<ChargingRequestEntity> CreateChargingRequest(string userId, int chargerId, double KwNeeded,int CurrentBatteryPercentage ,double Latitude,double Longitude ,string recipientUserId, Charger charger)
         {
 
-            // 1) احسب الـ base amount اللى الرسوم هتتطبق عليه
             // 1) حساب المبلغ الأساسي (Base Amount)
             decimal baseAmount = 0m;
             if (charger?.PriceOption != null && charger.Capacity?.kw > 0)
             {
-                baseAmount = charger.PriceOption.Value
-                    * (decimal)KwNeeded
-                    / (decimal)charger.Capacity.kw;
+                // حساب زمن الشحن بالساعات = الطاقة المطلوبة ÷ قدرة الشاحن
+                decimal chargingTimeInHours = (decimal)KwNeeded / (decimal)charger.Capacity.kw;
+
+                // قيمة الشحن = سعر الساعة × زمن الشحن
+                baseAmount = charger.PriceOption.Value * chargingTimeInHours;
             }
 
             // 2) حساب رسوم Voltyks
