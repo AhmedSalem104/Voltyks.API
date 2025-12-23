@@ -204,6 +204,7 @@ namespace Voltyks.AdminControlDashboard.Services
                         CreationDate = v.CreationDate,
                         BrandName = v.Brand.Name,
                         ModelName = v.Model.Name,
+                        ModelCapacity = v.Model.Capacity,
                         IsDeleted = v.IsDeleted
                     })
                     .ToListAsync(ct);

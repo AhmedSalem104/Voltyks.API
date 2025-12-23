@@ -9,6 +9,7 @@ namespace Voltyks.AdminControlDashboard.Dtos.Users
         public DateTime CreationDate { get; set; }
         public string BrandName { get; set; }
         public string ModelName { get; set; }
+        public double ModelCapacity { get; set; }
         public bool IsDeleted { get; set; }
     }
 }
