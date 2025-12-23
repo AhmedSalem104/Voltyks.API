@@ -35,12 +35,13 @@ namespace Voltyks.Persistence.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<UserType> UserTypes { get; set; }
 
-        // Paymob 
+        // Paymob
         public DbSet<PaymentOrder> PaymentOrders => Set<PaymentOrder>();
         public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
         public DbSet<WebhookLog> WebhookLogs => Set<WebhookLog>();
         public DbSet<PaymentAction> PaymentActions => Set<PaymentAction>();
         public DbSet<UserSavedCard> UserSavedCards => Set<UserSavedCard>();
+        public DbSet<CardTokenWebhookLog> CardTokenWebhookLogs => Set<CardTokenWebhookLog>();
 
 
 

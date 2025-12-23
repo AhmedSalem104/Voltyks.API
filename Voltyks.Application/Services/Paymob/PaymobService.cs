@@ -54,6 +54,7 @@ namespace Voltyks.Application.Services.Paymob
         private IGenericRepository<PaymentOrder, int> PaymentOrders => _uow.GetRepository<PaymentOrder, int>();
         private IGenericRepository<PaymentTransaction, int> PaymentTransactions => _uow.GetRepository<PaymentTransaction, int>();
         private IGenericRepository<UserSavedCard, int> SavedCards => _uow.GetRepository<UserSavedCard, int>();
+        private IGenericRepository<CardTokenWebhookLog, int> CardTokenWebhookLogs => _uow.GetRepository<CardTokenWebhookLog, int>();
 
         public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext, IHttpClientFactory httpFactory , UserManager<AppUser> userManager)
         {
@@ -715,14 +716,190 @@ namespace Voltyks.Application.Services.Paymob
                 return new ApiResponse<bool> { Status = true, Message = "Event acknowledged", Data = true };
             }
 
-            // --------- 2) extract card data ---------
+            // --------- CARD_TOKEN webhook handling with full logging ----------
+            return await HandleCardTokenWebhookAsync(fields, rawBody, isHmacValid: true);
+        }
+
+        /// <summary>
+        /// Handle CARD_TOKEN webhook with full logging and idempotency
+        /// </summary>
+        private async Task<ApiResponse<bool>> HandleCardTokenWebhookAsync(
+            Dictionary<string, string?> fields,
+            string rawPayload,
+            bool isHmacValid)
+        {
+            // 1. Generate unique webhook ID (for idempotency)
+            var webhookId = GenerateCardTokenWebhookId(fields);
+
+            // 2. Check if already processed (idempotency)
+            var existingLog = await CardTokenWebhookLogs.GetFirstOrDefaultAsync(x => x.WebhookId == webhookId);
+            if (existingLog != null)
+            {
+                _log?.LogInformation("CARD_TOKEN webhook already processed: {WebhookId}, Status: {Status}",
+                    webhookId, existingLog.Status);
+                return new ApiResponse<bool>(true, $"Already processed: {existingLog.Status}", true);
+            }
+
+            // 3. Create log entry immediately (Pending status)
+            var logEntry = new CardTokenWebhookLog
+            {
+                WebhookId = webhookId,
+                RawPayload = rawPayload,
+                IsHmacValid = isHmacValid,
+                Status = CardTokenStatus.Pending,
+                ReceivedAt = GetEgyptTime()
+            };
+
+            // 4. HMAC validation already done, but log if it failed
+            if (!isHmacValid)
+            {
+                logEntry.Status = CardTokenStatus.FailedHmac;
+                logEntry.FailureReason = "HMAC signature verification failed";
+                logEntry.ProcessedAt = GetEgyptTime();
+                await CardTokenWebhookLogs.AddAsync(logEntry);
+                await _uow.SaveChangesAsync();
+
+                _log?.LogWarning("CARD_TOKEN rejected: HMAC invalid. WebhookId={WebhookId}", webhookId);
+                return new ApiResponse<bool>(true, "HMAC invalid - logged", true);
+            }
+
+            // 5. Extract token
             var cardToken = FirstValue(fields,
                 "obj.token", "obj.saved_card_token", "obj.card_token",
                 "token", "saved_card_token", "card_token",
                 "obj.source_data.token", "source_data.token",
                 "obj.source_data.saved_card_token", "source_data.saved_card_token");
 
-            string? last4 = FirstValue(fields, "obj.last4", "last4");
+            logEntry.CardToken = cardToken?.Trim();
+
+            if (string.IsNullOrWhiteSpace(cardToken))
+            {
+                logEntry.Status = CardTokenStatus.FailedNoToken;
+                logEntry.FailureReason = "No token found in webhook payload";
+                logEntry.ProcessedAt = GetEgyptTime();
+                await CardTokenWebhookLogs.AddAsync(logEntry);
+                await _uow.SaveChangesAsync();
+
+                _log?.LogWarning("CARD_TOKEN missing token. WebhookId={WebhookId}", webhookId);
+                return new ApiResponse<bool>(true, "No token - logged", true);
+            }
+
+            // 6. Extract card details
+            logEntry.Last4 = ExtractLast4FromFields(fields);
+            logEntry.Brand = ExtractBrandFromFields(fields);
+            (logEntry.ExpiryMonth, logEntry.ExpiryYear) = ExtractExpiryFromFields(fields);
+
+            // 7. Resolve user ID
+            var userId = await ResolveUserIdFromTokenContextAsync(fields);
+            logEntry.UserId = userId;
+
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                logEntry.Status = CardTokenStatus.FailedNoUser;
+                logEntry.FailureReason = "Could not resolve UserId from webhook context";
+                logEntry.ProcessedAt = GetEgyptTime();
+                await CardTokenWebhookLogs.AddAsync(logEntry);
+                await _uow.SaveChangesAsync();
+
+                _log?.LogWarning("CARD_TOKEN missing user. WebhookId={WebhookId}", webhookId);
+                return new ApiResponse<bool>(true, "No user - logged", true);
+            }
+
+            // 8. Check for duplicate card (same token for same user - more accurate)
+            var existingCard = await SavedCards.GetFirstOrDefaultAsync(
+                c => c.UserId == userId && c.Token == cardToken.Trim());
+
+            if (existingCard != null)
+            {
+                logEntry.Status = CardTokenStatus.Duplicate;
+                logEntry.FailureReason = $"Card with same token already exists (CardId: {existingCard.Id})";
+                logEntry.SavedCardId = existingCard.Id;
+                logEntry.ProcessedAt = GetEgyptTime();
+                await CardTokenWebhookLogs.AddAsync(logEntry);
+                await _uow.SaveChangesAsync();
+
+                _log?.LogInformation("CARD_TOKEN duplicate. WebhookId={WebhookId}, ExistingCardId={CardId}",
+                    webhookId, existingCard.Id);
+                return new ApiResponse<bool>(true, "Duplicate - logged", true);
+            }
+
+            // 9. Save new card
+            try
+            {
+                var newCard = new UserSavedCard
+                {
+                    UserId = userId,
+                    Token = cardToken.Trim(),
+                    Last4 = logEntry.Last4,
+                    Brand = logEntry.Brand,
+                    ExpiryMonth = logEntry.ExpiryMonth,
+                    ExpiryYear = logEntry.ExpiryYear,
+                    MerchantId = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id"),
+                    CreatedAt = GetEgyptTime()
+                };
+
+                await SavedCards.AddAsync(newCard);
+                await _uow.SaveChangesAsync();
+
+                // Update log entry with success
+                logEntry.Status = CardTokenStatus.Saved;
+                logEntry.SavedCardId = newCard.Id;
+                logEntry.ProcessedAt = GetEgyptTime();
+                await CardTokenWebhookLogs.AddAsync(logEntry);
+                await _uow.SaveChangesAsync();
+
+                _log?.LogInformation(
+                    "CARD_TOKEN saved successfully. WebhookId={WebhookId}, UserId={UserId}, CardId={CardId}, Last4={Last4}",
+                    webhookId, userId, newCard.Id, logEntry.Last4);
+
+                return new ApiResponse<bool>(true, "Card saved", true);
+            }
+            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+            {
+                logEntry.Status = CardTokenStatus.Duplicate;
+                logEntry.FailureReason = "Unique constraint violation (race condition)";
+                logEntry.ProcessedAt = GetEgyptTime();
+                await CardTokenWebhookLogs.AddAsync(logEntry);
+                await _uow.SaveChangesAsync();
+
+                _log?.LogInformation("CARD_TOKEN race condition duplicate. WebhookId={WebhookId}", webhookId);
+                return new ApiResponse<bool>(true, "Duplicate (race) - logged", true);
+            }
+            catch (Exception ex)
+            {
+                logEntry.Status = CardTokenStatus.FailedDatabase;
+                logEntry.FailureReason = $"Database error: {ex.Message}";
+                logEntry.ProcessedAt = GetEgyptTime();
+                await CardTokenWebhookLogs.AddAsync(logEntry);
+                await _uow.SaveChangesAsync();
+
+                _log?.LogError(ex, "CARD_TOKEN database error. WebhookId={WebhookId}", webhookId);
+                return new ApiResponse<bool>(true, "DB error - logged", true);
+            }
+        }
+
+        /// <summary>
+        /// Generate unique webhook ID for idempotency
+        /// </summary>
+        private string GenerateCardTokenWebhookId(Dictionary<string, string?> fields)
+        {
+            var txnId = FirstValue(fields, "obj.id", "id", "obj.order.id", "order.id");
+            var token = FirstValue(fields, "obj.token", "token");
+
+            if (!string.IsNullOrWhiteSpace(txnId))
+                return $"CARD_TOKEN_{txnId}";
+            if (!string.IsNullOrWhiteSpace(token))
+                return $"CARD_TOKEN_{token.GetHashCode():X8}_{DateTime.UtcNow:yyyyMMddHHmmss}";
+
+            return $"CARD_TOKEN_{Guid.NewGuid():N}";
+        }
+
+        /// <summary>
+        /// Extract last 4 digits from webhook fields
+        /// </summary>
+        private string? ExtractLast4FromFields(Dictionary<string, string?> fields)
+        {
+            var last4 = FirstValue(fields, "obj.last4", "last4");
 
             // fallback from masked pan
             if (string.IsNullOrWhiteSpace(last4))
@@ -735,14 +912,29 @@ namespace Voltyks.Application.Services.Paymob
                 }
             }
 
-            string? brand = FirstValue(fields, "obj.card_subtype", "card_subtype",
-                                                "obj.source_data.type", "source_data.type",
-                                                "obj.brand", "brand");
+            if (string.IsNullOrWhiteSpace(last4)) return null;
 
-            // merchant id
-            long? mid = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id");
+            var digitsOnly = new string(last4.Where(char.IsDigit).ToArray());
+            return digitsOnly.Length >= 4 ? digitsOnly[^4..] : (digitsOnly.Length > 0 ? digitsOnly : null);
+        }
 
-            // expiry
+        /// <summary>
+        /// Extract card brand from webhook fields
+        /// </summary>
+        private string? ExtractBrandFromFields(Dictionary<string, string?> fields)
+        {
+            var brand = FirstValue(fields,
+                "obj.card_subtype", "card_subtype",
+                "obj.source_data.type", "source_data.type",
+                "obj.brand", "brand");
+            return brand?.Trim().ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Extract expiry month and year from webhook fields
+        /// </summary>
+        private (int? month, int? year) ExtractExpiryFromFields(Dictionary<string, string?> fields)
+        {
             int? expMonth = null, expYear = null;
             var mmStr = FirstValue(fields, "obj.expiry_month", "expiry_month",
                                              "obj.expiration_month", "expiration_month",
@@ -776,78 +968,7 @@ namespace Voltyks.Application.Services.Paymob
             if (expMonth is < 1 or > 12) expMonth = null;
             if (expYear is < 2000 or > 2100) expYear = null;
 
-            // --------- 3) normalize (no lowercasing the token) ----------
-            cardToken = cardToken?.Trim();
-
-            // last4: digits only and keep last 4
-            last4 = new string((last4 ?? "").Where(char.IsDigit).ToArray());
-            if (last4.Length > 4) last4 = last4[^4..];
-            if (string.IsNullOrWhiteSpace(last4)) last4 = null;
-
-            // brand: normalize to lower
-            brand = brand?.Trim().ToLowerInvariant();
-
-            // --------- 4) resolve user ----------
-            var userId = await ResolveUserIdFromTokenContextAsync(fields);
-            if (string.IsNullOrWhiteSpace(cardToken) || string.IsNullOrWhiteSpace(userId))
-            {
-                _log?.LogWarning("CARD_TOKEN missing essentials → userId={userId}", userId);
-                // ACK so PSP doesn't retry forever
-                return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN ack (missing user/token)", Data = true };
-            }
-
-            var repoCards = _uow.GetRepository<UserSavedCard, int>();
-
-            // --------- 5) logical dedupe (stronger) ----------
-            var existing = await repoCards.GetFirstOrDefaultAsync(
-                c => c.UserId == userId &&
-                     c.Last4 == last4 &&
-                     c.Brand == brand &&
-                     c.ExpiryMonth == expMonth &&
-                     c.ExpiryYear == expYear,
-                trackChanges: false
-            );
-
-            if (existing != null)
-            {
-                _log?.LogInformation("Card already exists → user={userId}, last4={last4}, brand={brand}, exp={m}/{y}",
-                    userId, last4, brand, expMonth, expYear);
-                return new ApiResponse<bool> { Status = true, Message = "Already saved", Data = true };
-            }
-
-            // --------- 6) insert via the SAME repo ----------
-            await repoCards.AddAsync(new UserSavedCard
-            {
-                UserId = userId!,
-                Token = cardToken!,           // keep original case
-                Last4 = last4,
-                Brand = brand,
-                MerchantId = mid,
-                ExpiryMonth = expMonth,
-                ExpiryYear = expYear,
-                CreatedAt = GetEgyptTime()
-            });
-
-            try
-            {
-                await _uow.SaveChangesAsync();
-                _log?.LogInformation("Saved NEW card → user={userId}, last4={last4}, brand={brand}, exp={m}/{y}",
-                    userId, last4, brand, expMonth, expYear);
-                return new ApiResponse<bool> { Status = true, Message = "CARD_TOKEN saved", Data = true };
-            }
-            catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
-            {
-                // race or double webhook → idempotent OK
-                _log?.LogInformation("Unique constraint hit → idempotent success. user={userId}, last4={last4}, brand={brand}, exp={m}/{y}",
-                    userId, last4, brand, expMonth, expYear);
-                return new ApiResponse<bool> { Status = true, Message = "Already saved", Data = true };
-            }
-            catch (Exception ex)
-            {
-                _log?.LogError(ex, "Unexpected error while saving card");
-                // still ACK to avoid PSP infinite retries; decide per your policy
-                return new ApiResponse<bool> { Status = true, Message = "Error handled", Data = true };
-            }
+            return (expMonth, expYear);
         }
 
 
@@ -2018,7 +2139,141 @@ namespace Voltyks.Application.Services.Paymob
             return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
         }
 
+        #region Card Token Webhook Log Queries
 
+        /// <summary>
+        /// Get paginated list of card token webhook logs
+        /// </summary>
+        public async Task<ApiResponse<object>> GetCardWebhookLogsAsync(
+            CardTokenStatus? status = null,
+            string? userId = null,
+            int page = 1,
+            int pageSize = 20)
+        {
+            var query = CardTokenWebhookLogs.Query();
+
+            if (status.HasValue)
+                query = query.Where(x => x.Status == status.Value);
+
+            if (!string.IsNullOrWhiteSpace(userId))
+                query = query.Where(x => x.UserId == userId);
+
+            var total = await query.CountAsync();
+            var rawItems = await query
+                .OrderByDescending(x => x.ReceivedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            // Map to DTOs with masked token (can't use range in EF query)
+            var items = rawItems.Select(x => new CardTokenWebhookLogDto
+            {
+                Id = x.Id,
+                WebhookId = x.WebhookId,
+                UserId = x.UserId,
+                CardToken = MaskCardToken(x.CardToken),
+                Last4 = x.Last4,
+                Brand = x.Brand,
+                ExpiryMonth = x.ExpiryMonth,
+                ExpiryYear = x.ExpiryYear,
+                Status = x.Status.ToString(),
+                StatusCode = (int)x.Status,
+                FailureReason = x.FailureReason,
+                IsHmacValid = x.IsHmacValid,
+                ReceivedAt = x.ReceivedAt,
+                ProcessedAt = x.ProcessedAt,
+                SavedCardId = x.SavedCardId
+            }).ToList();
+
+            var result = new
+            {
+                items,
+                total,
+                page,
+                pageSize,
+                totalPages = (int)Math.Ceiling(total / (double)pageSize)
+            };
+
+            return new ApiResponse<object>(result, "OK", true);
+        }
+
+        /// <summary>
+        /// Get detailed card token webhook log including raw payload
+        /// </summary>
+        public async Task<ApiResponse<CardTokenWebhookLogDetailDto?>> GetCardWebhookDetailAsync(int id)
+        {
+            var log = await CardTokenWebhookLogs.GetFirstOrDefaultAsync(x => x.Id == id);
+
+            if (log == null)
+                return new ApiResponse<CardTokenWebhookLogDetailDto?>(null, "Not found", false);
+
+            var dto = new CardTokenWebhookLogDetailDto
+            {
+                Id = log.Id,
+                WebhookId = log.WebhookId,
+                UserId = log.UserId,
+                CardToken = log.CardToken,
+                Last4 = log.Last4,
+                Brand = log.Brand,
+                ExpiryMonth = log.ExpiryMonth,
+                ExpiryYear = log.ExpiryYear,
+                Status = log.Status.ToString(),
+                StatusCode = (int)log.Status,
+                FailureReason = log.FailureReason,
+                IsHmacValid = log.IsHmacValid,
+                ReceivedAt = log.ReceivedAt,
+                ProcessedAt = log.ProcessedAt,
+                SavedCardId = log.SavedCardId,
+                RawPayload = log.RawPayload
+            };
+
+            return new ApiResponse<CardTokenWebhookLogDetailDto?>(dto, "OK", true);
+        }
+
+        /// <summary>
+        /// Get statistics for card token webhooks
+        /// </summary>
+        public async Task<ApiResponse<CardTokenWebhookStatsDto>> GetCardWebhookStatsAsync()
+        {
+            var query = CardTokenWebhookLogs.Query();
+
+            var stats = new CardTokenWebhookStatsDto
+            {
+                Total = await query.CountAsync(),
+                Saved = await query.CountAsync(x => x.Status == CardTokenStatus.Saved),
+                Duplicate = await query.CountAsync(x => x.Status == CardTokenStatus.Duplicate),
+                FailedNoUser = await query.CountAsync(x => x.Status == CardTokenStatus.FailedNoUser),
+                FailedNoToken = await query.CountAsync(x => x.Status == CardTokenStatus.FailedNoToken),
+                FailedHmac = await query.CountAsync(x => x.Status == CardTokenStatus.FailedHmac),
+                FailedDatabase = await query.CountAsync(x => x.Status == CardTokenStatus.FailedDatabase)
+            };
+
+            // Get top failure reasons
+            stats.TopFailureReasons = await query
+                .Where(x => x.FailureReason != null)
+                .GroupBy(x => x.FailureReason!)
+                .Select(g => new FailureReasonCount
+                {
+                    Reason = g.Key,
+                    Count = g.Count()
+                })
+                .OrderByDescending(x => x.Count)
+                .Take(10)
+                .ToListAsync();
+
+            return new ApiResponse<CardTokenWebhookStatsDto>(stats, "OK", true);
+        }
+
+        /// <summary>
+        /// Mask card token for display (show only last 8 chars)
+        /// </summary>
+        private static string? MaskCardToken(string? token)
+        {
+            if (string.IsNullOrEmpty(token)) return null;
+            return token.Length > 8 ? $"***{token[^8..]}" : $"***{token}";
+        }
+
+        #endregion
 
 
 
