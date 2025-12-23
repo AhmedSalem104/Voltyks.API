@@ -3,9 +3,9 @@ using System.Text.Json.Serialization;
 namespace Voltyks.Core.DTOs.MobileAppConfig
 {
     /// <summary>
-    /// Request DTO for admin to update mobile app config
+    /// Response DTO for admin - full config view
     /// </summary>
-    public class UpdateMobileAppConfigDto
+    public class MobileAppConfigAdminDto
     {
         [JsonPropertyName("android_enabled")]
         public bool AndroidEnabled { get; set; }

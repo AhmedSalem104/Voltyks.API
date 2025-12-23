@@ -11,14 +11,27 @@ namespace Voltyks.Persistence.Data.Configurations
             builder.ToTable("MobileAppConfigs");
             builder.HasKey(x => x.Id);
 
-            builder.Property(x => x.MobileAppEnabled)
+            builder.Property(x => x.AndroidEnabled)
                    .IsRequired()
                    .HasDefaultValue(true);
+
+            builder.Property(x => x.IosEnabled)
+                   .IsRequired()
+                   .HasDefaultValue(true);
+
+            builder.Property(x => x.AndroidMinVersion)
+                   .HasMaxLength(20);
+
+            builder.Property(x => x.IosMinVersion)
+                   .HasMaxLength(20);
 
             builder.HasData(new MobileAppConfig
             {
                 Id = 1,
-                MobileAppEnabled = true
+                AndroidEnabled = true,
+                IosEnabled = true,
+                AndroidMinVersion = null,
+                IosMinVersion = null
             });
         }
     }

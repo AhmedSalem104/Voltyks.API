@@ -18,11 +18,22 @@ namespace Voltyks.API.Controllers.Admin
         }
 
         /// <summary>
-        /// PATCH /api/v1/admin/app-config/mobile-enabled
-        /// Update mobile app kill-switch status
+        /// GET /api/v1/admin/app-config/mobile-status
+        /// Get full mobile app config (admin view)
         /// </summary>
-        [HttpPatch("mobile-enabled")]
-        public async Task<IActionResult> UpdateMobileEnabled(
+        [HttpGet("mobile-status")]
+        public async Task<IActionResult> GetMobileConfig(CancellationToken ct = default)
+        {
+            var result = await _serviceManager.MobileAppConfigService.GetAdminConfigAsync();
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// PATCH /api/v1/admin/app-config/mobile-status
+        /// Update mobile app config (kill-switch + min versions)
+        /// </summary>
+        [HttpPatch("mobile-status")]
+        public async Task<IActionResult> UpdateMobileConfig(
             [FromBody] UpdateMobileAppConfigDto dto,
             CancellationToken ct = default)
         {
