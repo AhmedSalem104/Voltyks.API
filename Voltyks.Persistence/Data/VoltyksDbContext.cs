@@ -6,6 +6,7 @@ using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using Voltyks.Persistence.Entities.Main.Paymob;
+using Voltyks.Persistence.Entities.Main.Store;
 
 namespace Voltyks.Persistence.Data
 {
@@ -65,6 +66,11 @@ namespace Voltyks.Persistence.Data
 
         // Mobile App Config
         public DbSet<MobileAppConfig> MobileAppConfigs { get; set; }
+
+        // Store Module
+        public DbSet<StoreCategory> StoreCategories { get; set; }
+        public DbSet<StoreProduct> StoreProducts { get; set; }
+        public DbSet<StoreReservation> StoreReservations { get; set; }
 
     }
 }
