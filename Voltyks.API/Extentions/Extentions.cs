@@ -142,7 +142,12 @@ namespace Voltyks.API.Extentions
 
         private static IServiceCollection AddBuildInServices(this IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    // Enable proper Unicode/Arabic character encoding in JSON responses
+                    options.JsonSerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+                });
             return services;
         }
         private static IServiceCollection AddSwaggerServices(this IServiceCollection services)
