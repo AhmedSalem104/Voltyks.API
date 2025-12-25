@@ -79,7 +79,7 @@ namespace Voltyks.Application.ServicesManager
         public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService, paginationService, signalRService);
         public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService);
         public IMobileAppConfigService MobileAppConfigService { get; } = new MobileAppConfigService(unitOfWork);
-        public IStoreService StoreService { get; } = new StoreService(context, httpContextAccessor);
+        public IStoreService StoreService { get; } = new StoreService(context, httpContextAccessor, signalRService);
 
 
 

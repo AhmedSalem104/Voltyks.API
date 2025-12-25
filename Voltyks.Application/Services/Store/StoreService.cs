@@ -7,13 +7,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Interfaces.Store;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Store.Categories;
 using Voltyks.Core.DTOs.Store.Products;
 using Voltyks.Core.DTOs.Store.Reservations;
+using Voltyks.Core.Enums;
 using Voltyks.Persistence.Data;
+using Voltyks.Persistence.Entities.Main;
 using Voltyks.Persistence.Entities.Main.Store;
 
 namespace Voltyks.Application.Services.Store
@@ -22,11 +25,16 @@ namespace Voltyks.Application.Services.Store
     {
         private readonly VoltyksDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ISignalRService _signalRService;
 
-        public StoreService(VoltyksDbContext context, IHttpContextAccessor httpContextAccessor)
+        public StoreService(
+            VoltyksDbContext context,
+            IHttpContextAccessor httpContextAccessor,
+            ISignalRService signalRService)
         {
             _context = context;
             _httpContextAccessor = httpContextAccessor;
+            _signalRService = signalRService;
         }
 
         private string? GetCurrentUserId()
@@ -229,6 +237,45 @@ namespace Voltyks.Application.Services.Store
 
                 _context.StoreReservations.Add(reservation);
                 await _context.SaveChangesAsync(ct);
+
+                // Send admin notification
+                var user = await _context.Users.FindAsync(userId);
+                var userName = user?.FullName ?? user?.UserName ?? "مستخدم";
+
+                var adminNotification = new Notification
+                {
+                    Title = "حجز منتج جديد",
+                    Body = $"قام {userName} بحجز {product.Name} (الكمية: {dto.Quantity})",
+                    IsRead = false,
+                    SentAt = DateTime.UtcNow,
+                    UserId = null,
+                    Type = NotificationTypes.Admin_Reservation_Created,
+                    OriginalId = reservation.Id,
+                    IsAdminNotification = true,
+                    UserTypeId = null
+                };
+                _context.Notifications.Add(adminNotification);
+                await _context.SaveChangesAsync(ct);
+
+                // Send SignalR broadcast to admin dashboard
+                await _signalRService.SendBroadcastAsync(
+                    "حجز منتج جديد",
+                    $"قام {userName} بحجز {product.Name}",
+                    new
+                    {
+                        id = $"reservation_{reservation.Id}",
+                        type = "reservation",
+                        originalId = reservation.Id,
+                        productId = product.Id,
+                        productName = product.Name,
+                        quantity = dto.Quantity,
+                        totalPrice = reservation.TotalPrice,
+                        currency = product.Currency,
+                        userName = userName,
+                        timestamp = adminNotification.SentAt.ToString("O")
+                    },
+                    ct
+                );
 
                 var resultDto = new ReservationDto
                 {

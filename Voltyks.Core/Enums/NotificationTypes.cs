@@ -21,5 +21,6 @@ namespace Voltyks.Core.Enums
         // Admin Notifications
         public const string Admin_Report_Created = "Admin_Report_Created";
         public const string Admin_Complaint_Created = "Admin_Complaint_Created";
+        public const string Admin_Reservation_Created = "Admin_Reservation_Created";
     }
 }
