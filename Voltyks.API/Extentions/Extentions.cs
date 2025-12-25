@@ -42,6 +42,8 @@ using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Services.Pagination;
 using Voltyks.API.Hubs;
 using Voltyks.Application.Interfaces.SignalR;
+using Voltyks.Application.Interfaces.ImageUpload;
+using Voltyks.Application.Services.ImageUpload;
 using Voltyks.API.Services;
 
 
@@ -281,6 +283,9 @@ namespace Voltyks.API.Extentions
 
             // SignalR Service
             services.AddScoped<ISignalRService, SignalRService>();
+
+            // Product Image Service
+            services.AddScoped<IProductImageService, ProductImageService>();
 
             return services;
 

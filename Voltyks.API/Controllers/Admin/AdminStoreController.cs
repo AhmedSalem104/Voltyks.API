@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.AdminControlDashboard;
+using Voltyks.Application.Interfaces.ImageUpload;
 using Voltyks.Core.DTOs.Common;
+using Voltyks.Core.DTOs.ImageUpload;
 using Voltyks.Core.DTOs.Store.Admin;
 
 namespace Voltyks.API.Controllers.Admin
@@ -12,10 +14,14 @@ namespace Voltyks.API.Controllers.Admin
     public class AdminStoreController : ControllerBase
     {
         private readonly IAdminServiceManager _adminServiceManager;
+        private readonly IProductImageService _productImageService;
 
-        public AdminStoreController(IAdminServiceManager adminServiceManager)
+        public AdminStoreController(
+            IAdminServiceManager adminServiceManager,
+            IProductImageService productImageService)
         {
             _adminServiceManager = adminServiceManager;
+            _productImageService = productImageService;
         }
 
         #region Category Endpoints
@@ -127,7 +133,43 @@ namespace Voltyks.API.Controllers.Admin
         [HttpDelete("products/{id}/force")]
         public async Task<IActionResult> ForceDeleteProduct(int id, CancellationToken ct = default)
         {
+            // First, cleanup images folder (before product is deleted from DB)
+            await _productImageService.DeleteAllProductImagesAsync(id, ct);
+
+            // Then delete the product from database
             var result = await _adminServiceManager.AdminStoreService.ForceDeleteProductAsync(id, ct);
+            return Ok(result);
+        }
+
+        #endregion
+
+        #region Product Image Endpoints
+
+        [HttpPost("products/{id}/images")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadProductImages(
+            int id,
+            [FromForm] UploadProductImagesDto dto,
+            CancellationToken ct = default)
+        {
+            var result = await _productImageService.UploadImagesAsync(id, dto.Images, ct);
+            return Ok(result);
+        }
+
+        [HttpDelete("products/{id}/images")]
+        public async Task<IActionResult> DeleteProductImage(
+            int id,
+            [FromBody] DeleteProductImageDto dto,
+            CancellationToken ct = default)
+        {
+            var result = await _productImageService.DeleteImageAsync(id, dto.ImagePath, ct);
+            return Ok(result);
+        }
+
+        [HttpDelete("products/{id}/images/all")]
+        public async Task<IActionResult> DeleteAllProductImages(int id, CancellationToken ct = default)
+        {
+            var result = await _productImageService.DeleteAllProductImagesAsync(id, ct);
             return Ok(result);
         }
 
