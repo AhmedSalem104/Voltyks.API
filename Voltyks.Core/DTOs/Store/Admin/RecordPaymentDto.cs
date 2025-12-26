@@ -10,7 +10,6 @@ namespace Voltyks.Core.DTOs.Store.Admin
         [StringLength(100)]
         public string? PaymentReference { get; set; }
 
-        [Range(0.01, double.MaxValue, ErrorMessage = "Paid amount must be greater than 0")]
         public decimal? PaidAmount { get; set; } // optional - default: TotalPrice
 
         [StringLength(1000)]
