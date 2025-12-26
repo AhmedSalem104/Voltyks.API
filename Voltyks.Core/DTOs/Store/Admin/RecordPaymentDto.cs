@@ -4,16 +4,14 @@ namespace Voltyks.Core.DTOs.Store.Admin
 {
     public class RecordPaymentDto
     {
-        [Required]
         [StringLength(50)]
-        public string PaymentMethod { get; set; } = string.Empty; // cash, bank_transfer, instapay, vodafone_cash, fawry, other
+        public string? PaymentMethod { get; set; } // optional - default: "manual"
 
         [StringLength(100)]
         public string? PaymentReference { get; set; }
 
-        [Required]
         [Range(0.01, double.MaxValue, ErrorMessage = "Paid amount must be greater than 0")]
-        public decimal PaidAmount { get; set; }
+        public decimal? PaidAmount { get; set; } // optional - default: TotalPrice
 
         [StringLength(1000)]
         public string? AdminNotes { get; set; }

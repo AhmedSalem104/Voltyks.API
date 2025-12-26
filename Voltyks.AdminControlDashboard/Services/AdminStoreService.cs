@@ -940,9 +940,9 @@ namespace Voltyks.AdminControlDashboard.Services
                 // }
 
                 reservation.PaymentStatus = "paid";
-                reservation.PaymentMethod = dto.PaymentMethod;
+                reservation.PaymentMethod = string.IsNullOrEmpty(dto.PaymentMethod) ? "manual" : dto.PaymentMethod;
                 reservation.PaymentReference = dto.PaymentReference;
-                reservation.PaidAmount = dto.PaidAmount;
+                reservation.PaidAmount = (dto.PaidAmount == null || dto.PaidAmount <= 0) ? reservation.TotalPrice : dto.PaidAmount.Value;
                 reservation.PaidAt = DateTime.UtcNow;
                 if (!string.IsNullOrWhiteSpace(dto.AdminNotes))
                     reservation.AdminNotes = dto.AdminNotes;
