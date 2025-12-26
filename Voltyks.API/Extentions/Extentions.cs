@@ -209,10 +209,10 @@ namespace Voltyks.API.Extentions
             app.UseStaticFiles();
             app.UseHttpsRedirection();
 
-            // Enable CORS - must be before UseRouting
-            app.UseCors("AllowAll");
-
             app.UseRouting();
+
+            // Enable CORS - must be after UseRouting for endpoint-specific CORS policies
+            app.UseCors("AllowAll");
             app.UseResponseCaching();
             app.UseAuthentication();
             app.UseAuthorization();
