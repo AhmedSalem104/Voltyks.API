@@ -933,10 +933,11 @@ namespace Voltyks.AdminControlDashboard.Services
                     return new ApiResponse<AdminReservationDto>("Reservation not found", false);
                 }
 
-                if (reservation.Status == "pending")
-                {
-                    return new ApiResponse<AdminReservationDto>("Must contact customer before recording payment", false);
-                }
+                // TODO: Re-enable this check when online payment is implemented
+                // if (reservation.Status == "pending")
+                // {
+                //     return new ApiResponse<AdminReservationDto>("Must contact customer before recording payment", false);
+                // }
 
                 reservation.PaymentStatus = "paid";
                 reservation.PaymentMethod = dto.PaymentMethod;
