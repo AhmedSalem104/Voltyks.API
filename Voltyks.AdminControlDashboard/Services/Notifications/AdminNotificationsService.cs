@@ -20,6 +20,7 @@ namespace Voltyks.AdminControlDashboard.Services.Notifications
             int page = 1,
             int pageSize = 20,
             bool? onlyUnread = null,
+            string? type = null,
             CancellationToken ct = default)
         {
             try
@@ -34,6 +35,23 @@ namespace Voltyks.AdminControlDashboard.Services.Notifications
                     query = query.Where(n => !n.IsRead);
                 }
 
+                // Filter by type: report, complaint, product_reservation
+                if (!string.IsNullOrEmpty(type))
+                {
+                    var notificationType = type.ToLower() switch
+                    {
+                        "report" => NotificationTypes.Admin_Report_Created,
+                        "complaint" => NotificationTypes.Admin_Complaint_Created,
+                        "product_reservation" => NotificationTypes.Admin_Reservation_Created,
+                        _ => null
+                    };
+
+                    if (notificationType != null)
+                    {
+                        query = query.Where(n => n.Type == notificationType);
+                    }
+                }
+
                 var totalCount = await query.CountAsync(ct);
 
                 var notifications = await query
@@ -42,10 +60,8 @@ namespace Voltyks.AdminControlDashboard.Services.Notifications
                     .Take(pageSize)
                     .Select(n => new AdminNotificationDto
                     {
-                        Id = n.Type == NotificationTypes.Admin_Report_Created
-                            ? $"report_{n.OriginalId}"
-                            : $"complaint_{n.OriginalId}",
-                        Type = n.Type == NotificationTypes.Admin_Report_Created ? "report" : "complaint",
+                        Id = GetNotificationId(n.Type, n.OriginalId),
+                        Type = GetNotificationTypeName(n.Type),
                         OriginalId = n.OriginalId ?? 0,
                         Title = n.Title,
                         Message = n.Body,
@@ -69,6 +85,28 @@ namespace Voltyks.AdminControlDashboard.Services.Notifications
                     errors: new List<string> { ex.Message }
                 );
             }
+        }
+
+        private static string GetNotificationId(string? notificationType, int? originalId)
+        {
+            return notificationType switch
+            {
+                NotificationTypes.Admin_Report_Created => $"report_{originalId}",
+                NotificationTypes.Admin_Complaint_Created => $"complaint_{originalId}",
+                NotificationTypes.Admin_Reservation_Created => $"reservation_{originalId}",
+                _ => $"unknown_{originalId}"
+            };
+        }
+
+        private static string GetNotificationTypeName(string? notificationType)
+        {
+            return notificationType switch
+            {
+                NotificationTypes.Admin_Report_Created => "report",           // بلاغ
+                NotificationTypes.Admin_Complaint_Created => "complaint",     // شكوى
+                NotificationTypes.Admin_Reservation_Created => "product_reservation", // حجز منتج
+                _ => "unknown"
+            };
         }
 
         public async Task<ApiResponse<int>> GetUnreadCountAsync(CancellationToken ct = default)

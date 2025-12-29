@@ -9,6 +9,7 @@ namespace Voltyks.AdminControlDashboard.Interfaces.Notifications
             int page = 1,
             int pageSize = 20,
             bool? onlyUnread = null,
+            string? type = null,
             CancellationToken ct = default);
 
         Task<ApiResponse<int>> GetUnreadCountAsync(CancellationToken ct = default);

@@ -18,15 +18,17 @@ namespace Voltyks.API.Controllers.Admin
 
         /// <summary>
         /// GET /api/admin/notifications - Get admin notifications with pagination
+        /// Filter by type: report (بلاغ), complaint (شكوى), product_reservation (حجز منتج)
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetNotifications(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20,
             [FromQuery] bool? onlyUnread = null,
+            [FromQuery] string? type = null,
             CancellationToken ct = default)
         {
-            var result = await _adminServiceManager.AdminNotificationsService.GetNotificationsAsync(page, pageSize, onlyUnread, ct);
+            var result = await _adminServiceManager.AdminNotificationsService.GetNotificationsAsync(page, pageSize, onlyUnread, type, ct);
             return Ok(result);
         }
 
