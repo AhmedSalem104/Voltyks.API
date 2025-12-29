@@ -716,11 +716,19 @@ namespace Voltyks.AdminControlDashboard.Services
                     return new ApiResponse<bool>("Product not found", false);
                 }
 
+                // Check for active (non-cancelled) reservations
                 if (product.Reservations.Any(r => r.Status != "cancelled"))
                 {
-                    return new ApiResponse<bool>("Cannot permanently delete product with active reservations", false);
+                    return new ApiResponse<bool>("Cannot permanently delete product with active reservations. Cancel all reservations first.", false);
                 }
 
+                // Delete all cancelled reservations first (due to FK constraint with Restrict)
+                if (product.Reservations.Any())
+                {
+                    _context.StoreReservations.RemoveRange(product.Reservations);
+                }
+
+                // Now delete the product
                 _context.StoreProducts.Remove(product);
                 await _context.SaveChangesAsync(ct);
 
