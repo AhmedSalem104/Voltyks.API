@@ -45,6 +45,8 @@ using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Interfaces.ImageUpload;
 using Voltyks.Application.Services.ImageUpload;
 using Voltyks.API.Services;
+using Voltyks.Application.Interfaces.AppSettings;
+using Voltyks.Application.Services.AppSettings;
 
 
 namespace Voltyks.API.Extentions
@@ -270,6 +272,8 @@ namespace Voltyks.API.Extentions
             services.AddScoped<IFeesConfigService, FeesConfigService>();
             services.AddScoped<ITermsService, TermsService>();
 
+            // App Settings Service
+            services.AddScoped<IAppSettingsService, AppSettingsService>();
 
             services.AddHttpClient("paymob"); // تقدر تضيف BaseAddress لو تحب
             services.AddSingleton<IPaymobAuthTokenProvider, PaymobAuthTokenProviderRedis>();

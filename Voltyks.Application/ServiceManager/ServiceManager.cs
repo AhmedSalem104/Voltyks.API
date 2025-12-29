@@ -23,6 +23,7 @@ using Voltyks.Application.Interfaces.Terms;
 using Voltyks.Application.Interfaces.UserReport;
 using Voltyks.Application.Interfaces.MobileAppConfig;
 using Voltyks.Application.Interfaces.Store;
+using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Services;
 using Voltyks.Application.Services.Store;
 using Voltyks.Application.Services.Auth;
@@ -63,7 +64,8 @@ namespace Voltyks.Application.ServicesManager
     IFeesConfigService feesConfigService,
     ILogger<ProcessesService> processesLogger,
     IPaginationService paginationService,
-    ISignalRService signalRService) : IServiceManager
+    ISignalRService signalRService,
+    IAppSettingsService appSettingsService) : IServiceManager
     {
       
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService);
@@ -71,7 +73,7 @@ namespace Voltyks.Application.ServicesManager
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
-        public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor);
+        public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor, appSettingsService);
         public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory, signalRService);
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);

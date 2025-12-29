@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.ServicesManager.ServicesManager;
 
 namespace Voltyks.API.Controllers
@@ -8,10 +9,12 @@ namespace Voltyks.API.Controllers
     public class AppConfigController : ControllerBase
     {
         private readonly IServiceManager _serviceManager;
+        private readonly IAppSettingsService _appSettingsService;
 
-        public AppConfigController(IServiceManager serviceManager)
+        public AppConfigController(IServiceManager serviceManager, IAppSettingsService appSettingsService)
         {
             _serviceManager = serviceManager;
+            _appSettingsService = appSettingsService;
         }
 
         /// <summary>
@@ -39,6 +42,17 @@ namespace Voltyks.API.Controllers
             CancellationToken ct = default)
         {
             var result = await _serviceManager.MobileAppConfigService.GetStatusAsync(platform, version);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// GET /api/v1/app-config/charging-mode-status
+        /// Public endpoint for users to check if charging mode is enabled
+        /// </summary>
+        [HttpGet("charging-mode-status")]
+        public async Task<IActionResult> GetChargingModeStatus(CancellationToken ct = default)
+        {
+            var result = await _appSettingsService.GetChargingModeStatusAsync(ct);
             return Ok(result);
         }
     }

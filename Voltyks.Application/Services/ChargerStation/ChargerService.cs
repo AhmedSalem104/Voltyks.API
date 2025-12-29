@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Http;
 using Voltyks.Persistence.Entities;
 using System.Threading.Channels;
 using static System.Net.Mime.MediaTypeNames;
+using Voltyks.Application.Interfaces.AppSettings;
 
 namespace Voltyks.Application.Interfaces.ChargerStation
 {
@@ -21,12 +22,14 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IHttpContextAccessor _httpContext;
+        private readonly IAppSettingsService _appSettingsService;
 
-        public ChargerService(IUnitOfWork unitOfWork, IMapper mapper, IHttpContextAccessor httpContext)
+        public ChargerService(IUnitOfWork unitOfWork, IMapper mapper, IHttpContextAccessor httpContext, IAppSettingsService appSettingsService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _httpContext = httpContext;
+            _appSettingsService = appSettingsService;
         }
         public async Task<ApiResponse<IEnumerable<CapacityDto>>> GetAllCapacitiesAsync()
         {
@@ -137,6 +140,17 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             if (charger.UserId != userId)
                 return new ApiResponse<bool>(ErrorMessages.YouAreNotAuthorizedToModifyThisCharger, true);
+
+            // التحقق من وضع الشحن - منع التفعيل لو الوضع مُعطّل
+            var chargingModeEnabled = await _appSettingsService.IsChargingModeEnabledAsync();
+            if (!chargingModeEnabled && !charger.IsActive)
+            {
+                return new ApiResponse<bool>(
+                    data: false,
+                    message: "Cannot activate charger. Charging mode is not enabled yet. Please wait for admin activation.",
+                    status: false
+                );
+            }
 
             // عكس الحالة
             charger.IsActive = !charger.IsActive;
@@ -362,10 +376,14 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         // Add Charger
         private async Task AddChargerRecordAsync(AddChargerDto dto, string userId, int addressId)
         {
+            // التحقق من وضع الشحن لتحديد حالة الشاحن الجديد
+            var chargingModeEnabled = await _appSettingsService.IsChargingModeEnabledAsync();
+
             var charger = _mapper.Map<Charger>(dto);
             charger.UserId = userId;
             charger.AddressId = addressId;
             charger.Adaptor = dto.Adaptor;
+            charger.IsActive = chargingModeEnabled; // Inactive لو الوضع مُعطّل
 
             await _unitOfWork.GetRepository<Charger, int>().AddAsync(charger);
             await _unitOfWork.SaveChangesAsync();

@@ -67,6 +67,9 @@ namespace Voltyks.Persistence.Data
         // Mobile App Config
         public DbSet<MobileAppConfig> MobileAppConfigs { get; set; }
 
+        // App Settings
+        public DbSet<AppSettings> AppSettings { get; set; }
+
         // Store Module
         public DbSet<StoreCategory> StoreCategories { get; set; }
         public DbSet<StoreProduct> StoreProducts { get; set; }
