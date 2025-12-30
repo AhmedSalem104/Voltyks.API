@@ -357,21 +357,12 @@ namespace Voltyks.Application.Services.Paymob
 
                 // 4) Compose request body for Paymob (requires payment_methods: [id])
                 var specialReference = Guid.NewGuid().ToString("N");
-                var notificationUrl = string.IsNullOrWhiteSpace(r.NotificationUrl)
-                    ? "https://voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net/api/payment/webhook"
-                    : r.NotificationUrl;
 
-
-              
                 var body = new
                 {
-                    amount = r.Amount,      // تأكد من وحدة المبلغ حسب إعداد حسابك
+                    amount = r.Amount,
                     currency,
-                    // 👇 change: send as strings to avoid any parsing ambiguity on Paymob side
-                    //integration_id = new[] { integrationId.ToString() }, // << المطلوب من Paymob
-                    //payment_methods = new[] { selectedMethod }, // << المطلوب من Paymob
-                    payment_methods = new[] { integrationId }, // << المطلوب من Paymob
-
+                    payment_methods = new[] { integrationId },
                     billing_data = new
                     {
                         first_name = r.BillingData.First_Name,
@@ -380,15 +371,10 @@ namespace Voltyks.Application.Services.Paymob
                         phone_number = r.BillingData.Phone_Number
                     },
                     special_reference = specialReference,
-                    notification_url = notificationUrl,
+                    // notification_url removed - Paymob will use webhook configured in dashboard
                     tokenize = r.SaveCard,
-                    //merchant_order_id = orderId,                 // أو uid:<userId>|ord:<orderId>
                     merchant_order_id = $"uid:{upsert.Data!.UserId}|ord:{orderId}",
-                    metadata = new { user_id = upsert.Data!.UserId }  // عدّل حسب ما بيرجع UpsertOrderAsync
-
-                    // redirection_url = (selectedMethod == "Card" && !string.IsNullOrWhiteSpace(r.RedirectionUrl)) ? r.RedirectionUrl : null
-
-
+                    metadata = new { user_id = upsert.Data!.UserId }
                 };
 
 
