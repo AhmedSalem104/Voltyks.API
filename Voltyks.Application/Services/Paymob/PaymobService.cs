@@ -625,14 +625,7 @@ namespace Voltyks.Application.Services.Paymob
             _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
                 req.Method, req.Path, req.QueryString.Value, req.Headers["User-Agent"].ToString());
 
-            // [A-1] (optional but recommended) verify webhook signature before parsing
-            if (!VerifyWebhookSignature(req, rawBody))
-            {
-                _log?.LogWarning("Invalid webhook signature → ignoring");
-                return new ApiResponse<bool> { Status = true, Message = "Ignored (bad signature)", Data = true };
-            }
-
-            // --------- 0) collect fields as-is ----------
+            // --------- 0) collect fields as-is (BEFORE HMAC check to detect event type) ----------
             var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             foreach (var kv in req.Query) fields[kv.Key] = kv.Value.ToString();
 
@@ -688,7 +681,14 @@ namespace Voltyks.Application.Services.Paymob
 
             if (hasCardTokenKeys) eventType = "CARD_TOKEN";
 
-            // --------- TRANSACTION webhook handling ----------
+            // --------- 2) verify HMAC with correct event type ----------
+            if (!VerifyWebhookSignature(req, rawBody, eventType))
+            {
+                _log?.LogWarning("Invalid webhook signature for {EventType} → ignoring", eventType);
+                return new ApiResponse<bool> { Status = true, Message = "Ignored (bad signature)", Data = true };
+            }
+
+            // --------- 3) TRANSACTION webhook handling ----------
             if (eventType == "TRANSACTION" || eventType == "TXN" ||
                 (!hasCardTokenKeys && TryParseLong(fields, "obj.id", "id") > 0))
             {
@@ -702,7 +702,7 @@ namespace Voltyks.Application.Services.Paymob
                 return new ApiResponse<bool> { Status = true, Message = "Event acknowledged", Data = true };
             }
 
-            // --------- CARD_TOKEN webhook handling with full logging ----------
+            // --------- 4) CARD_TOKEN webhook handling with full logging ----------
             return await HandleCardTokenWebhookAsync(fields, rawBody, isHmacValid: true);
         }
 
@@ -958,7 +958,7 @@ namespace Voltyks.Application.Services.Paymob
         }
 
 
-        private bool VerifyWebhookSignature(HttpRequest req, string rawBody)
+        private bool VerifyWebhookSignature(HttpRequest req, string rawBody, string eventType = "TRANSACTION")
         {
             // Get HMAC from query string (Paymob sends it as ?hmac=...)
             var hmacFromPaymob = req.Query["hmac"].FirstOrDefault();
@@ -988,9 +988,12 @@ namespace Voltyks.Application.Services.Paymob
                     return false;
                 }
 
-                // Paymob HMAC fields in exact order (for TRANSACTION webhooks)
-                // Reference: https://docs.paymob.com/docs/hmac-calculation
-                var concatenated = BuildTransactionConcat(obj);
+                // Use correct concat method based on event type
+                // CARD_TOKEN/TOKEN uses alphabetically sorted values
+                // TRANSACTION uses specific fields in exact order
+                var concatenated = (eventType == "CARD_TOKEN" || eventType == "TOKEN")
+                    ? BuildTokenConcat(obj)
+                    : BuildTransactionConcat(obj);
 
                 // Calculate HMAC-SHA512
                 using var hmac = new HMACSHA512(KeyFromHexOrUtf8(_opt.HmacSecret));
@@ -1004,7 +1007,7 @@ namespace Voltyks.Application.Services.Paymob
 
                 if (!isValid)
                 {
-                    _log?.LogWarning("HMAC verification failed for webhook");
+                    _log?.LogWarning("HMAC verification failed for webhook. EventType={EventType}", eventType);
                 }
 
                 return isValid;
