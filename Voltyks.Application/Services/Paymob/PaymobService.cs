@@ -358,7 +358,7 @@ namespace Voltyks.Application.Services.Paymob
                 // 4) Compose request body for Paymob (requires payment_methods: [id])
                 var specialReference = Guid.NewGuid().ToString("N");
                 var notificationUrl = string.IsNullOrWhiteSpace(r.NotificationUrl)
-                    ? $"http://voltyks-app.runasp.net/notification/{orderId}" // يُفضّل HTTPS في الإنتاج
+                    ? "https://voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net/api/payment/webhook"
                     : r.NotificationUrl;
 
 
