@@ -334,13 +334,19 @@ namespace Voltyks.Application.Services.Paymob
                     return new ApiResponse<CreateIntentResponse>(upsert.Message ?? "Unauthorized", false);
 
                 // 3) Pick method + integrationId (from appsettings)
-                var selectedMethod = string.Equals(r.PaymentMethod, "Wallet", StringComparison.OrdinalIgnoreCase)
-                    ? "Wallet"
-                    : "Card";
+                var selectedMethod = r.PaymentMethod?.ToLowerInvariant() switch
+                {
+                    "wallet" => "Wallet",
+                    "applepay" => "ApplePay",
+                    _ => "Card"
+                };
 
-                int integrationId = selectedMethod == "Wallet"
-                    ? _opt.Integration.Wallet
-                    : _opt.Integration.Card;
+                int integrationId = selectedMethod switch
+                {
+                    "Wallet" => _opt.Integration.Wallet,
+                    "ApplePay" => _opt.Integration.ApplePay,
+                    _ => _opt.Integration.Card
+                };
 
                 if (integrationId <= 0)
                     return new ApiResponse<CreateIntentResponse>($"No valid integration_id configured for {selectedMethod}.", false);
