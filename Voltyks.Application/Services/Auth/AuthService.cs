@@ -703,7 +703,7 @@ namespace Voltyks.Application.Services.Auth
 
             // 3. Get the fees
             var fees = (double)chargingRequest.VoltyksFees;
-            var currentWallet = user.Wallet ?? 0;
+            var currentWallet = user.Wallet;
 
             // 4. Calculate the deduction
             double deductedAmount;

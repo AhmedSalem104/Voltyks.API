@@ -634,8 +634,8 @@ namespace Voltyks.Application.Services.ChargingRequest
             var fees = (double)req.VoltyksFees;
 
             // التحويل: + لصاحب العربية، - لصاحب المحطة
-            carOwner.Wallet = (carOwner.Wallet ?? 0) + fees;
-            stationOwner.Wallet = (stationOwner.Wallet ?? 0) - fees;
+            carOwner.Wallet += fees;
+            stationOwner.Wallet -= fees;
 
             using var tx = await _db.Database.BeginTransactionAsync(ct);
             try

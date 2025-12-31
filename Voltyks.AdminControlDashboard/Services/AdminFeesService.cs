@@ -131,7 +131,7 @@ namespace Voltyks.AdminControlDashboard.Services
                 }
 
                 // Get current wallet balance
-                var currentWallet = recipientUser.Wallet ?? 0;
+                var currentWallet = recipientUser.Wallet;
 
                 // For negative amounts (deduction), check sufficient balance
                 if (dto.Amount < 0)

@@ -26,7 +26,7 @@ namespace Voltyks.Persistence.Entities.Identity
 
         public bool IsBanned { get; set; } = false;
 
-        public double? Wallet { get; set; }
+        public double Wallet { get; set; } = 0;
 
 
         public string? CurrentActivitiesJson { get; set; } = "[]";
