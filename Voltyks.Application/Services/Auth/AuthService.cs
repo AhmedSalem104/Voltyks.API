@@ -1414,9 +1414,9 @@ namespace Voltyks.Application.Services.Auth
                 // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
                 client.DefaultRequestHeaders.UserAgent.Clear();
                 client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("YourAppName", "1.0"));
+                    new ProductInfoHeaderValue("VoltyksApp", "1.0"));
                 client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("(contact@yourdomain.com)"));
+                    new ProductInfoHeaderValue("(support@voltyks.com)"));
 
                 var resp = await client.GetAsync(url);
                 if (!resp.IsSuccessStatusCode)
