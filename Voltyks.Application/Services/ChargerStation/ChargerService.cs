@@ -34,7 +34,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         public async Task<ApiResponse<IEnumerable<CapacityDto>>> GetAllCapacitiesAsync()
         {
             var capacities = await _unitOfWork.GetRepository<Capacity, int>().GetAllAsync();
-            var data = _mapper.Map<IEnumerable<CapacityDto>>(capacities);
+            var sortedCapacities = capacities.OrderBy(c => c.kw);
+            var data = _mapper.Map<IEnumerable<CapacityDto>>(sortedCapacities);
 
             return new ApiResponse<IEnumerable<CapacityDto>>(data);
         }
