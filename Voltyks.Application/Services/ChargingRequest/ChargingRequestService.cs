@@ -420,8 +420,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                 // حوّل StationOwnerId لنص للمقارنة
                 var stationOwnerIdRaw = request.Charger.User.Id?.ToString();
 
-                if (string.IsNullOrWhiteSpace(stationOwnerIdRaw) ||
-                    !string.Equals(stationOwnerIdRaw, currentUserIdRaw, StringComparison.Ordinal))
+                // السماح للـ Admin بالوصول لأي طلب
+                var isAdmin = IsCurrentUserAdmin();
+
+                if (!isAdmin && (string.IsNullOrWhiteSpace(stationOwnerIdRaw) ||
+                    !string.Equals(stationOwnerIdRaw, currentUserIdRaw, StringComparison.Ordinal)))
                 {
                     return new ApiResponse<ChargingRequestDetailsDto>(null, "Forbidden: not your station", false);
                 }
@@ -847,10 +850,14 @@ namespace Voltyks.Application.Services.ChargingRequest
                 .GetAllAsync(t => t.UserId == userId);
             return tokens.Select(t => t.Token).ToList();
         }
-        // RegisterDeviceTokenAsync ===> Helper Private Mehtods 
+        // RegisterDeviceTokenAsync ===> Helper Private Mehtods
         private string? GetCurrentUserId()
         {
             return _httpContext.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+        private bool IsCurrentUserAdmin()
+        {
+            return _httpContext.HttpContext?.User?.IsInRole("Admin") == true;
         }
         private async Task<bool> SaveOrUpdateDeviceTokenAsync(string token, string userId)
         {
