@@ -31,7 +31,9 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         public double KwNeeded { get; set; }
         public int CurrentBatteryPercentage { get; set; }
 
-        public string PricePerHour { get; set; }
+        public decimal PricePerHour { get; set; }
+        public double TimeNeeded { get; set; }  // Time to charge in hours
+        public bool AdapterNeeded { get; set; }
         public string AdapterAvailability { get; set; }
 
         // Charger Location

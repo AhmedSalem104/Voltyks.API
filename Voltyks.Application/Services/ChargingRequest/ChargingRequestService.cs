@@ -519,7 +519,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                     ChargerId = request.ChargerId,
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
-                    PricePerHour = request.Charger.PriceOption != null ? $"{request.Charger.PriceOption.Value} EGP" : "N/A",
+                    PricePerHour = request.Charger.PriceOption?.Value ?? 0,
+                    TimeNeeded = request.Charger.Capacity?.kw > 0
+                        ? Math.Round(request.KwNeeded / request.Charger.Capacity.kw, 2)
+                        : 0,
+                    AdapterNeeded = request.Charger.Adaptor == true,
                     AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
                     ChargerArea = request.Charger.Address?.Area ?? "N/A",
                     ChargerStreet = request.Charger.Address?.Street ?? "N/A",
