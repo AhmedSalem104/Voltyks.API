@@ -1406,54 +1406,70 @@ namespace Voltyks.Application.Services.Auth
         }
         public async Task<(string Area, string Street)> GetAddressFromLatLongNominatimAsync(double latitude, double longitude)
         {
-            // Nominatim API (مجاني)
-            string url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={latitude}&lon={longitude}&addressdetails=1&accept-language=ar";
-
-            using (var client = new HttpClient())
+            try
             {
-                // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
-                client.DefaultRequestHeaders.UserAgent.Clear();
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("VoltyksApp", "1.0"));
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("(support@voltyks.com)"));
+                // Nominatim API (مجاني)
+                string url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={latitude}&lon={longitude}&addressdetails=1&accept-language=ar";
 
-                var resp = await client.GetAsync(url);
-                if (!resp.IsSuccessStatusCode)
-                    return ("N/A", "N/A");
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                    // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
+                    client.DefaultRequestHeaders.UserAgent.Clear();
+                    client.DefaultRequestHeaders.UserAgent.Add(
+                        new ProductInfoHeaderValue("VoltyksApp", "1.0"));
+                    client.DefaultRequestHeaders.UserAgent.Add(
+                        new ProductInfoHeaderValue("(support@voltyks.com)"));
 
-                var body = await resp.Content.ReadAsStringAsync();
-                var json = JObject.Parse(body);
-                var address = json["address"] as JObject;
-                if (address == null)
-                    return ("N/A", "N/A");
+                    var resp = await client.GetAsync(url);
+                    if (!resp.IsSuccessStatusCode)
+                        return ("N/A", "N/A");
 
-                // نحاول نطلع الشارع
-                // Nominatim ممكن يرجع street تحت مفاتيح مختلفة (road, pedestrian, footway...)
-                string street =
-                    (string)address["road"] ??
-                    (string)address["pedestrian"] ??
-                    (string)address["footway"] ??
-                    (string)address["path"] ??
-                    (string)address["residential"] ??
-                    (string)address["neighbourhood"] ??
-                    "N/A";
+                    var body = await resp.Content.ReadAsStringAsync();
+                    var json = JObject.Parse(body);
+                    var address = json["address"] as JObject;
+                    if (address == null)
+                        return ("N/A", "N/A");
 
-                // نحاول نطلع المنطقة/الحَي/المدينة
-                // بنستخدم fallback ذكي حسب المتاح
-                string area =
-                    (string)address["suburb"] ??
-                    (string)address["neighbourhood"] ??
-                    (string)address["city_district"] ??
-                    (string)address["city"] ??
-                    (string)address["town"] ??
-                    (string)address["village"] ??
-                    (string)address["county"] ??
-                    (string)address["state_district"] ??
-                    (string)address["state"] ??
-                    "N/A";
+                    // نحاول نطلع الشارع
+                    // Nominatim ممكن يرجع street تحت مفاتيح مختلفة (road, pedestrian, footway...)
+                    string street =
+                        (string)address["road"] ??
+                        (string)address["pedestrian"] ??
+                        (string)address["footway"] ??
+                        (string)address["path"] ??
+                        (string)address["residential"] ??
+                        (string)address["neighbourhood"] ??
+                        "N/A";
 
-                return (area, street);
+                    // نحاول نطلع المنطقة/الحَي/المدينة
+                    // بنستخدم fallback ذكي حسب المتاح
+                    string area =
+                        (string)address["suburb"] ??
+                        (string)address["neighbourhood"] ??
+                        (string)address["city_district"] ??
+                        (string)address["city"] ??
+                        (string)address["town"] ??
+                        (string)address["village"] ??
+                        (string)address["county"] ??
+                        (string)address["state_district"] ??
+                        (string)address["state"] ??
+                        "N/A";
+
+                    return (area, street);
+                }
+            }
+            catch (HttpRequestException)
+            {
+                return ("N/A", "N/A");
+            }
+            catch (TaskCanceledException)
+            {
+                return ("N/A", "N/A");
+            }
+            catch (Exception)
+            {
+                return ("N/A", "N/A");
             }
         }
         private static ApiResponse<T> BannedResponse<T>(string? message = null)
