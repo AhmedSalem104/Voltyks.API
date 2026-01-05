@@ -336,6 +336,11 @@ namespace Voltyks.Application.Services.Auth
 
                 var newAccessToken = await GenerateJwtTokenAsync(user);
 
+                // Sliding Refresh Token - generate new refresh token with fresh 7-day expiry
+                var newRefreshToken = Guid.NewGuid().ToString();
+                await redisService.SetAsync($"refresh_token:{user.Id}", newRefreshToken, TimeSpan.FromDays(7));
+
+                // Update JWT Cookie
                 response.Cookies.Append("JWT_Token", newAccessToken, new CookieOptions
                 {
                     HttpOnly = true,
@@ -343,6 +348,15 @@ namespace Voltyks.Application.Services.Auth
                     SameSite = SameSiteMode.Strict,
                     Expires = GetEgyptTime().AddMinutes(20),
                     MaxAge = TimeSpan.FromMinutes(20)
+                });
+
+                // Update Refresh Token Cookie with new token
+                response.Cookies.Append("Refresh_Token", newRefreshToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = GetEgyptTime().AddDays(7)
                 });
 
                 // 1) جرّبه من الـ DTO لو تحب تضيف خاصية اختيارية dto.FcmToken
@@ -428,6 +442,11 @@ namespace Voltyks.Application.Services.Auth
 
                 var newAccessToken = await GenerateJwtTokenAsync(user);
 
+                // Sliding Refresh Token - generate new refresh token with fresh 7-day expiry
+                var newRefreshToken = Guid.NewGuid().ToString();
+                await redisService.SetAsync($"refresh_token:{user.Id}", newRefreshToken, TimeSpan.FromDays(7));
+
+                // Update JWT Cookie
                 response.Cookies.Append("JWT_Token", newAccessToken, new CookieOptions
                 {
                     HttpOnly = true,
@@ -435,6 +454,15 @@ namespace Voltyks.Application.Services.Auth
                     SameSite = SameSiteMode.Strict,
                     Expires = GetEgyptTime().AddMinutes(20),
                     MaxAge = TimeSpan.FromMinutes(20)
+                });
+
+                // Update Refresh Token Cookie with new token
+                response.Cookies.Append("Refresh_Token", newRefreshToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = GetEgyptTime().AddDays(7)
                 });
 
                 // FCM token from Header
