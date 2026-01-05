@@ -15,6 +15,7 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         public string PhoneNumber { get; set; }
         public string City { get; set; }
         public string Token { get; set; }
+        public string RefreshToken { get; set; }
 
     }
 }

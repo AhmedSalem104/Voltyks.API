@@ -195,7 +195,8 @@ namespace Voltyks.Application.Services.Auth
                 City = userWithAddress?.Address?.City,
                 PhoneNumber = user.PhoneNumber,
                 Email = user.Email,
-                Token = accessToken
+                Token = accessToken,
+                RefreshToken = refreshToken
             };
 
             return new ApiResponse<UserLoginResultDto>(result, SuccessfulMessage.LoginSuccessful);
