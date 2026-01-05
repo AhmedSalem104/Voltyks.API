@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.Fees;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/fees")]
     public class AdminFeesController : ControllerBase

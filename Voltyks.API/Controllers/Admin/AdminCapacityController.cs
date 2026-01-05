@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.Capacity;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/capacity")]
     public class AdminCapacityController : ControllerBase

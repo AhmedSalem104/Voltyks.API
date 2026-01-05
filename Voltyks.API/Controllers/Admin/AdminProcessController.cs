@@ -10,7 +10,7 @@ using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/process")]
     public class AdminProcessController : ControllerBase
@@ -42,7 +42,6 @@ namespace Voltyks.API.Controllers.Admin
         /// POST /api/admin/process/force-seed - Force seed data into database
         /// </summary>
         [HttpPost("force-seed")]
-        [AllowAnonymous]
         public async Task<IActionResult> ForceSeed()
         {
             await _dbInitializer.ForceSeedAsync();
@@ -53,7 +52,6 @@ namespace Voltyks.API.Controllers.Admin
         /// DELETE /api/admin/process/reset-admin - Delete admin user and reseed
         /// </summary>
         [HttpDelete("reset-admin")]
-        [AllowAnonymous]
         public async Task<IActionResult> ResetAdmin()
         {
             // Delete Admin user
@@ -80,7 +78,6 @@ namespace Voltyks.API.Controllers.Admin
         /// POST /api/admin/process/seed-price-options - Seed PriceOptions with increment of 10 (100-5000)
         /// </summary>
         [HttpPost("seed-price-options")]
-        [AllowAnonymous]
         public async Task<IActionResult> SeedPriceOptions()
         {
             try

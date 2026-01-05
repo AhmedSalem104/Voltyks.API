@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.Terms;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/terms")]
     public class AdminTermsController : ControllerBase

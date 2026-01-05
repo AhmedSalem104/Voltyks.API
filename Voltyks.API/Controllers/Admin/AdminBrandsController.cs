@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.Brands;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/brands")]
     public class AdminBrandsController : ControllerBase

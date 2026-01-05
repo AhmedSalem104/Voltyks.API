@@ -8,7 +8,7 @@ using Voltyks.Core.DTOs.Store.Admin;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/store")]
     public class AdminStoreController : ControllerBase

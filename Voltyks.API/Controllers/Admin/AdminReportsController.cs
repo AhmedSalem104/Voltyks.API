@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.Reports;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/reports")]
     public class AdminReportsController : ControllerBase

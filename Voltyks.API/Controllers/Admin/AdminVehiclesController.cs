@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.Vehicles;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/vehicles")]
     public class AdminVehiclesController : ControllerBase

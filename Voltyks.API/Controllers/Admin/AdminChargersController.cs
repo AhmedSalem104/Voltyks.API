@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.Chargers;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/chargers")]
     public class AdminChargersController : ControllerBase

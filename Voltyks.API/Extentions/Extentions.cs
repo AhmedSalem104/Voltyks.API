@@ -3,6 +3,8 @@ using System.IO.Compression;
 using System.Data.Entity.Infrastructure;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -101,12 +103,15 @@ namespace Voltyks.API.Extentions
 
             services.AddBuildInServices();
 
-            // Add CORS - Allow all origins for API access
+            // Add CORS - Restricted to specific domains in production
+            var allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                ?? new[] { "https://voltyks.com", "https://www.voltyks.com", "https://admin.voltyks.com" };
+
             services.AddCors(options =>
             {
-                options.AddPolicy("AllowAll", policy =>
+                options.AddPolicy("AllowSpecific", policy =>
                 {
-                    policy.AllowAnyOrigin()
+                    policy.WithOrigins(allowedOrigins)
                           .AllowAnyMethod()
                           .AllowAnyHeader();
                 });
@@ -114,11 +119,43 @@ namespace Voltyks.API.Extentions
                 // SignalR CORS policy - requires credentials
                 options.AddPolicy("SignalRPolicy", policy =>
                 {
-                    policy.SetIsOriginAllowed(_ => true)
+                    policy.WithOrigins(allowedOrigins)
                           .AllowAnyMethod()
                           .AllowAnyHeader()
                           .AllowCredentials();
                 });
+            });
+
+            // Rate Limiting for security
+            services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                // Global rate limit: 100 requests per minute per IP
+                options.AddFixedWindowLimiter("GlobalLimit", config =>
+                {
+                    config.PermitLimit = 100;
+                    config.Window = TimeSpan.FromMinutes(1);
+                    config.QueueLimit = 0;
+                });
+
+                // Auth endpoints: 10 requests per minute per IP (prevent brute force)
+                options.AddFixedWindowLimiter("AuthLimit", config =>
+                {
+                    config.PermitLimit = 10;
+                    config.Window = TimeSpan.FromMinutes(1);
+                    config.QueueLimit = 0;
+                });
+
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 100,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0
+                        }));
             });
 
             // Add SignalR
@@ -241,15 +278,29 @@ namespace Voltyks.API.Extentions
 
             app.UseGlobalErrorHandling();
 
-            // Configure the HTTP request pipeline.
-            // Enable Swagger in all environments (Development & Production)
-            app.UseSwagger();
-
-            app.UseSwaggerUI(c =>
+            // Security Headers Middleware
+            app.Use(async (context, next) =>
             {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
-                c.DefaultModelsExpandDepth(-1); // ✅ إخفاء قسم Schemas
+                context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+                context.Response.Headers.Append("X-Frame-Options", "DENY");
+                context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+                context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+                context.Response.Headers.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+                await next();
             });
+
+            // Configure the HTTP request pipeline.
+            // Only enable Swagger in Development environment
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI(c =>
+                {
+                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
+                    c.DefaultModelsExpandDepth(-1);
+                });
+            }
+
             app.UseStaticFiles();
             app.UseHttpsRedirection();
 
@@ -258,11 +309,14 @@ namespace Voltyks.API.Extentions
 
             app.UseRouting();
 
+            // Rate Limiting - after routing
+            app.UseRateLimiter();
+
             // Output Caching - after routing, before auth
             app.UseOutputCache();
 
-            // Enable CORS - must be after UseRouting for endpoint-specific CORS policies
-            app.UseCors("AllowAll");
+            // Enable CORS - restricted to specific domains
+            app.UseCors("AllowSpecific");
             app.UseResponseCaching();
             app.UseAuthentication();
             app.UseAuthorization();

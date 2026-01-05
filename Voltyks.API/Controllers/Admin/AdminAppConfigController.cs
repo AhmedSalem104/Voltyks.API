@@ -5,7 +5,7 @@ using Voltyks.Core.DTOs.MobileAppConfig;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/v1/admin/app-config")]
     public class AdminAppConfigController : ControllerBase

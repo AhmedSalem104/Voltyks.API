@@ -5,7 +5,7 @@ using Voltyks.AdminControlDashboard.Dtos.ComplaintCategories;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/complaint-categories")]
     public class AdminComplaintCategoriesController : ControllerBase

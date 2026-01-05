@@ -4,7 +4,7 @@ using Voltyks.AdminControlDashboard;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/complaints")]
     public class AdminComplaintsController : ControllerBase

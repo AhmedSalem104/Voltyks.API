@@ -5,7 +5,7 @@ using Voltyks.Persistence.Entities.Main.Paymob;
 
 namespace Voltyks.API.Controllers.Admin
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/v1/admin/payment")]
     public class AdminPaymentController : ControllerBase
