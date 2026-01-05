@@ -238,7 +238,11 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 PricePerHour = charger.PriceOption != null ? charger.PriceOption.Value : 0m,
         
 
-                AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available"
+                AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available",
+                KwNeeded = request.KwNeed,
+                TimeNeeded = charger.Capacity?.kw > 0
+                    ? Math.Round(request.KwNeed / charger.Capacity.kw, 2)
+                    : 0
             };
 
 
@@ -322,9 +326,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             double estimatedCost = EstimatePrice(sessionDurationHr, charger.PriceOption.Value);
             dto.PriceEstimated = estimatedCost;
 
-            // Calculate charging estimated time in minutes
-            double chargingTimeMinutes = sessionDurationHr * 60;
-            dto.ChargingEstimatedTime = Math.Round(chargingTimeMinutes, 1);
+            // TimeNeeded is already set in GetChargerByIdAsync
         }
         private double CalculateDistanceInKm(double lat1, double lon1, double lat2, double lon2)
         {
