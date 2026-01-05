@@ -180,7 +180,10 @@ namespace Voltyks.Application.Services.Auth
             var accessToken = await GenerateJwtTokenAsync(user);
             var refreshToken = Guid.NewGuid().ToString();
 
+            // Store refresh token with userId as key
             await redisService.SetAsync($"refresh_token:{user.Id}", refreshToken, TimeSpan.FromDays(7));
+            // Store reverse mapping: token -> userId (for lookup without JWT)
+            await redisService.SetAsync($"refresh_token_reverse:{refreshToken}", user.Id, TimeSpan.FromDays(7));
 
             SetCookies(accessToken, refreshToken);
 
@@ -338,7 +341,11 @@ namespace Voltyks.Application.Services.Auth
 
                 // Sliding Refresh Token - generate new refresh token with fresh 7-day expiry
                 var newRefreshToken = Guid.NewGuid().ToString();
+
+                // Delete old reverse mapping and add new one
+                await redisService.RemoveAsync($"refresh_token_reverse:{dto.RefreshToken}");
                 await redisService.SetAsync($"refresh_token:{user.Id}", newRefreshToken, TimeSpan.FromDays(7));
+                await redisService.SetAsync($"refresh_token_reverse:{newRefreshToken}", user.Id, TimeSpan.FromDays(7));
 
                 // Update JWT Cookie
                 response.Cookies.Append("JWT_Token", newAccessToken, new CookieOptions
@@ -412,22 +419,30 @@ namespace Voltyks.Application.Services.Auth
                     };
                 }
 
-                // Find user by matching refresh token in Redis
-                // We need to get userId from the token - check all users or use a reverse lookup
-                // For efficiency, we'll get the userId from a claim in the expired JWT if present
-                var userId = httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+                // Find userId using reverse lookup in Redis (token -> userId)
+                var userId = await redisService.GetAsync($"refresh_token_reverse:{refreshToken}");
 
-                AppUser user = null;
-                if (!string.IsNullOrEmpty(userId))
+                if (string.IsNullOrEmpty(userId))
                 {
-                    // Verify token matches Redis
-                    var redisStoredToken = await redisService.GetAsync($"refresh_token:{userId}");
-                    if (redisStoredToken == refreshToken)
+                    return new ApiResponse<string>
                     {
-                        user = await userManager.FindByIdAsync(userId);
-                    }
+                        Status = false,
+                        Message = ErrorMessages.RefreshTokenMismatch
+                    };
                 }
 
+                // Verify the token matches what's stored for this user
+                var redisStoredToken = await redisService.GetAsync($"refresh_token:{userId}");
+                if (redisStoredToken != refreshToken)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Status = false,
+                        Message = ErrorMessages.RefreshTokenMismatch
+                    };
+                }
+
+                var user = await userManager.FindByIdAsync(userId);
                 if (user == null)
                 {
                     return new ApiResponse<string>
@@ -444,7 +459,11 @@ namespace Voltyks.Application.Services.Auth
 
                 // Sliding Refresh Token - generate new refresh token with fresh 7-day expiry
                 var newRefreshToken = Guid.NewGuid().ToString();
+
+                // Delete old reverse mapping and add new one
+                await redisService.RemoveAsync($"refresh_token_reverse:{refreshToken}");
                 await redisService.SetAsync($"refresh_token:{user.Id}", newRefreshToken, TimeSpan.FromDays(7));
+                await redisService.SetAsync($"refresh_token_reverse:{newRefreshToken}", user.Id, TimeSpan.FromDays(7));
 
                 // Update JWT Cookie
                 response.Cookies.Append("JWT_Token", newAccessToken, new CookieOptions
