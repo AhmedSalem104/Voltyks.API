@@ -52,10 +52,12 @@ namespace Voltyks.Application.Services.Caching
         public async Task RemoveByPatternAsync(string pattern)
         {
             var keys = await _redisService.GetAllKeysAsync(pattern);
-            foreach (var key in keys)
-            {
-                await _redisService.RemoveAsync(key);
-            }
+            var keyList = keys.ToList();
+
+            if (keyList.Count == 0) return;
+
+            // Parallel removal for better performance
+            await Task.WhenAll(keyList.Select(key => _redisService.RemoveAsync(key)));
         }
     }
 }

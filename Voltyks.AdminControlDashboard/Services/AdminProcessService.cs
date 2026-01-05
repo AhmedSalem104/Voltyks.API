@@ -23,15 +23,9 @@ namespace Voltyks.AdminControlDashboard.Services
                 .Include(p => p.ChargerRequest)
                     .ThenInclude(cr => cr!.Charger)
                         .ThenInclude(c => c.Protocol)
-                .Include(p => p.ChargerRequest)
-                    .ThenInclude(cr => cr!.Charger)
-                        .ThenInclude(c => c.Capacity)
-                .Include(p => p.ChargerRequest)
-                    .ThenInclude(cr => cr!.Charger)
-                        .ThenInclude(c => c.PriceOption)
-                .Include(p => p.ChargerRequest)
-                    .ThenInclude(cr => cr!.Charger)
-                        .ThenInclude(c => c.Address)
+                .Include(p => p.ChargerRequest!.Charger!.Capacity)
+                .Include(p => p.ChargerRequest!.Charger!.PriceOption)
+                .Include(p => p.ChargerRequest!.Charger!.Address)
                 .OrderByDescending(p => p.DateCreated)
                 .ToListAsync(ct);
 

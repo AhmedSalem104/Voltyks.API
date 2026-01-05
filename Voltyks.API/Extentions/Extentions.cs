@@ -1,7 +1,9 @@
 ﻿using System.IO;
+using System.IO.Compression;
 using System.Data.Entity.Infrastructure;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -56,6 +58,46 @@ namespace Voltyks.API.Extentions
         // Services
         public static IServiceCollection RegisterAllServices(this IServiceCollection services, IConfiguration configuration)
         {
+            // Response Compression for better performance
+            services.AddResponseCompression(options =>
+            {
+                options.EnableForHttps = true;
+                options.Providers.Add<BrotliCompressionProvider>();
+                options.Providers.Add<GzipCompressionProvider>();
+                options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+                {
+                    "application/json",
+                    "text/json"
+                });
+            });
+
+            services.Configure<BrotliCompressionProviderOptions>(options =>
+            {
+                options.Level = CompressionLevel.Fastest;
+            });
+
+            services.Configure<GzipCompressionProviderOptions>(options =>
+            {
+                options.Level = CompressionLevel.Fastest;
+            });
+
+            // Output Caching for static endpoints
+            services.AddOutputCache(options =>
+            {
+                options.DefaultExpirationTimeSpan = TimeSpan.Zero;
+
+                options.AddPolicy("StaticData", policy =>
+                {
+                    policy.Expire(TimeSpan.FromMinutes(30));
+                    policy.SetVaryByQuery("*");
+                });
+
+                options.AddPolicy("ShortCache", policy =>
+                {
+                    policy.Expire(TimeSpan.FromMinutes(5));
+                    policy.SetVaryByQuery("*");
+                });
+            });
 
             services.AddBuildInServices();
 
@@ -211,7 +253,13 @@ namespace Voltyks.API.Extentions
             app.UseStaticFiles();
             app.UseHttpsRedirection();
 
+            // Response Compression - before routing for best effect
+            app.UseResponseCompression();
+
             app.UseRouting();
+
+            // Output Caching - after routing, before auth
+            app.UseOutputCache();
 
             // Enable CORS - must be after UseRouting for endpoint-specific CORS policies
             app.UseCors("AllowAll");
