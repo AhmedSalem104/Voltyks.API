@@ -290,16 +290,13 @@ namespace Voltyks.API.Extentions
             });
 
             // Configure the HTTP request pipeline.
-            // Only enable Swagger in Development environment
-            if (app.Environment.IsDevelopment())
+            // Enable Swagger in all environments
+            app.UseSwagger();
+            app.UseSwaggerUI(c =>
             {
-                app.UseSwagger();
-                app.UseSwaggerUI(c =>
-                {
-                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
-                    c.DefaultModelsExpandDepth(-1);
-                });
-            }
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
+                c.DefaultModelsExpandDepth(-1);
+            });
 
             app.UseStaticFiles();
             app.UseHttpsRedirection();
