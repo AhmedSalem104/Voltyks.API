@@ -34,7 +34,7 @@ namespace Voltyks.Core.DTOs.Charger
         public double PriceEstimated { get; set; }
 
         /// <summary>
-        /// Estimated charging time in hours based on KwNeed and charger capacity
+        /// Estimated charging time in MINUTES based on KwNeed and charger capacity
         /// </summary>
         public double TimeNeeded { get; set; }
 

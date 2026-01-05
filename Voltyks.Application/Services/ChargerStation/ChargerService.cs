@@ -241,7 +241,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available",
                 KwNeeded = request.KwNeed,
                 TimeNeeded = charger.Capacity?.kw > 0
-                    ? Math.Round(request.KwNeed / charger.Capacity.kw, 2)
+                    ? Math.Round((request.KwNeed / charger.Capacity.kw) * 60, 0)
                     : 0
             };
 
