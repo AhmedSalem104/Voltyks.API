@@ -189,6 +189,10 @@ namespace Voltyks.API.Extentions
                 options.AppId = configuration["Authentication:Facebook:client_id"];
                 options.AppSecret = configuration["Authentication:Facebook:client_secret"];
             });
+
+            // Add Authorization service for role-based authorization
+            services.AddAuthorization();
+
             // ✅ Firebase Admin Initialization
             if (FirebaseApp.DefaultInstance == null)
             {
