@@ -297,7 +297,7 @@ namespace Voltyks.Application.Services.Auth
 
 
         }
-        public async Task<ApiResponse<string>> RefreshJwtTokenAsync(RefreshTokenDto dto)
+        public async Task<ApiResponse<TokensResponseDto>> RefreshJwtTokenAsync(RefreshTokenDto dto)
         {
             try
             {
@@ -307,7 +307,7 @@ namespace Voltyks.Application.Services.Auth
                 var savedRefreshToken = request.Cookies["Refresh_Token"];
                 if (savedRefreshToken != dto.RefreshToken)
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = ErrorMessages.InvalidOrMismatchedToken
@@ -317,7 +317,7 @@ namespace Voltyks.Application.Services.Auth
                 var user = await userManager.GetUserAsync(httpContextAccessor.HttpContext.User);
                 if (user == null)
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = ErrorMessages.UnauthorizedAccess
@@ -325,12 +325,12 @@ namespace Voltyks.Application.Services.Auth
                 }
 
                 if (user.IsBanned)
-                    return BannedResponse<string>();
+                    return BannedResponse<TokensResponseDto>();
 
                 var redisStoredToken = await redisService.GetAsync($"refresh_token:{user.Id}");
                 if (redisStoredToken != dto.RefreshToken)
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = ErrorMessages.RefreshTokenMismatch
@@ -341,6 +341,9 @@ namespace Voltyks.Application.Services.Auth
 
                 // Sliding Refresh Token - generate new refresh token with fresh 7-day expiry
                 var newRefreshToken = Guid.NewGuid().ToString();
+                var now = GetEgyptTime();
+                var accessTokenExpiry = now.AddMinutes(30);
+                var refreshTokenExpiry = now.AddDays(7);
 
                 // Delete old reverse mapping and add new one
                 await redisService.RemoveAsync($"refresh_token_reverse:{dto.RefreshToken}");
@@ -353,8 +356,8 @@ namespace Voltyks.Application.Services.Auth
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
-                    Expires = GetEgyptTime().AddMinutes(20),
-                    MaxAge = TimeSpan.FromMinutes(20)
+                    Expires = accessTokenExpiry,
+                    MaxAge = TimeSpan.FromMinutes(30)
                 });
 
                 // Update Refresh Token Cookie with new token
@@ -363,7 +366,7 @@ namespace Voltyks.Application.Services.Auth
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
-                    Expires = GetEgyptTime().AddDays(7)
+                    Expires = refreshTokenExpiry
                 });
 
                 // 1) جرّبه من الـ DTO لو تحب تضيف خاصية اختيارية dto.FcmToken
@@ -376,22 +379,28 @@ namespace Voltyks.Application.Services.Auth
                 if (!string.IsNullOrWhiteSpace(fcmToken))
                     await AddFcmTokenAsync(user.Id, fcmToken);
 
-                return new ApiResponse<string>(
-                    data: newAccessToken,
+                return new ApiResponse<TokensResponseDto>(
+                    data: new TokensResponseDto
+                    {
+                        AccessToken = newAccessToken,
+                        RefreshToken = newRefreshToken,
+                        AccessTokenExpiresAt = accessTokenExpiry,
+                        RefreshTokenExpiresAt = refreshTokenExpiry
+                    },
                     message: SuccessfulMessage.TokenRefreshedSuccessfully,
                     status: true
                 );
             }
             catch (Exception ex)
             {
-                return new ApiResponse<string>
+                return new ApiResponse<TokensResponseDto>
                 {
                     Status = false,
                     Message = ex.Message
                 };
             }
         }
-        public async Task<ApiResponse<string>> RefreshJwtTokenFromCookiesAsync()
+        public async Task<ApiResponse<TokensResponseDto>> RefreshJwtTokenFromCookiesAsync()
         {
             try
             {
@@ -402,7 +411,7 @@ namespace Voltyks.Application.Services.Auth
                 var authHeader = request.Headers["Authorization"].ToString();
                 if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = "Refresh token not found in Authorization header. Use: Authorization: Bearer {refreshToken}"
@@ -412,7 +421,7 @@ namespace Voltyks.Application.Services.Auth
                 var refreshToken = authHeader.Substring("Bearer ".Length).Trim();
                 if (string.IsNullOrEmpty(refreshToken))
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = "Invalid refresh token format"
@@ -424,7 +433,7 @@ namespace Voltyks.Application.Services.Auth
 
                 if (string.IsNullOrEmpty(userId))
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = ErrorMessages.RefreshTokenMismatch
@@ -435,7 +444,7 @@ namespace Voltyks.Application.Services.Auth
                 var redisStoredToken = await redisService.GetAsync($"refresh_token:{userId}");
                 if (redisStoredToken != refreshToken)
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = ErrorMessages.RefreshTokenMismatch
@@ -445,7 +454,7 @@ namespace Voltyks.Application.Services.Auth
                 var user = await userManager.FindByIdAsync(userId);
                 if (user == null)
                 {
-                    return new ApiResponse<string>
+                    return new ApiResponse<TokensResponseDto>
                     {
                         Status = false,
                         Message = ErrorMessages.RefreshTokenMismatch
@@ -453,12 +462,15 @@ namespace Voltyks.Application.Services.Auth
                 }
 
                 if (user.IsBanned)
-                    return BannedResponse<string>();
+                    return BannedResponse<TokensResponseDto>();
 
                 var newAccessToken = await GenerateJwtTokenAsync(user);
 
                 // Sliding Refresh Token - generate new refresh token with fresh 7-day expiry
                 var newRefreshToken = Guid.NewGuid().ToString();
+                var now = GetEgyptTime();
+                var accessTokenExpiry = now.AddMinutes(30);
+                var refreshTokenExpiry = now.AddDays(7);
 
                 // Delete old reverse mapping and add new one
                 await redisService.RemoveAsync($"refresh_token_reverse:{refreshToken}");
@@ -471,8 +483,8 @@ namespace Voltyks.Application.Services.Auth
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
-                    Expires = GetEgyptTime().AddMinutes(20),
-                    MaxAge = TimeSpan.FromMinutes(20)
+                    Expires = accessTokenExpiry,
+                    MaxAge = TimeSpan.FromMinutes(30)
                 });
 
                 // Update Refresh Token Cookie with new token
@@ -481,7 +493,7 @@ namespace Voltyks.Application.Services.Auth
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
-                    Expires = GetEgyptTime().AddDays(7)
+                    Expires = refreshTokenExpiry
                 });
 
                 // FCM token from Header
@@ -489,15 +501,21 @@ namespace Voltyks.Application.Services.Auth
                 if (!string.IsNullOrWhiteSpace(fcmFromHeader))
                     await AddFcmTokenAsync(user.Id, fcmFromHeader);
 
-                return new ApiResponse<string>(
-                    data: newAccessToken,
+                return new ApiResponse<TokensResponseDto>(
+                    data: new TokensResponseDto
+                    {
+                        AccessToken = newAccessToken,
+                        RefreshToken = newRefreshToken,
+                        AccessTokenExpiresAt = accessTokenExpiry,
+                        RefreshTokenExpiresAt = refreshTokenExpiry
+                    },
                     message: SuccessfulMessage.TokenRefreshedSuccessfully,
                     status: true
                 );
             }
             catch (Exception ex)
             {
-                return new ApiResponse<string>
+                return new ApiResponse<TokensResponseDto>
                 {
                     Status = false,
                     Message = ex.Message

@@ -1,15 +1,45 @@
-# Voltyks Payment System - Frontend Integration Guide
+# Voltyks Payment System - Complete Integration Guide
 
-## Base URL
+> **Last Updated:** 2025-12-30
+> **Version:** 2.0
+> **Mode:** LIVE (Production)
+
+---
+
+## Table of Contents
+1. [Configuration](#configuration)
+2. [Payment Flows](#payment-flows)
+   - [Flow 1: New Card Payment](#flow-1-new-card-payment-intention-api)
+   - [Flow 2: Pay with Saved Card](#flow-2-pay-with-saved-card)
+   - [Flow 3: Card Tokenization](#flow-3-card-tokenization-save-card-only)
+3. [Card Management](#card-management-endpoints)
+4. [Webhook System](#webhook-system)
+5. [Error Handling](#error-handling)
+6. [Code Examples](#complete-flutter-integration-example)
+7. [Testing](#testing)
+
+---
+
+## Configuration
+
+### Base URL
 ```
 https://voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net
 ```
 
-## Authentication
-All endpoints (except webhook) require JWT Bearer token in header:
+### Authentication
+All endpoints (except webhook) require JWT Bearer token:
 ```
 Authorization: Bearer <your_jwt_token>
 ```
+
+### Paymob Credentials (LIVE)
+| Key | Value |
+|-----|-------|
+| **PublicKey** | `egy_pk_live_rsNEP90gJW81yOPUm2MtkZPgb7hcvq6w` |
+| **Integration Card** | `5413127` |
+| **Integration Wallet** | `5413126` |
+| **Currency** | `EGP` |
 
 ---
 
@@ -17,7 +47,7 @@ Authorization: Bearer <your_jwt_token>
 
 ### Flow 1: New Card Payment (Intention API)
 
-This is the main flow for paying with a new card using Paymob SDK.
+Main flow for paying with a new card using Paymob SDK.
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
@@ -27,25 +57,30 @@ This is the main flow for paying with a new card using Paymob SDK.
        │                    │                    │                    │
        │ 1. POST /intention │                    │                    │
        │───────────────────>│                    │                    │
+       │                    │ 2. Create Paymob   │                    │
+       │                    │    Intention       │                    │
+       │                    │───────────────────>│                    │
        │                    │                    │                    │
-       │ 2. client_secret   │                    │                    │
+       │ 3. clientSecret +  │                    │                    │
+       │    publicKey       │                    │                    │
        │<───────────────────│                    │                    │
        │                    │                    │                    │
-       │ 3. Open Paymob SDK │                    │                    │
-       │    with client_secret                   │                    │
+       │ 4. Open Paymob SDK with clientSecret    │                    │
        │────────────────────────────────────────>│                    │
        │                    │                    │                    │
-       │ 4. User enters card details             │                    │
-       │    & completes payment                  │                    │
+       │ 5. User enters card & completes payment │                    │
        │<────────────────────────────────────────│                    │
        │                    │                    │                    │
-       │                    │ 5. Webhook (TRANSACTION)                │
+       │                    │ 6. Webhook (TRANSACTION)                │
        │                    │<────────────────────────────────────────│
        │                    │                    │                    │
-       │ 6. Check order status                   │                    │
+       │                    │ 7. Webhook (CARD_TOKEN) - if saveCard   │
+       │                    │<────────────────────────────────────────│
+       │                    │                    │                    │
+       │ 8. POST /getOrderStatus                 │                    │
        │───────────────────>│                    │                    │
        │                    │                    │                    │
-       │ 7. Payment result  │                    │                    │
+       │ 9. Payment result  │                    │                    │
        │<───────────────────│                    │                    │
 ```
 
@@ -70,13 +105,13 @@ This is the main flow for paying with a new card using Paymob SDK.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| amountCents | number | Yes | Amount in cents (100 = 1 EGP) |
-| billing.first_name | string | Yes | Customer first name |
-| billing.last_name | string | Yes | Customer last name |
-| billing.email | string | Yes | Customer email |
-| billing.phone_number | string | Yes | Customer phone (Egyptian format) |
-| saveCard | boolean | No | Save card for future payments |
-| paymentMethod | string | No | "Card" or "Wallet" (default: Card) |
+| `amountCents` | number | Yes | Amount in cents (100 = 1 EGP) |
+| `billing.first_name` | string | Yes | Customer first name |
+| `billing.last_name` | string | Yes | Customer last name |
+| `billing.email` | string | Yes | Customer email |
+| `billing.phone_number` | string | Yes | Customer phone (Egyptian format) |
+| `saveCard` | boolean | No | Save card for future payments (default: false) |
+| `paymentMethod` | string | No | "Card" or "Wallet" (default: Card) |
 
 **Response:**
 ```json
@@ -97,9 +132,9 @@ This is the main flow for paying with a new card using Paymob SDK.
 
 #### Step 2: Open Paymob SDK
 
-Use the `clientSecret` and `publicKey` from the response to initialize Paymob SDK.
+Use `clientSecret` and `publicKey` to initialize Paymob SDK.
 
-**Flutter Example:**
+**Flutter:**
 ```dart
 import 'package:paymob_payment/paymob_payment.dart';
 
@@ -109,14 +144,9 @@ PaymobPayment.instance.initialize(
 );
 
 final result = await PaymobPayment.instance.pay();
-if (result.success) {
-  // Payment successful
-} else {
-  // Payment failed
-}
 ```
 
-**React Native Example:**
+**React Native:**
 ```javascript
 import { PaymobSDK } from 'paymob-react-native';
 
@@ -126,9 +156,7 @@ const paymentResult = await PaymobSDK.pay({
 });
 ```
 
-#### Step 3: Check Payment Status
-
-After SDK closes, verify payment status:
+#### Step 3: Verify Payment Status
 
 **Endpoint:** `POST /api/payment/getOrderStatus`
 
@@ -145,7 +173,7 @@ After SDK closes, verify payment status:
   "status": true,
   "message": "Order status fetched from Paymob",
   "data": {
-    "merchantOrderId": "abc123",
+    "merchantOrderId": "uid:user123|ord:abc123",
     "orderStatus": "paid",
     "transactionStatus": "Paid",
     "isSuccess": true,
@@ -153,7 +181,7 @@ After SDK closes, verify payment status:
     "currency": "EGP",
     "paymobOrderId": 123456789,
     "paymobTransactionId": 987654321,
-    "checkedAt": "2025-12-15T14:30:00"
+    "checkedAt": "2025-12-30T14:30:00"
   }
 }
 ```
@@ -162,7 +190,7 @@ After SDK closes, verify payment status:
 
 ### Flow 2: Pay with Saved Card
 
-For returning customers who have saved cards.
+For returning customers with saved cards.
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
@@ -173,19 +201,19 @@ For returning customers who have saved cards.
        │ 1. GET /GetListOfCards                  │
        │───────────────────>│                    │
        │                    │                    │
-       │ 2. List of cards   │                    │
+       │ 2. List of saved cards                  │
        │<───────────────────│                    │
        │                    │                    │
        │ 3. User selects card                    │
        │                    │                    │
        │ 4. POST /payWithSavedCard               │
        │───────────────────>│                    │
-       │                    │ 5. Charge card     │
+       │                    │ 5. Token payment   │
        │                    │───────────────────>│
        │                    │                    │
-       │                    │ 6. Result          │
+       │                    │ 6. Payment result  │
        │                    │<───────────────────│
-       │ 7. Payment result  │                    │
+       │ 7. Response        │                    │
        │<───────────────────│                    │
 ```
 
@@ -256,7 +284,7 @@ To save a card without making a payment.
 
 **Endpoint:** `POST /api/payment/tokenization`
 
-**Request:** (no body required)
+**Request:** No body required
 
 **Response:**
 ```json
@@ -276,45 +304,105 @@ Then open Paymob SDK with the payment key to let user enter card details.
 
 ## Card Management Endpoints
 
-### Set Default Card
+### Get All Saved Cards
+**Endpoint:** `GET /api/payment/GetListOfCards`
 
+### Set Default Card
 **Endpoint:** `POST /api/payment/setDefault_Card`
 
-**Request:**
 ```json
-{
-  "cardId": 1
-}
-```
-
-**Response:**
-```json
-{
-  "status": true,
-  "message": "Default set",
-  "data": true
-}
+{ "cardId": 1 }
 ```
 
 ### Delete Card
-
 **Endpoint:** `DELETE /api/payment/delete_Card`
 
-**Request:**
 ```json
-{
-  "cardId": 1
-}
+{ "cardId": 1 }
 ```
 
-**Response:**
-```json
-{
-  "status": true,
-  "message": "Deleted",
-  "data": true
-}
+---
+
+## Webhook System
+
+### Overview
+
+The backend automatically handles webhooks from Paymob at:
 ```
+POST /api/payment/webhook
+```
+
+### Webhook Types
+
+| Event Type | Description | HMAC Method |
+|------------|-------------|-------------|
+| `TRANSACTION` | Payment completed/failed | `BuildTransactionConcat` - specific fields order |
+| `CARD_TOKEN` | Card saved for future use | `BuildTokenConcat` - alphabetically sorted values |
+
+### Webhook Processing Flow
+
+```
+1. Webhook arrives at /api/payment/webhook
+       ↓
+2. Parse payload fields (query + body)
+       ↓
+3. Detect event type:
+   - Has token keys → CARD_TOKEN
+   - Has transaction id → TRANSACTION
+       ↓
+4. Verify HMAC signature with correct method
+       ↓
+5. Process based on type:
+   - TRANSACTION → Update PaymentOrder status
+   - CARD_TOKEN → Save card to UserSavedCard table
+       ↓
+6. Return HTTP 200 OK (always)
+```
+
+### CARD_TOKEN Webhook Processing
+
+When `saveCard: true` and payment succeeds, Paymob sends CARD_TOKEN webhook:
+
+```
+1. Generate unique webhookId for idempotency
+       ↓
+2. Check if already processed (prevent duplicates)
+       ↓
+3. Validate HMAC signature
+       ↓
+4. Extract card token from:
+   - obj.token
+   - obj.saved_card_token
+   - obj.card_token
+   - obj.source_data.token
+       ↓
+5. Extract card details:
+   - Last4: obj.masked_pan or obj.source_data.pan
+   - Brand: obj.card_subtype or obj.source_data.type
+   - Expiry: obj.expiry_month, obj.expiry_year
+       ↓
+6. Resolve userId from:
+   - obj.metadata.user_id
+   - merchant_order_id (uid:xxx pattern)
+   - PaymentOrder lookup by paymobOrderId
+       ↓
+7. Save card to UserSavedCard table
+       ↓
+8. Log to CardTokenWebhookLog table
+```
+
+### Webhook Response Messages
+
+| Message | Meaning |
+|---------|---------|
+| `Ignored (bad signature)` | HMAC verification failed |
+| `Event acknowledged` | Unknown event type |
+| `Transaction Paid` | Payment successful |
+| `Card saved` | Card tokenization successful |
+| `No token - logged` | No card token in payload |
+| `No user - logged` | Could not resolve user ID |
+| `Duplicate - logged` | Card already exists for user |
+| `Already processed: {status}` | Duplicate webhook (idempotency) |
 
 ---
 
@@ -330,10 +418,11 @@ Then open Paymob SDK with the payment key to let user enter card details.
 }
 ```
 
-### Common Error Codes
+### HTTP Status Codes
 
-| HTTP Status | Meaning |
-|-------------|---------|
+| Status | Meaning |
+|--------|---------|
+| 200 | Success |
 | 400 | Bad Request - Invalid input |
 | 401 | Unauthorized - Invalid/expired token |
 | 502 | Bad Gateway - Paymob API error |
@@ -350,19 +439,6 @@ Then open Paymob SDK with the payment key to let user enter card details.
 
 ---
 
-## Webhook Events (Backend Handles Automatically)
-
-The backend automatically handles these webhook events from Paymob:
-
-| Event Type | Description |
-|------------|-------------|
-| `TRANSACTION` | Payment completed/failed - updates order status |
-| `CARD_TOKEN` | Card saved - stores card for future use |
-
-**Note:** Frontend doesn't need to handle webhooks. Just check order status after SDK closes.
-
----
-
 ## Complete Flutter Integration Example
 
 ```dart
@@ -376,7 +452,7 @@ class PaymentService {
 
   PaymentService(this.authToken);
 
-  // Pay with new card
+  /// Pay with new card
   Future<PaymentResult> payWithNewCard({
     required int amountCents,
     required String firstName,
@@ -438,7 +514,7 @@ class PaymentService {
     );
   }
 
-  // Get saved cards
+  /// Get saved cards
   Future<List<SavedCard>> getSavedCards() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/payment/GetListOfCards'),
@@ -453,7 +529,7 @@ class PaymentService {
         .toList();
   }
 
-  // Pay with saved card
+  /// Pay with saved card
   Future<PaymentResult> payWithSavedCard({
     required int cardId,
     required int amountCents,
@@ -476,6 +552,32 @@ class PaymentService {
       message: data['message'],
       orderId: data['data']['merchantOrderId'],
     );
+  }
+
+  /// Set default card
+  Future<bool> setDefaultCard(int cardId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/payment/setDefault_Card'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({'cardId': cardId}),
+    );
+    return jsonDecode(response.body)['status'] ?? false;
+  }
+
+  /// Delete card
+  Future<bool> deleteCard(int cardId) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/payment/delete_Card'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+      body: jsonEncode({'cardId': cardId}),
+    );
+    return jsonDecode(response.body)['status'] ?? false;
   }
 }
 
@@ -524,16 +626,48 @@ class SavedCard {
 | Card Number | Expiry | CVV | Result |
 |-------------|--------|-----|--------|
 | 4987654321098769 | Any future date | 123 | Success |
+| 5123456789012346 | Any future date | 123 | Success (Mastercard) |
 | 4000000000000002 | Any future date | 123 | Declined |
 
 ### Test Flow
 1. Use sandbox credentials in development
 2. Switch to live credentials for production
 3. Always verify payment status after SDK closes
+4. Check saved cards after payment with `saveCard: true`
+
+---
+
+## API Endpoints Summary
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/payment/intention` | Create payment intention |
+| `POST` | `/api/payment/getOrderStatus` | Check payment status |
+| `POST` | `/api/payment/tokenization` | Start card tokenization |
+| `GET` | `/api/payment/GetListOfCards` | Get user's saved cards |
+| `POST` | `/api/payment/setDefault_Card` | Set default card |
+| `DELETE` | `/api/payment/delete_Card` | Delete saved card |
+| `POST` | `/api/payment/payWithSavedCard` | Pay with saved card |
+| `POST` | `/api/payment/webhook` | Paymob webhook endpoint |
+
+---
+
+## Changelog
+
+### v2.0 (2025-12-30)
+- Fixed HMAC verification for CARD_TOKEN webhooks
+- Removed `notification_url` from intention request (uses Paymob dashboard config)
+- Added detailed webhook processing documentation
+- Updated to LIVE mode credentials
+
+### v1.0 (2025-12-25)
+- Initial payment system implementation
+- Intention API, saved cards, tokenization
 
 ---
 
 ## Support
 
-For API issues, contact backend team.
-For Paymob SDK issues, refer to [Paymob Documentation](https://docs.paymob.com).
+- **API Issues:** Contact backend team
+- **Paymob SDK Issues:** [Paymob Documentation](https://docs.paymob.com)
+- **Webhook URL:** `https://voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net/api/payment/webhook`
