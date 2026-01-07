@@ -289,10 +289,23 @@ namespace Voltyks.Application.Services.Auth
                 };
             }
 
-            // 3. Only here if creation succeeded
+            // 3. Generate tokens for the new user
+            var token = await GenerateJwtTokenAsync(user);
+            var refreshToken = Guid.NewGuid().ToString();
+
+            // 4. Store refresh token in Redis
+            await redisService.SetAsync($"refresh_token:{user.Id}", refreshToken, TimeSpan.FromDays(7));
+            await redisService.SetAsync($"refresh_token_reverse:{refreshToken}", user.Id, TimeSpan.FromDays(7));
+
+            // 5. Return success with tokens
             return new ApiResponse<UserRegisterationResultDto>(
-                MapToUserResultDto(user),
-               SuccessfulMessage.UserCreatedSuccessfully
+                new UserRegisterationResultDto
+                {
+                    Email = user.Email,
+                    Token = token,
+                    RefreshToken = refreshToken
+                },
+                SuccessfulMessage.UserCreatedSuccessfully
             );
 
 
@@ -844,19 +857,19 @@ namespace Voltyks.Application.Services.Auth
                         errors: new() { "No current user context and no UserId provided." });
             }
 
-            // Rate limiting: 1 complaint per 2 minutes
+            // Rate limiting: 1 complaint per 6 hours
             var complaintKey = $"complaint_last:{userId}";
             var lastComplaintTime = await redisService.GetAsync(complaintKey);
             if (!string.IsNullOrEmpty(lastComplaintTime))
             {
                 var lastTime = DateTime.Parse(lastComplaintTime);
-                var waitTime = TimeSpan.FromMinutes(2) - (DateTime.UtcNow - lastTime);
+                var waitTime = TimeSpan.FromHours(6) - (DateTime.UtcNow - lastTime);
                 if (waitTime > TimeSpan.Zero)
                 {
                     return new ApiResponse<object>(
-                        $"يمكنك تقديم شكوى جديدة بعد {waitTime.Minutes} دقيقة و {waitTime.Seconds} ثانية",
+                        $"يمكنك تقديم شكوى جديدة بعد {waitTime.Hours} ساعة و {waitTime.Minutes} دقيقة",
                         status: false,
-                        errors: new() { "Rate limit exceeded. Only 1 complaint per 2 minutes allowed." }
+                        errors: new() { "Rate limit exceeded. Only 1 complaint per 6 hours allowed." }
                     );
                 }
             }
@@ -882,7 +895,7 @@ namespace Voltyks.Application.Services.Auth
             await context.SaveChangesAsync(ct);
 
             // Record complaint time for rate limiting
-            await redisService.SetAsync(complaintKey, DateTime.UtcNow.ToString("O"), TimeSpan.FromMinutes(2));
+            await redisService.SetAsync(complaintKey, DateTime.UtcNow.ToString("O"), TimeSpan.FromHours(6));
 
             // ===== Admin SignalR Notification (Real-time) =====
             var user = await userManager.FindByIdAsync(userId);
@@ -950,7 +963,7 @@ namespace Voltyks.Application.Services.Auth
             }
 
             var lastTime = DateTime.Parse(lastComplaintTime);
-            var waitTime = TimeSpan.FromMinutes(2) - (DateTime.UtcNow - lastTime);
+            var waitTime = TimeSpan.FromHours(6) - (DateTime.UtcNow - lastTime);
 
             if (waitTime <= TimeSpan.Zero)
             {
@@ -965,11 +978,11 @@ namespace Voltyks.Application.Services.Auth
                 data: new CanSubmitComplaintDto
                 {
                     CanSubmit = false,
-                    HoursRemaining = 0,
+                    HoursRemaining = (int)waitTime.TotalHours,
                     MinutesRemaining = waitTime.Minutes,
                     SecondsRemaining = waitTime.Seconds
                 },
-                message: $"يمكنك تقديم شكوى جديدة بعد {waitTime.Minutes} دقيقة و {waitTime.Seconds} ثانية",
+                message: $"يمكنك تقديم شكوى جديدة بعد {(int)waitTime.TotalHours} ساعة و {waitTime.Minutes} دقيقة",
                 status: true
             );
         }

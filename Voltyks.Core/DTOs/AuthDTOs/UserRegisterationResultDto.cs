@@ -11,6 +11,10 @@ namespace Voltyks.Core.DTOs.AuthDTOs
     {
         [Required(ErrorMessage = "Email is required")]
         [EmailAddress(ErrorMessage = "Invalid Email Address")]
-        public string Email { get; set; }               
+        public string Email { get; set; }
+
+        public string Token { get; set; }
+
+        public string RefreshToken { get; set; }
     }
 }

@@ -109,7 +109,9 @@
       "Bash(__NEW_LINE__ echo -e \"\\\\n=== Admin Settings \\(api/admin/settings/charging-mode\\) ===\")",
       "Bash(__NEW_LINE__ echo -e \"\\\\n=== Admin Payment ===\")",
       "Bash(__NEW_LINE__ echo \"=== Admin Payment v1 \\(api/v1/admin/payment/card-webhooks\\) ===\")",
-      "Bash(__NEW_LINE__ echo -e \"\\\\n=== Admin Payment Stats ===\")"
+      "Bash(__NEW_LINE__ echo -e \"\\\\n=== Admin Payment Stats ===\")",
+      "Bash(NEW_TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1laWQiOiI2Nzg4NzA5OS00ZDQxLTRiZWEtYTNlOC03MmY1MDJkOWVhM2YiLCJ1bmlxdWVfbmFtZSI6IlRlc3RVc2VyNzRjNzRlYTgiLCJlbWFpbCI6InRlc3R1c2VyM2UzNWQwMjBAZXhhbXBsZS5jb20iLCJEaXNwbGF5TmFtZSI6IiIsIm5iZiI6MTc2NzcwMzc3OCwiZXhwIjoxNzY3NzEyNzc4LCJpYXQiOjE3Njc3MDM3NzgsImlzcyI6Imh0dHBzOi8vdm9sdHlrcy1kcWg2Znpnd2RuZHJkbmc3LmNhbmFkYWNlbnRyYWwtMDEuYXp1cmV3ZWJzaXRlcy5uZXQiLCJhdWQiOiJNeUF1ZGllbmNlIn0.n6KrHZbzUox2JQpvuBIwmQq4fIZ-y-TWL-hlY1ERJb4\")",
+      "Bash(__NEW_LINE__ echo \"=== Regular User \\(NOT Admin\\) ===\")"
     ],
     "deny": [],
     "ask": []
