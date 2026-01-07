@@ -35,12 +35,18 @@ namespace Voltyks.AdminControlDashboard.Services
             return _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
         }
 
-        public async Task<ApiResponse<List<AdminUserDto>>> GetUsersAsync(string? search = null, CancellationToken ct = default)
+        public async Task<ApiResponse<List<AdminUserDto>>> GetUsersAsync(string? search = null, bool includeDeleted = false, CancellationToken ct = default)
         {
             try
             {
                 // DbContext for complex query (same pattern as ProcessesService)
                 var query = _context.Users.AsNoTracking();
+
+                // Filter out deleted users unless includeDeleted is true
+                if (!includeDeleted)
+                {
+                    query = query.Where(u => !u.IsDeleted);
+                }
 
                 if (!string.IsNullOrWhiteSpace(search))
                 {
@@ -62,6 +68,8 @@ namespace Voltyks.AdminControlDashboard.Services
                         IsBanned = u.IsBanned,
                         IsAvailable = u.IsAvailable,
                         Rating = u.Rating,
+                        IsDeleted = u.IsDeleted,
+                        DeletedAt = u.DeletedAt,
                         DateCreated = DateTime.Now // AppUser doesn't have DateCreated, using Now as placeholder
                     })
                     .ToListAsync(ct);
@@ -244,6 +252,161 @@ namespace Voltyks.AdminControlDashboard.Services
             {
                 return new ApiResponse<List<AdminUserReportDto>>(
                     message: "Failed to retrieve reports",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
+
+        public async Task<ApiResponse<object>> SoftDeleteUserAsync(string userId, CancellationToken ct = default)
+        {
+            try
+            {
+                var user = await _context.Users.FindAsync(new object[] { userId }, ct);
+
+                if (user == null)
+                {
+                    return new ApiResponse<object>("User not found", false);
+                }
+
+                // Prevent deleting Admin user
+                if (user.UserName == "Admin")
+                {
+                    return new ApiResponse<object>("Cannot delete Admin user", false);
+                }
+
+                // Prevent deleting yourself
+                var currentUserId = GetCurrentUserId();
+                if (userId == currentUserId)
+                {
+                    return new ApiResponse<object>("Cannot delete yourself", false);
+                }
+
+                user.IsDeleted = true;
+                user.DeletedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync(ct);
+
+                return new ApiResponse<object>(
+                    data: new { userId, isDeleted = true, deletedAt = user.DeletedAt },
+                    message: "User deleted successfully (soft delete)",
+                    status: true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<object>(
+                    message: "Failed to delete user",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
+
+        public async Task<ApiResponse<object>> HardDeleteUserAsync(string userId, CancellationToken ct = default)
+        {
+            try
+            {
+                var user = await _context.Users
+                    .Include(u => u.Chargers)
+                    .Include(u => u.ChargingRequests)
+                    .Include(u => u.DeviceTokens)
+                    .Include(u => u.Notifications)
+                    .Include(u => u.WalletTransactions)
+                    .FirstOrDefaultAsync(u => u.Id == userId, ct);
+
+                if (user == null)
+                {
+                    return new ApiResponse<object>("User not found", false);
+                }
+
+                // Prevent deleting Admin user
+                if (user.UserName == "Admin")
+                {
+                    return new ApiResponse<object>("Cannot delete Admin user", false);
+                }
+
+                // Prevent deleting yourself
+                var currentUserId = GetCurrentUserId();
+                if (userId == currentUserId)
+                {
+                    return new ApiResponse<object>("Cannot delete yourself", false);
+                }
+
+                // Delete related entities first
+                if (user.DeviceTokens?.Any() == true)
+                    _context.Set<Voltyks.Persistence.Entities.Main.DeviceToken>().RemoveRange(user.DeviceTokens);
+
+                if (user.Notifications?.Any() == true)
+                    _context.Set<Voltyks.Persistence.Entities.Main.Notification>().RemoveRange(user.Notifications);
+
+                if (user.WalletTransactions?.Any() == true)
+                    _context.Set<Voltyks.Persistence.Entities.Main.WalletTransaction>().RemoveRange(user.WalletTransactions);
+
+                // Delete vehicles
+                var vehicles = await _context.Set<Voltyks.Persistence.Entities.Main.Vehicle>()
+                    .Where(v => v.UserId == userId)
+                    .ToListAsync(ct);
+                if (vehicles.Any())
+                    _context.Set<Voltyks.Persistence.Entities.Main.Vehicle>().RemoveRange(vehicles);
+
+                // Delete complaints
+                var complaints = await _context.Set<Voltyks.Persistence.Entities.Main.UserGeneralComplaint>()
+                    .Where(c => c.UserId == userId)
+                    .ToListAsync(ct);
+                if (complaints.Any())
+                    _context.Set<Voltyks.Persistence.Entities.Main.UserGeneralComplaint>().RemoveRange(complaints);
+
+                // Delete user reports
+                var reports = await _context.Set<Voltyks.Persistence.Entities.Main.UserReport>()
+                    .Where(r => r.UserId == userId)
+                    .ToListAsync(ct);
+                if (reports.Any())
+                    _context.Set<Voltyks.Persistence.Entities.Main.UserReport>().RemoveRange(reports);
+
+                // Finally delete user
+                _context.Users.Remove(user);
+                await _context.SaveChangesAsync(ct);
+
+                return new ApiResponse<object>(
+                    data: new { userId, permanentlyDeleted = true },
+                    message: "User permanently deleted",
+                    status: true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<object>(
+                    message: "Failed to permanently delete user. User may have related data that prevents deletion.",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
+
+        public async Task<ApiResponse<object>> RestoreUserAsync(string userId, CancellationToken ct = default)
+        {
+            try
+            {
+                var user = await _context.Users.FindAsync(new object[] { userId }, ct);
+
+                if (user == null)
+                {
+                    return new ApiResponse<object>("User not found", false);
+                }
+
+                if (!user.IsDeleted)
+                {
+                    return new ApiResponse<object>("User is not deleted", false);
+                }
+
+                user.IsDeleted = false;
+                user.DeletedAt = null;
+                await _context.SaveChangesAsync(ct);
+
+                return new ApiResponse<object>(
+                    data: new { userId, isDeleted = false, restored = true },
+                    message: "User restored successfully",
+                    status: true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<object>(
+                    message: "Failed to restore user",
                     status: false,
                     errors: new List<string> { ex.Message });
             }

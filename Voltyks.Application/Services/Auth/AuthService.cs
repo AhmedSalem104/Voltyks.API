@@ -163,7 +163,18 @@ namespace Voltyks.Application.Services.Auth
                     Message = ErrorMessages.UserNotFound
                 };
             }
-            // 🚫 جديد: منع دخول المحظورين
+
+            // Check if account is deleted
+            if (user.IsDeleted)
+            {
+                return new ApiResponse<UserLoginResultDto>
+                {
+                    Status = false,
+                    Message = "This account has been deleted. Contact support to restore."
+                };
+            }
+
+            // Check if account is banned
             if (user.IsBanned)
                 return BannedResponse<UserLoginResultDto>();
 
@@ -547,16 +558,21 @@ namespace Voltyks.Application.Services.Auth
             try { normalizedPhone = NormalizePhoneToInternational(phoneNumberDto.PhoneNumber); }
             catch (Exception ex) { return new ApiResponse<List<string>>(ex.Message) { Status = false }; }
 
+            // Check ALL users including deleted ones (IsDeleted = true)
             var existingPhoneUser = await userManager.Users
                 .FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);
 
             if (existingPhoneUser is not null)
             {
-                // 🚫 جديد: لو الحساب محظور
+                // Check if account is deleted
+                if (existingPhoneUser.IsDeleted)
+                    return new ApiResponse<List<string>>("Phone number belongs to a deleted account. Contact support to restore.") { Status = false };
+
+                // Check if account is banned
                 if (existingPhoneUser.IsBanned)
                     return BannedResponse<List<string>>("Phone number belongs to a banned account.");
 
-                // كان عندك قبل كده “موجود”
+                // Phone already exists
                 return new ApiResponse<List<string>>(ErrorMessages.PhoneAlreadyExists) { Status = false };
             }
 
@@ -569,12 +585,17 @@ namespace Voltyks.Application.Services.Auth
             else if (!IsEmail(emailDto.Email))
                 return new ApiResponse<List<string>>(ErrorMessages.InvalidEmailFormat) { Status = false };
 
+            // Check ALL users including deleted ones (IsDeleted = true)
             var existingEmailUser = await userManager.Users
                 .FirstOrDefaultAsync(e => e.Email == emailDto.Email);
 
             if (existingEmailUser is not null)
             {
-                // 🚫 جديد: لو الحساب محظور
+                // Check if account is deleted
+                if (existingEmailUser.IsDeleted)
+                    return new ApiResponse<List<string>>("Email belongs to a deleted account. Contact support to restore.") { Status = false };
+
+                // Check if account is banned
                 if (existingEmailUser.IsBanned)
                     return BannedResponse<List<string>>("Email belongs to a banned account.");
 

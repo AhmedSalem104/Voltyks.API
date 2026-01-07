@@ -10,5 +10,7 @@ namespace Voltyks.AdminControlDashboard.Dtos.Users
         public bool IsAvailable { get; set; }
         public double Rating { get; set; }
         public DateTime DateCreated { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAt { get; set; }
     }
 }

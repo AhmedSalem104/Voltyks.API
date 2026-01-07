@@ -17,14 +17,15 @@ namespace Voltyks.API.Controllers.Admin
         }
 
         /// <summary>
-        /// GET /api/admin/users?search=
+        /// GET /api/admin/users?search=&includeDeleted=false
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetUsers(
             [FromQuery] string? search = null,
+            [FromQuery] bool includeDeleted = false,
             CancellationToken ct = default)
         {
-            var result = await _adminServiceManager.AdminUsersService.GetUsersAsync(search, ct);
+            var result = await _adminServiceManager.AdminUsersService.GetUsersAsync(search, includeDeleted, ct);
             return Ok(result);
         }
 
@@ -85,6 +86,42 @@ namespace Voltyks.API.Controllers.Admin
             CancellationToken ct = default)
         {
             var result = await _adminServiceManager.AdminUsersService.GetUserReportsAsync(id, ct);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// DELETE /api/admin/users/{id} - Soft delete user (marks as deleted but keeps in DB)
+        /// </summary>
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> SoftDeleteUser(
+            string id,
+            CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminUsersService.SoftDeleteUserAsync(id, ct);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// DELETE /api/admin/users/{id}/permanent - Hard delete user (permanently removes from DB)
+        /// </summary>
+        [HttpDelete("{id}/permanent")]
+        public async Task<IActionResult> HardDeleteUser(
+            string id,
+            CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminUsersService.HardDeleteUserAsync(id, ct);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// PATCH /api/admin/users/{id}/restore - Restore a soft-deleted user
+        /// </summary>
+        [HttpPatch("{id}/restore")]
+        public async Task<IActionResult> RestoreUser(
+            string id,
+            CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminUsersService.RestoreUserAsync(id, ct);
             return Ok(result);
         }
     }
