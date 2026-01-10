@@ -11,6 +11,7 @@ namespace Voltyks.Application.Interfaces.Paymob
     using Voltyks.Core.DTOs;
     using Voltyks.Core.DTOs.ChargerRequest;
     using Voltyks.Core.DTOs.Paymob.AddtionDTOs;
+    using Voltyks.Core.DTOs.Paymob.ApplePay;
     using Voltyks.Core.DTOs.Paymob.CardsDTOs;
     using Voltyks.Core.DTOs.Paymob.Generic_Result_DTOs;
     using Voltyks.Core.DTOs.Paymob.Input_DTOs;
@@ -52,6 +53,14 @@ namespace Voltyks.Application.Interfaces.Paymob
         Task<ApiResponse<CardTokenWebhookLogDetailDto?>> GetCardWebhookDetailAsync(int id);
         Task<ApiResponse<CardTokenWebhookStatsDto>> GetCardWebhookStatsAsync();
 
+        // === Apple Pay Server-to-Server ===
+        /// <summary>
+        /// Process Apple Pay token directly from mobile app (Server-to-Server flow)
+        /// </summary>
+        /// <param name="request">Apple Pay request containing token from iOS PKPayment</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Apple Pay processing result with transaction details</returns>
+        Task<ApiResponse<ApplePayProcessResponse>> ProcessApplePayAsync(ApplePayDirectRequest request, CancellationToken ct = default);
 
     }
 

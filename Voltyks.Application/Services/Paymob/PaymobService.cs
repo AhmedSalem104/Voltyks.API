@@ -20,6 +20,7 @@ using System.Text.Json;
 using System.Text;
 using System.Net;
 using Voltyks.Core.DTOs.Paymob.CardsDTOs;
+using Voltyks.Core.DTOs.Paymob.ApplePay;
 using Twilio.TwiML.Messaging;
 using Voltyks.Core.DTOs.Paymob.intention;
 using System.Text.Json.Serialization;
@@ -2270,7 +2271,317 @@ namespace Voltyks.Application.Services.Paymob
 
         #endregion
 
+        #region Apple Pay Server-to-Server
 
+        /// <summary>
+        /// Process Apple Pay token directly from mobile app (Server-to-Server flow)
+        /// Flow: Create Order → Create Payment Key → Send Apple Pay Token to Paymob → Return Result
+        /// </summary>
+        public async Task<ApiResponse<ApplePayProcessResponse>> ProcessApplePayAsync(ApplePayDirectRequest request, CancellationToken ct = default)
+        {
+            var response = new ApplePayProcessResponse
+            {
+                AmountCents = request.AmountCents,
+                Currency = request.Currency,
+                ProcessedAt = GetEgyptTime()
+            };
+
+            try
+            {
+                // 1. Validate input
+                if (string.IsNullOrWhiteSpace(request.ApplePayToken))
+                {
+                    _log?.LogWarning("Apple Pay: Empty token received");
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = "EMPTY_TOKEN";
+                    response.ErrorMessage = "Apple Pay token is required";
+                    return new ApiResponse<ApplePayProcessResponse>(response, "Apple Pay token is required", false);
+                }
+
+                if (request.AmountCents < 100)
+                {
+                    _log?.LogWarning("Apple Pay: Invalid amount {Amount}", request.AmountCents);
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = "INVALID_AMOUNT";
+                    response.ErrorMessage = "Amount must be at least 100 cents";
+                    return new ApiResponse<ApplePayProcessResponse>(response, "Invalid amount", false);
+                }
+
+                _log?.LogInformation("Apple Pay: Starting payment processing for {Amount} cents", request.AmountCents);
+
+                // 2. Get Paymob auth token
+                var authToken = await _tokenProvider.GetAsync();
+                if (string.IsNullOrWhiteSpace(authToken))
+                {
+                    _log?.LogError("Apple Pay: Failed to get Paymob auth token");
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = "AUTH_FAILED";
+                    response.ErrorMessage = "Failed to authenticate with payment provider";
+                    return new ApiResponse<ApplePayProcessResponse>(response, "Authentication failed", false);
+                }
+
+                // 3. Generate merchant order ID and create DB order
+                var merchantOrderId = Guid.NewGuid().ToString("N");
+                var currency = request.Currency ?? "EGP";
+                response.MerchantOrderId = merchantOrderId;
+
+                using (await AcquireLockAsync(merchantOrderId))
+                {
+                    var upsertResult = await UpsertOrderAsync(merchantOrderId, request.AmountCents, currency);
+                    if (!upsertResult.Status || upsertResult.Data == null)
+                    {
+                        _log?.LogError("Apple Pay: Failed to create order in DB");
+                        response.Success = false;
+                        response.Status = "Failed";
+                        response.ErrorCode = "ORDER_CREATION_FAILED";
+                        response.ErrorMessage = "Failed to create payment order";
+                        return new ApiResponse<ApplePayProcessResponse>(response, "Order creation failed", false);
+                    }
+
+                    // 4. Create Paymob Order
+                    var paymobOrderId = await GetOrCreatePaymobOrderIdAsync(merchantOrderId, request.AmountCents, currency);
+                    if (paymobOrderId <= 0)
+                    {
+                        _log?.LogError("Apple Pay: Failed to create Paymob order");
+                        response.Success = false;
+                        response.Status = "Failed";
+                        response.ErrorCode = "PAYMOB_ORDER_FAILED";
+                        response.ErrorMessage = "Failed to create payment order with provider";
+                        return new ApiResponse<ApplePayProcessResponse>(response, "Paymob order creation failed", false);
+                    }
+                    response.PaymobOrderId = paymobOrderId;
+
+                    _log?.LogInformation("Apple Pay: Created Paymob order {OrderId}", paymobOrderId);
+
+                    // 5. Create Payment Key with Apple Pay integration
+                    var billing = new BillingData(
+                        first_name: request.BillingData.first_name ?? "NA",
+                        last_name: request.BillingData.last_name ?? "NA",
+                        email: request.BillingData.email ?? "na@example.com",
+                        phone_number: request.BillingData.phone_number ?? "00000000000",
+                        apartment: "NA", floor: "NA", building: "NA", street: "NA",
+                        city: "Cairo", state: "NA", country: "EG", postal_code: "NA"
+                    );
+
+                    var paymentKey = await GetOrCreatePaymentKeyAsync(
+                        upsertResult.Data,
+                        request.AmountCents,
+                        currency,
+                        billing,
+                        _opt.Integration.ApplePay, // Use Apple Pay integration ID
+                        3600, // 1 hour expiry
+                        tokenize: false
+                    );
+
+                    if (string.IsNullOrWhiteSpace(paymentKey))
+                    {
+                        _log?.LogError("Apple Pay: Failed to create payment key");
+                        response.Success = false;
+                        response.Status = "Failed";
+                        response.ErrorCode = "PAYMENT_KEY_FAILED";
+                        response.ErrorMessage = "Failed to create payment key";
+                        return new ApiResponse<ApplePayProcessResponse>(response, "Payment key creation failed", false);
+                    }
+
+                    _log?.LogInformation("Apple Pay: Created payment key for order {OrderId}", paymobOrderId);
+
+                    // 6. Process Apple Pay token with Paymob
+                    var applePayResult = await SendApplePayTokenToPaymobAsync(paymentKey, request.ApplePayToken, ct);
+
+                    if (!applePayResult.Status || applePayResult.Data == null)
+                    {
+                        _log?.LogError("Apple Pay: Paymob rejected the token - {Message}", applePayResult.Message);
+                        response.Success = false;
+                        response.Status = "Failed";
+                        response.ErrorCode = "PAYMOB_REJECTED";
+                        response.ErrorMessage = applePayResult.Message ?? "Payment provider rejected the transaction";
+
+                        // Record failed transaction
+                        await AddTransactionAsync(merchantOrderId, paymobOrderId, request.AmountCents, currency, "ApplePay", "Failed", false);
+
+                        return new ApiResponse<ApplePayProcessResponse>(response, applePayResult.Message ?? "Apple Pay failed", false);
+                    }
+
+                    // 7. Parse Paymob response
+                    var paymobResponse = applePayResult.Data;
+                    response.TransactionId = paymobResponse.TransactionId;
+                    response.Success = paymobResponse.Success;
+                    response.Status = paymobResponse.Success ? "Paid" : (paymobResponse.IsPending ? "Pending" : "Failed");
+                    response.IsPending = paymobResponse.IsPending;
+                    response.Message = paymobResponse.Success ? "Payment successful" : paymobResponse.Message;
+
+                    // 8. Record transaction in DB
+                    var txStatus = response.Success ? "Paid" : (response.IsPending ? "Pending" : "Failed");
+                    await AddTransactionAsync(merchantOrderId, paymobOrderId, request.AmountCents, currency, "ApplePay", txStatus, response.Success);
+
+                    _log?.LogInformation("Apple Pay: Transaction completed - Status: {Status}, TxId: {TxId}",
+                        txStatus, response.TransactionId);
+
+                    return new ApiResponse<ApplePayProcessResponse>(response, response.Message, response.Success);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError(ex, "Apple Pay: Unexpected error during payment processing");
+                response.Success = false;
+                response.Status = "Failed";
+                response.ErrorCode = "INTERNAL_ERROR";
+                response.ErrorMessage = "An unexpected error occurred";
+                return new ApiResponse<ApplePayProcessResponse>(response, "Internal error", false)
+                {
+                    Errors = new List<string> { ex.Message }
+                };
+            }
+        }
+
+        /// <summary>
+        /// Send Apple Pay token to Paymob for processing
+        /// Paymob API: POST /api/acceptance/payments/pay
+        /// </summary>
+        private async Task<ApiResponse<ApplePayProcessResponse>> SendApplePayTokenToPaymobAsync(
+            string paymentKey,
+            string applePayToken,
+            CancellationToken ct = default)
+        {
+            var response = new ApplePayProcessResponse();
+
+            try
+            {
+                // Paymob Apple Pay endpoint
+                var url = $"{_opt.ApiBase.TrimEnd('/')}/api/acceptance/payments/pay";
+
+                // Build request payload
+                // According to Paymob docs, Apple Pay token should be sent as-is
+                var payload = new
+                {
+                    source = new
+                    {
+                        identifier = applePayToken,
+                        subtype = "APPLE_PAY"
+                    },
+                    payment_token = paymentKey
+                };
+
+                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                });
+
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+                httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                _log?.LogInformation("Apple Pay: Sending token to Paymob - URL: {Url}", url);
+
+                var httpResponse = await _http.SendAsync(httpRequest, ct);
+                var responseBody = await httpResponse.Content.ReadAsStringAsync(ct);
+
+                _log?.LogInformation("Apple Pay: Paymob response status {Status}, body length: {Length}",
+                    httpResponse.StatusCode, responseBody.Length);
+
+                if (!httpResponse.IsSuccessStatusCode)
+                {
+                    _log?.LogError("Apple Pay: Paymob API error - Status: {Status}, Body: {Body}",
+                        httpResponse.StatusCode, responseBody);
+
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = $"HTTP_{(int)httpResponse.StatusCode}";
+                    response.ErrorMessage = $"Paymob API error: {httpResponse.StatusCode}";
+
+                    // Try to parse error message from response
+                    try
+                    {
+                        using var errorDoc = JsonDocument.Parse(responseBody);
+                        if (errorDoc.RootElement.TryGetProperty("message", out var msgEl))
+                        {
+                            response.ErrorMessage = msgEl.GetString() ?? response.ErrorMessage;
+                        }
+                        else if (errorDoc.RootElement.TryGetProperty("detail", out var detailEl))
+                        {
+                            response.ErrorMessage = detailEl.GetString() ?? response.ErrorMessage;
+                        }
+                    }
+                    catch { /* Ignore parsing errors */ }
+
+                    return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
+                }
+
+                // Parse successful response
+                using var doc = JsonDocument.Parse(responseBody);
+                var root = doc.RootElement;
+
+                // Extract transaction details
+                if (root.TryGetProperty("id", out var idEl))
+                {
+                    response.TransactionId = idEl.GetInt64().ToString();
+                }
+
+                if (root.TryGetProperty("success", out var successEl))
+                {
+                    response.Success = successEl.GetBoolean();
+                }
+
+                if (root.TryGetProperty("pending", out var pendingEl))
+                {
+                    response.IsPending = pendingEl.GetBoolean();
+                }
+
+                if (root.TryGetProperty("data", out var dataEl) && dataEl.TryGetProperty("message", out var dataMsgEl))
+                {
+                    response.Message = dataMsgEl.GetString();
+                }
+
+                // Check for error in response
+                if (root.TryGetProperty("txn_response_code", out var txnCodeEl))
+                {
+                    var code = txnCodeEl.GetString();
+                    if (!string.IsNullOrEmpty(code) && code != "APPROVED")
+                    {
+                        response.Success = false;
+                        response.ErrorCode = code;
+                    }
+                }
+
+                response.Status = response.Success ? "Paid" : (response.IsPending ? "Pending" : "Failed");
+                response.ProcessedAt = GetEgyptTime();
+
+                return new ApiResponse<ApplePayProcessResponse>(response,
+                    response.Success ? "Payment successful" : "Payment failed",
+                    response.Success);
+            }
+            catch (HttpRequestException ex)
+            {
+                _log?.LogError(ex, "Apple Pay: HTTP error communicating with Paymob");
+                response.Success = false;
+                response.Status = "Failed";
+                response.ErrorCode = "NETWORK_ERROR";
+                response.ErrorMessage = "Network error communicating with payment provider";
+                return new ApiResponse<ApplePayProcessResponse>(response, "Network error", false);
+            }
+            catch (JsonException ex)
+            {
+                _log?.LogError(ex, "Apple Pay: Failed to parse Paymob response");
+                response.Success = false;
+                response.Status = "Failed";
+                response.ErrorCode = "PARSE_ERROR";
+                response.ErrorMessage = "Failed to parse payment provider response";
+                return new ApiResponse<ApplePayProcessResponse>(response, "Parse error", false);
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError(ex, "Apple Pay: Unexpected error sending token to Paymob");
+                response.Success = false;
+                response.Status = "Failed";
+                response.ErrorCode = "INTERNAL_ERROR";
+                response.ErrorMessage = "Internal error processing payment";
+                return new ApiResponse<ApplePayProcessResponse>(response, "Internal error", false);
+            }
+        }
+
+        #endregion
 
 
     }

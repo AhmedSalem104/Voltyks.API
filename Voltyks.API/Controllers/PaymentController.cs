@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.Paymob.AddtionDTOs;
+using Voltyks.Core.DTOs.Paymob.ApplePay;
 using Voltyks.Core.DTOs.Paymob.CardsDTOs;
 using Voltyks.Core.DTOs.Paymob.Core_API_DTOs;
 using Voltyks.Core.DTOs.Paymob.intention;
@@ -111,9 +112,14 @@ namespace Voltyks.API.Controllers
             if (req.AmountCents <= 0)
                 return BadRequest("Invalid amount/currency");
 
-            // Normalize
-            var method = req.PaymentMethod?.Trim();
-            method = string.Equals(method, "Wallet", StringComparison.OrdinalIgnoreCase) ? "Wallet" : "Card";
+            // Normalize payment method - now supports Card, Wallet, and ApplePay
+            var method = req.PaymentMethod?.Trim()?.ToLowerInvariant() switch
+            {
+                "wallet" => "Wallet",
+                "applepay" => "ApplePay",
+                "apple_pay" => "ApplePay",
+                _ => "Card"
+            };
 
             var dto = new CreateIntentRequest(
                 amount: req.AmountCents,
@@ -187,7 +193,44 @@ namespace Voltyks.API.Controllers
         }
 
 
+        // ===================== Apple Pay Server-to-Server =====================
 
+        /// <summary>
+        /// Process Apple Pay payment directly (Server-to-Server)
+        /// Mobile app sends the Apple Pay token from PKPayment.token.paymentData
+        /// </summary>
+        /// <param name="req">Apple Pay request with token and billing data</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Payment result with transaction details</returns>
+        [HttpPost("applepay/process")]
+        [ProducesResponseType(typeof(ApiResponse<ApplePayProcessResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<ApplePayProcessResponse>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ApiResponse<ApplePayProcessResponse>>> ProcessApplePay(
+            [FromBody] ApplePayDirectRequest req,
+            CancellationToken ct = default)
+        {
+            // Validate model
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
+
+                return BadRequest(new ApiResponse<ApplePayProcessResponse>(
+                    message: "Invalid request",
+                    status: false,
+                    errors: errors
+                ));
+            }
+
+            var result = await _svc.ProcessApplePayAsync(req, ct);
+
+            if (!result.Status)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
 
     }
 }
