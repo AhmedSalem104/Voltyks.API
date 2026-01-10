@@ -32,5 +32,11 @@ namespace Voltyks.Core.DTOs.Paymob.ApplePay
         /// Optional currency (defaults to EGP)
         /// </summary>
         public string Currency { get; set; } = "EGP";
+
+        /// <summary>
+        /// Idempotency key to prevent duplicate charges (recommended: use unique transaction ID from client).
+        /// If not provided, server generates from MerchantOrderId.
+        /// </summary>
+        public string? IdempotencyKey { get; set; }
     }
 }

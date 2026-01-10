@@ -62,6 +62,14 @@ namespace Voltyks.Application.Interfaces.Paymob
         /// <returns>Apple Pay processing result with transaction details</returns>
         Task<ApiResponse<ApplePayProcessResponse>> ProcessApplePayAsync(ApplePayDirectRequest request, CancellationToken ct = default);
 
+        /// <summary>
+        /// Verify Apple Pay payment status by merchant order ID
+        /// </summary>
+        /// <param name="merchantOrderId">The merchant order ID from the original payment request</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Current payment status</returns>
+        Task<ApiResponse<ApplePayVerifyResponse>> VerifyApplePayAsync(string merchantOrderId, CancellationToken ct = default);
+
     }
 
 

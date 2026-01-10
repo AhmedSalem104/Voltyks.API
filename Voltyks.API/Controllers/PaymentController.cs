@@ -232,5 +232,24 @@ namespace Voltyks.API.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Verify Apple Pay payment status by merchant order ID
+        /// </summary>
+        /// <param name="req">Request containing the merchant order ID</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Current payment status</returns>
+        [HttpPost("applepay/verify")]
+        [ProducesResponseType(typeof(ApiResponse<ApplePayVerifyResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<ApplePayVerifyResponse>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponse<ApplePayVerifyResponse>>> VerifyApplePay(
+            [FromBody] ApplePayVerifyRequest req,
+            CancellationToken ct = default)
+        {
+            var result = await _svc.VerifyApplePayAsync(req.MerchantOrderId, ct);
+            if (!result.Status)
+                return NotFound(result);
+            return Ok(result);
+        }
+
     }
 }

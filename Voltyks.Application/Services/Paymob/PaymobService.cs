@@ -30,6 +30,7 @@ using Voltyks.Persistence.Entities.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Data.SqlClient;
+using Voltyks.Application.Interfaces.Redis;
 
 
 namespace Voltyks.Application.Services.Paymob
@@ -43,7 +44,8 @@ namespace Voltyks.Application.Services.Paymob
         private readonly IPaymobAuthTokenProvider _tokenProvider;
         private readonly IHttpContextAccessor _httpContext;
         private readonly IHttpClientFactory _httpFactory;
-        private readonly UserManager<AppUser> _userManager; // 👈 ده اللي ناقصك
+        private readonly UserManager<AppUser> _userManager;
+        private readonly IRedisService _redisService;
 
 
         private IGenericRepository<PaymentOrder, int> OrdersRepo => _uow.GetRepository<PaymentOrder, int>();
@@ -57,7 +59,7 @@ namespace Voltyks.Application.Services.Paymob
         private IGenericRepository<UserSavedCard, int> SavedCards => _uow.GetRepository<UserSavedCard, int>();
         private IGenericRepository<CardTokenWebhookLog, int> CardTokenWebhookLogs => _uow.GetRepository<CardTokenWebhookLog, int>();
 
-        public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext, IHttpClientFactory httpFactory , UserManager<AppUser> userManager)
+        public PaymobService(HttpClient http, IOptions<PaymobOptions> opt, IUnitOfWork uow, ILogger<PaymobService> log, IPaymobAuthTokenProvider tokenProvider, IHttpContextAccessor httpContext, IHttpClientFactory httpFactory, UserManager<AppUser> userManager, IRedisService redisService)
         {
             _http = http;
             _opt = opt.Value;
@@ -67,7 +69,7 @@ namespace Voltyks.Application.Services.Paymob
             _httpContext = httpContext;
             _httpFactory = httpFactory;
             _userManager = userManager;
-
+            _redisService = redisService;
         }
         public async Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req)
         {
@@ -2311,7 +2313,30 @@ namespace Voltyks.Application.Services.Paymob
 
                 _log?.LogInformation("Apple Pay: Starting payment processing for {Amount} cents", request.AmountCents);
 
-                // 2. Get Paymob auth token
+                // 2. Generate stable merchant order ID first (needed for idempotency)
+                var merchantOrderId = Guid.NewGuid().ToString("N");
+                var currency = request.Currency ?? "EGP";
+                response.MerchantOrderId = merchantOrderId;
+
+                // 3. Idempotency check - prefer client-provided key, fallback to stable merchantOrderId
+                var idempotencyKey = !string.IsNullOrWhiteSpace(request.IdempotencyKey)
+                    ? request.IdempotencyKey
+                    : $"applepay:{merchantOrderId}";
+                var redisKey = $"applepay_idempotency:{idempotencyKey}";
+
+                var existingResult = await _redisService.GetAsync(redisKey);
+                if (!string.IsNullOrEmpty(existingResult))
+                {
+                    _log?.LogWarning("Apple Pay: Duplicate request detected for idempotency key (key masked)");
+                    try
+                    {
+                        var cached = JsonSerializer.Deserialize<ApiResponse<ApplePayProcessResponse>>(existingResult);
+                        if (cached != null) return cached;
+                    }
+                    catch { /* Continue if deserialization fails */ }
+                }
+
+                // 4. Get Paymob auth token
                 var authToken = await _tokenProvider.GetAsync();
                 if (string.IsNullOrWhiteSpace(authToken))
                 {
@@ -2323,11 +2348,7 @@ namespace Voltyks.Application.Services.Paymob
                     return new ApiResponse<ApplePayProcessResponse>(response, "Authentication failed", false);
                 }
 
-                // 3. Generate merchant order ID and create DB order
-                var merchantOrderId = Guid.NewGuid().ToString("N");
-                var currency = request.Currency ?? "EGP";
-                response.MerchantOrderId = merchantOrderId;
-
+                // 5. Create DB order with already-generated merchantOrderId
                 using (await AcquireLockAsync(merchantOrderId))
                 {
                     var upsertResult = await UpsertOrderAsync(merchantOrderId, request.AmountCents, currency);
@@ -2341,7 +2362,7 @@ namespace Voltyks.Application.Services.Paymob
                         return new ApiResponse<ApplePayProcessResponse>(response, "Order creation failed", false);
                     }
 
-                    // 4. Create Paymob Order
+                    // 6. Create Paymob Order
                     var paymobOrderId = await GetOrCreatePaymobOrderIdAsync(merchantOrderId, request.AmountCents, currency);
                     if (paymobOrderId <= 0)
                     {
@@ -2356,7 +2377,7 @@ namespace Voltyks.Application.Services.Paymob
 
                     _log?.LogInformation("Apple Pay: Created Paymob order {OrderId}", paymobOrderId);
 
-                    // 5. Create Payment Key with Apple Pay integration
+                    // 7. Create Payment Key with Apple Pay integration
                     var billing = new BillingData(
                         first_name: request.BillingData.first_name ?? "NA",
                         last_name: request.BillingData.last_name ?? "NA",
@@ -2388,7 +2409,7 @@ namespace Voltyks.Application.Services.Paymob
 
                     _log?.LogInformation("Apple Pay: Created payment key for order {OrderId}", paymobOrderId);
 
-                    // 6. Process Apple Pay token with Paymob
+                    // 8. Process Apple Pay token with Paymob (SECURITY: Never log applePayToken)
                     var applePayResult = await SendApplePayTokenToPaymobAsync(paymentKey, request.ApplePayToken, ct);
 
                     if (!applePayResult.Status || applePayResult.Data == null)
@@ -2405,22 +2426,44 @@ namespace Voltyks.Application.Services.Paymob
                         return new ApiResponse<ApplePayProcessResponse>(response, applePayResult.Message ?? "Apple Pay failed", false);
                     }
 
-                    // 7. Parse Paymob response
+                    // 9. Parse Paymob response - only mark Paid if confirmed (success=true AND pending=false)
                     var paymobResponse = applePayResult.Data;
                     response.TransactionId = paymobResponse.TransactionId;
-                    response.Success = paymobResponse.Success;
-                    response.Status = paymobResponse.Success ? "Paid" : (paymobResponse.IsPending ? "Pending" : "Failed");
-                    response.IsPending = paymobResponse.IsPending;
-                    response.Message = paymobResponse.Success ? "Payment successful" : paymobResponse.Message;
 
-                    // 8. Record transaction in DB
-                    var txStatus = response.Success ? "Paid" : (response.IsPending ? "Pending" : "Failed");
-                    await AddTransactionAsync(merchantOrderId, paymobOrderId, request.AmountCents, currency, "ApplePay", txStatus, response.Success);
+                    var isConfirmedPaid = paymobResponse.Success && !paymobResponse.IsPending;
+                    var isFailed = !paymobResponse.Success && !paymobResponse.IsPending;
+
+                    response.Success = isConfirmedPaid;
+                    response.IsPending = !isConfirmedPaid && !isFailed;
+                    response.Status = isConfirmedPaid ? "Paid"
+                                    : isFailed ? "Failed"
+                                    : "Pending";
+                    response.Message = isConfirmedPaid
+                        ? "Payment successful"
+                        : isFailed
+                            ? (paymobResponse.Message ?? "Payment failed")
+                            : "Payment initiated - awaiting confirmation";
+
+                    // 10. Record transaction in DB (Paid only if confirmed)
+                    var txStatus = response.Status;
+                    await AddTransactionAsync(merchantOrderId, paymobOrderId, request.AmountCents, currency, "ApplePay", txStatus, isConfirmedPaid);
 
                     _log?.LogInformation("Apple Pay: Transaction completed - Status: {Status}, TxId: {TxId}",
                         txStatus, response.TransactionId);
 
-                    return new ApiResponse<ApplePayProcessResponse>(response, response.Message, response.Success);
+                    // 11. Cache result for idempotency (15 min TTL)
+                    var result = new ApiResponse<ApplePayProcessResponse>(response, response.Message, isConfirmedPaid || response.IsPending);
+                    try
+                    {
+                        var cacheJson = JsonSerializer.Serialize(result);
+                        await _redisService.SetAsync(redisKey, cacheJson, TimeSpan.FromMinutes(15));
+                    }
+                    catch (Exception cacheEx)
+                    {
+                        _log?.LogWarning(cacheEx, "Apple Pay: Failed to cache result for idempotency");
+                    }
+
+                    return result;
                 }
             }
             catch (Exception ex)
@@ -2440,6 +2483,7 @@ namespace Voltyks.Application.Services.Paymob
         /// <summary>
         /// Send Apple Pay token to Paymob for processing
         /// Paymob API: POST /api/acceptance/payments/pay
+        /// SECURITY: Never log the applePayToken - it contains sensitive payment data
         /// </summary>
         private async Task<ApiResponse<ApplePayProcessResponse>> SendApplePayTokenToPaymobAsync(
             string paymentKey,
@@ -2465,15 +2509,14 @@ namespace Voltyks.Application.Services.Paymob
                     payment_token = paymentKey
                 };
 
-                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                });
+                // No naming policy - keeps property names as-is (snake_case for Paymob)
+                var json = JsonSerializer.Serialize(payload);
 
                 using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
                 httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                _log?.LogInformation("Apple Pay: Sending token to Paymob - URL: {Url}", url);
+                // SECURITY: Only log URL, never log applePayToken or payload contents
+                _log?.LogInformation("Apple Pay: Sending request to Paymob - URL: {Url}", url);
 
                 var httpResponse = await _http.SendAsync(httpRequest, ct);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync(ct);
@@ -2578,6 +2621,59 @@ namespace Voltyks.Application.Services.Paymob
                 response.ErrorCode = "INTERNAL_ERROR";
                 response.ErrorMessage = "Internal error processing payment";
                 return new ApiResponse<ApplePayProcessResponse>(response, "Internal error", false);
+            }
+        }
+
+        /// <summary>
+        /// Verify Apple Pay payment status by merchant order ID
+        /// </summary>
+        public async Task<ApiResponse<ApplePayVerifyResponse>> VerifyApplePayAsync(string merchantOrderId, CancellationToken ct = default)
+        {
+            var response = new ApplePayVerifyResponse { MerchantOrderId = merchantOrderId };
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(merchantOrderId))
+                {
+                    return new ApiResponse<ApplePayVerifyResponse>(response, "Merchant order ID is required", false);
+                }
+
+                // Get order from DB
+                var order = await PaymentOrders.GetFirstOrDefaultAsync(o => o.MerchantOrderId == merchantOrderId);
+                if (order == null)
+                {
+                    _log?.LogWarning("Apple Pay Verify: Order not found for merchantOrderId {OrderId}", merchantOrderId);
+                    return new ApiResponse<ApplePayVerifyResponse>(response, "Order not found", false);
+                }
+
+                response.PaymobOrderId = order.PaymobOrderId;
+                response.AmountCents = order.AmountCents;
+                response.Currency = order.Currency ?? "EGP";
+                response.Status = order.Status ?? "Unknown";
+                response.IsPaid = order.Status == "Paid";
+                response.IsPending = order.Status == "Pending";
+
+                // Get latest transaction
+                var tx = await PaymentTransactions.GetFirstOrDefaultAsync(t => t.MerchantOrderId == merchantOrderId);
+                if (tx != null)
+                {
+                    response.TransactionId = tx.PaymobTransactionId?.ToString();
+                    response.PaidAt = tx.Status == "Paid" ? tx.UpdatedAt : null;
+                    response.FailureReason = tx.Status == "Failed" ? tx.GatewayResponseMessage : null;
+                }
+
+                _log?.LogInformation("Apple Pay Verify: Status={Status}, IsPaid={IsPaid}, IsPending={IsPending} for merchantOrderId {OrderId}",
+                    response.Status, response.IsPaid, response.IsPending, merchantOrderId);
+
+                return new ApiResponse<ApplePayVerifyResponse>(response, "Success", true);
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError(ex, "Apple Pay Verify: Error verifying payment status for merchantOrderId {OrderId}", merchantOrderId);
+                return new ApiResponse<ApplePayVerifyResponse>(response, "Error verifying payment status", false)
+                {
+                    Errors = new List<string> { ex.Message }
+                };
             }
         }
 
