@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Voltyks.Application.Interfaces.Paymob;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.Paymob.AddtionDTOs;
@@ -7,6 +8,7 @@ using Voltyks.Core.DTOs.Paymob.ApplePay;
 using Voltyks.Core.DTOs.Paymob.CardsDTOs;
 using Voltyks.Core.DTOs.Paymob.Core_API_DTOs;
 using Voltyks.Core.DTOs.Paymob.intention;
+using Voltyks.Core.DTOs.Paymob.Options;
 
 
 namespace Voltyks.API.Controllers
@@ -17,7 +19,18 @@ namespace Voltyks.API.Controllers
     public class PaymentController : ControllerBase
     {
         private readonly IPaymobService _svc;
-        public PaymentController(IPaymobService svc) => _svc = svc;
+        private readonly IHostEnvironment _env;
+        private readonly PaymobOptions _opt;
+
+        public PaymentController(
+            IPaymobService svc,
+            IHostEnvironment env,
+            IOptions<PaymobOptions> opt)
+        {
+            _svc = svc;
+            _env = env;
+            _opt = opt.Value;
+        }
 
 
         //[HttpPost("checkout/card")]
@@ -103,6 +116,45 @@ namespace Voltyks.API.Controllers
 
             var res = await _svc.HandleWebhookAsync(Request, raw);
             return Ok(res); // مهم: 200 دائمًا لويبهوك بايموب
+        }
+
+        /// <summary>
+        /// Test endpoint for webhook simulation (Development/Staging ONLY)
+        /// Requires X-Webhook-Test-Key header with valid API key
+        /// </summary>
+        [HttpPost("webhook/test")]
+        [AllowAnonymous]
+        [RequestSizeLimit(1_048_576)]
+        [ApiExplorerSettings(IgnoreApi = true)] // Hide from Swagger in production
+        public async Task<IActionResult> WebhookTest()
+        {
+            // Double protection: Environment check + API Key
+            // 1) Environment check - only allow in Development or Staging
+            var isAllowedEnv = _env.IsDevelopment() ||
+                               _env.EnvironmentName.Equals("Staging", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAllowedEnv)
+            {
+                return NotFound(); // Return 404 in Production (hide endpoint existence)
+            }
+
+            // 2) API Key check - require X-Webhook-Test-Key header
+            var testKey = Request.Headers["X-Webhook-Test-Key"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(testKey) ||
+                string.IsNullOrWhiteSpace(_opt.WebhookTestKey) ||
+                !testKey.Equals(_opt.WebhookTestKey, StringComparison.Ordinal))
+            {
+                return NotFound(); // Return 404 for invalid key (hide endpoint existence)
+            }
+
+            // Process webhook with HMAC verification skipped
+            Request.EnableBuffering();
+            using var reader = new StreamReader(Request.Body);
+            var raw = await reader.ReadToEndAsync();
+            Request.Body.Position = 0;
+
+            var res = await _svc.HandleWebhookAsync(Request, raw, skipHmac: true);
+            return Ok(res);
         }
 
 
