@@ -392,12 +392,12 @@ namespace Voltyks.Application.Services.Paymob
                 using var req = new HttpRequestMessage(HttpMethod.Post, baseUrl);
                 req.Headers.Accept.ParseAdd("application/json");
                 req.Headers.TryAddWithoutValidation("Authorization", $"Token {secretKey}");
+                // No CamelCase policy - preserve snake_case property names for Paymob
                 req.Content = new StringContent(
                     JsonSerializer.Serialize(
                         body,
                         new JsonSerializerOptions
                         {
-                            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
                         }),
                     Encoding.UTF8, "application/json"
@@ -690,11 +690,58 @@ namespace Voltyks.Application.Services.Paymob
 
             if (hasCardTokenKeys) eventType = "CARD_TOKEN";
 
-            // --------- 2) verify HMAC with correct event type ----------
-            if (!VerifyWebhookSignature(req, rawBody, eventType))
+            // --------- 1.5) LOG ALL INCOMING WEBHOOKS (before HMAC) ----------
+            var merchantOrderId = FirstValue(fields, "obj.order.merchant_order_id", "merchant_order_id", "obj.merchant_order_id");
+            var paymobOrderId = TryParseLong(fields, "obj.order.id", "order.id", "obj.order_id", "order_id");
+            var paymobTxId = TryParseLong(fields, "obj.id", "id");
+            var hmacFromQuery = req.Query["hmac"].FirstOrDefault();
+
+            // Log to WebhookLogs for debugging (ALL webhooks, even failed HMAC)
+            var webhookLog = new WebhookLog
             {
-                _log?.LogWarning("Invalid webhook signature for {EventType} → ignoring", eventType);
+                EventType = eventType,
+                MerchantOrderId = merchantOrderId,
+                PaymobOrderId = paymobOrderId > 0 ? paymobOrderId : null,
+                PaymobTransactionId = paymobTxId > 0 ? paymobTxId : null,
+                IsHmacValid = false, // Will update after verification
+                IsValid = false,
+                HttpStatus = 200,
+                HeadersJson = $"{{\"hmac\":\"{hmacFromQuery ?? "MISSING"}\",\"content-type\":\"{req.ContentType}\"}}",
+                RawPayload = rawBody.Length > 10000 ? rawBody.Substring(0, 10000) + "...[TRUNCATED]" : rawBody,
+                ReceivedAt = GetEgyptTime()
+            };
+
+            // --------- 2) verify HMAC with correct event type ----------
+            var isHmacValid = VerifyWebhookSignature(req, rawBody, eventType);
+            webhookLog.IsHmacValid = isHmacValid;
+
+            if (!isHmacValid)
+            {
+                _log?.LogWarning("Invalid webhook signature for {EventType}. HMAC={Hmac}", eventType, hmacFromQuery ?? "MISSING");
+                webhookLog.IsValid = false;
+                try
+                {
+                    await WebhookLogs.AddAsync(webhookLog);
+                    await _uow.SaveChangesAsync();
+                    _log?.LogInformation("Logged failed HMAC webhook: EventType={EventType}, MerchantOrderId={MerchantOrderId}", eventType, merchantOrderId);
+                }
+                catch (Exception ex)
+                {
+                    _log?.LogError(ex, "Failed to log webhook to database");
+                }
                 return new ApiResponse<bool> { Status = true, Message = "Ignored (bad signature)", Data = true };
+            }
+
+            // HMAC valid - update log and save
+            webhookLog.IsValid = true;
+            try
+            {
+                await WebhookLogs.AddAsync(webhookLog);
+                await _uow.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _log?.LogError(ex, "Failed to log valid webhook to database");
             }
 
             // --------- 3) TRANSACTION webhook handling ----------
