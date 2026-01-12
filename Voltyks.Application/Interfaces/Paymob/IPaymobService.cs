@@ -40,7 +40,7 @@ namespace Voltyks.Application.Interfaces.Paymob
 
         Task<ApiResponse<CardCheckoutResponse>> CheckoutCardAsync(CardCheckoutServiceDto req);
         Task<ApiResponse<WalletCheckoutResponse>> CheckoutWalletAsync(WalletCheckoutServiceDto req);
-        Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody, bool skipHmac = false);
+        Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody);
         Task<ApiResponse<OrderStatusDto>> GetOrderStatusFromPaymobAsync(long paymobOrderId);
         Task<ApiResponse<IntentionClientSecretDto>> ExchangePaymentKeyForClientSecretAsync(string paymentKey, string? publicKeyOverride = null, CancellationToken ct = default);
 

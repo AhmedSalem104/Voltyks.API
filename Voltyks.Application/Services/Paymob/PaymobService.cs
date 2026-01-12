@@ -475,37 +475,6 @@ namespace Voltyks.Application.Services.Paymob
             return 0;
         }
 
-        /// <summary>
-        /// Mask PII (email, phone, token) in webhook payload before storing in logs
-        /// </summary>
-        private static string MaskPiiInPayload(string payload)
-        {
-            if (string.IsNullOrWhiteSpace(payload)) return payload;
-
-            // Mask email addresses: test@example.com → t***@example.com
-            payload = System.Text.RegularExpressions.Regex.Replace(
-                payload,
-                @"""email""\s*:\s*""([^""]{1})([^""@]*)@([^""]*)""",
-                @"""email"":""$1***@$3""",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            // Mask phone numbers: 01234567890 → ******7890 (keep last 4)
-            payload = System.Text.RegularExpressions.Regex.Replace(
-                payload,
-                @"""phone[_]?number""\s*:\s*""([^""]{0,})([^""]{4})""",
-                @"""phone_number"":""******$2""",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            // Mask token values: keep only last 8 characters
-            payload = System.Text.RegularExpressions.Regex.Replace(
-                payload,
-                @"""token""\s*:\s*""([^""]{8,})([^""]{8})""",
-                @"""token"":""***$2""",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-            return payload;
-        }
-
 
         //public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
         //{
@@ -659,7 +628,7 @@ namespace Voltyks.Application.Services.Paymob
         //    // أي نوع حدث آخر
         //    return new ApiResponse<bool> { Status = true, Message = "Event processed", Data = true };
         //}
-        public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody, bool skipHmac = false)
+        public async Task<ApiResponse<bool>> HandleWebhookAsync(HttpRequest req, string rawBody)
         {
             // [A] quick log
             _log?.LogWarning("Webhook arrived: {Method} {Path}{Query} UA={UA}",
@@ -711,9 +680,6 @@ namespace Voltyks.Application.Services.Paymob
             string typeRaw = (FirstValue(fields, "type", "obj.type") ?? "TRANSACTION").Trim();
             string eventType = typeRaw.ToUpperInvariant();
 
-            // Normalize TOKEN → CARD_TOKEN (Paymob sends both)
-            if (eventType == "TOKEN") eventType = "CARD_TOKEN";
-
             // broaden token key detection
             bool hasCardTokenKeys = FirstValue(fields,
                 "obj.token", "obj.saved_card_token", "obj.card_token",
@@ -731,24 +697,22 @@ namespace Voltyks.Application.Services.Paymob
             var hmacFromQuery = req.Query["hmac"].FirstOrDefault();
 
             // Log to WebhookLogs for debugging (ALL webhooks, even failed HMAC)
-            // Mask PII in payload before storing
-            var maskedPayload = MaskPiiInPayload(rawBody);
             var webhookLog = new WebhookLog
             {
-                EventType = skipHmac ? $"{eventType}_TEST" : eventType,
+                EventType = eventType,
                 MerchantOrderId = merchantOrderId,
                 PaymobOrderId = paymobOrderId > 0 ? paymobOrderId : null,
                 PaymobTransactionId = paymobTxId > 0 ? paymobTxId : null,
                 IsHmacValid = false, // Will update after verification
                 IsValid = false,
                 HttpStatus = 200,
-                HeadersJson = $"{{\"hmac\":\"{hmacFromQuery ?? "MISSING"}\",\"content-type\":\"{req.ContentType}\",\"isTest\":{(skipHmac ? "true" : "false")}}}",
-                RawPayload = maskedPayload.Length > 10000 ? maskedPayload.Substring(0, 10000) + "...[TRUNCATED]" : maskedPayload,
+                HeadersJson = $"{{\"hmac\":\"{hmacFromQuery ?? "MISSING"}\",\"content-type\":\"{req.ContentType}\"}}",
+                RawPayload = rawBody.Length > 10000 ? rawBody.Substring(0, 10000) + "...[TRUNCATED]" : rawBody,
                 ReceivedAt = GetEgyptTime()
             };
 
-            // --------- 2) verify HMAC with correct event type (skip if test mode) ----------
-            var isHmacValid = skipHmac || VerifyWebhookSignature(req, rawBody, eventType);
+            // --------- 2) verify HMAC with correct event type ----------
+            var isHmacValid = VerifyWebhookSignature(req, rawBody, eventType);
             webhookLog.IsHmacValid = isHmacValid;
 
             if (!isHmacValid)

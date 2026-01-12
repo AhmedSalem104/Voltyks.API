@@ -12,7 +12,6 @@ namespace Voltyks.Core.DTOs.Paymob.Options
         public string ApiKey { get; set; } = default!;
         public string HmacSecret { get; set; } = default!;
         public string SecretKey { get; set; } = default!;
-        public string? WebhookTestKey { get; set; }  // API key for /webhook/test endpoint (Dev/Staging only)
 
         public string IframeId { get; set; } = default!;
         public string Currency { get; set; } = "EGP";
