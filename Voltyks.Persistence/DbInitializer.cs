@@ -289,6 +289,41 @@ namespace Voltyks.Persistence
                     }
                 }
 
+                // 2.5) إنشاء Admin2 (01005151055) إذا لم يكن موجوداً
+                var existingAdmin2 = await _userManager.FindByNameAsync("Admin2");
+                if (existingAdmin2 == null)
+                {
+                    var admin2User = new AppUser
+                    {
+                        FullName = "Admin User",
+                        FirstName = "Admin",
+                        LastName = "User",
+                        Email = "admin2@voltyks.com",
+                        UserName = "Admin2",
+                        PhoneNumber = "+201005151055",
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Admin Street"
+                        }
+                    };
+
+                    var resultAdmin2 = await _userManager.CreateAsync(admin2User, "Admin01005151055@");
+                    if (resultAdmin2.Succeeded)
+                    {
+                        await _userManager.AddToRoleAsync(admin2User, "Admin");
+                        await _userManager.AddClaimsAsync(admin2User, new[]
+                        {
+                            new System.Security.Claims.Claim("role-level", "admin"),
+                            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
+                            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+                        });
+                    }
+                }
+
                 // 3) إنشاء Operator إذا لم يكن موجوداً
                 var existingOperator = await _userManager.FindByNameAsync("operator");
                 if (existingOperator == null)
