@@ -2544,19 +2544,37 @@ namespace Voltyks.Application.Services.Paymob
                 // Paymob Apple Pay endpoint
                 var url = $"{_opt.ApiBase.TrimEnd('/')}/api/acceptance/payments/pay";
 
-                // Build request payload
-                // According to Paymob docs, Apple Pay token should be sent as-is
+                // Parse Apple Pay token from iOS (it's a JSON string that needs to be an object)
+                // iOS sends: "{\"header\":{...},\"data\":...}"
+                // We need: {"header":{...},"data":...} as a JSON object, not string
+                JsonElement tokenObject;
+                try
+                {
+                    using var tokenDoc = JsonDocument.Parse(applePayToken);
+                    tokenObject = tokenDoc.RootElement.Clone();
+                }
+                catch (JsonException ex)
+                {
+                    _log?.LogError(ex, "Apple Pay: Failed to parse Apple Pay token as JSON");
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = "INVALID_TOKEN_FORMAT";
+                    response.ErrorMessage = "Apple Pay token is not valid JSON";
+                    return new ApiResponse<ApplePayProcessResponse>(response, "Invalid token format", false);
+                }
+
+                // Build request payload with token as object (not string)
                 var payload = new
                 {
                     source = new
                     {
-                        identifier = applePayToken,
+                        identifier = tokenObject,
                         subtype = "APPLE_PAY"
                     },
                     payment_token = paymentKey
                 };
 
-                // No naming policy - keeps property names as-is (snake_case for Paymob)
+                // Serialize with proper JSON handling
                 var json = JsonSerializer.Serialize(payload);
 
                 using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
