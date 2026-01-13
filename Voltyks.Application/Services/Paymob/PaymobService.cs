@@ -2663,13 +2663,13 @@ namespace Voltyks.Application.Services.Paymob
                     try
                     {
                         using var errorDoc = JsonDocument.Parse(responseBody);
-                        if (errorDoc.RootElement.TryGetProperty("message", out var msgEl))
+                        if (errorDoc.RootElement.TryGetProperty("message", out var errMsgProp))
                         {
-                            response.ErrorMessage = msgEl.GetString() ?? response.ErrorMessage;
+                            response.ErrorMessage = errMsgProp.GetString() ?? response.ErrorMessage;
                         }
-                        else if (errorDoc.RootElement.TryGetProperty("detail", out var detailEl))
+                        else if (errorDoc.RootElement.TryGetProperty("detail", out var errDetailProp))
                         {
-                            response.ErrorMessage = detailEl.GetString() ?? response.ErrorMessage;
+                            response.ErrorMessage = errDetailProp.GetString() ?? response.ErrorMessage;
                         }
                     }
                     catch { /* Ignore parsing errors */ }
@@ -2680,6 +2680,10 @@ namespace Voltyks.Application.Services.Paymob
                 // Parse successful response
                 using var doc = JsonDocument.Parse(responseBody);
                 var root = doc.RootElement;
+
+                // Log full response for debugging (without sensitive data)
+                _log?.LogInformation("Apple Pay: Paymob response keys: {Keys}",
+                    string.Join(", ", root.EnumerateObject().Select(p => p.Name)));
 
                 // Extract transaction details
                 if (root.TryGetProperty("id", out var idEl))
@@ -2697,20 +2701,57 @@ namespace Voltyks.Application.Services.Paymob
                     response.IsPending = pendingEl.GetBoolean();
                 }
 
-                if (root.TryGetProperty("data", out var dataEl) && dataEl.TryGetProperty("message", out var dataMsgEl))
+                // Extract error/message from various possible fields
+                string? errorMsg = null;
+
+                if (root.TryGetProperty("data", out var dataEl))
                 {
-                    response.Message = dataMsgEl.GetString();
+                    if (dataEl.ValueKind == JsonValueKind.Object && dataEl.TryGetProperty("message", out var dataMsgEl))
+                    {
+                        errorMsg = dataMsgEl.GetString();
+                    }
+                    else if (dataEl.ValueKind == JsonValueKind.String)
+                    {
+                        errorMsg = dataEl.GetString();
+                    }
                 }
+
+                if (string.IsNullOrEmpty(errorMsg) && root.TryGetProperty("message", out var msgEl))
+                {
+                    errorMsg = msgEl.GetString();
+                }
+
+                if (string.IsNullOrEmpty(errorMsg) && root.TryGetProperty("detail", out var detailElement))
+                {
+                    errorMsg = detailElement.GetString();
+                }
+
+                response.Message = errorMsg;
 
                 // Check for error in response
                 if (root.TryGetProperty("txn_response_code", out var txnCodeEl))
                 {
                     var code = txnCodeEl.GetString();
+                    response.ErrorCode = code;
                     if (!string.IsNullOrEmpty(code) && code != "APPROVED")
                     {
                         response.Success = false;
-                        response.ErrorCode = code;
+                        _log?.LogWarning("Apple Pay: Transaction rejected with code: {Code}, message: {Message}", code, errorMsg);
                     }
+                }
+
+                // Also check for error field
+                if (root.TryGetProperty("error", out var errorEl))
+                {
+                    response.ErrorMessage = errorEl.GetString();
+                    response.Success = false;
+                }
+
+                // If success is false but no error message, try to get more details
+                if (!response.Success && string.IsNullOrEmpty(response.ErrorMessage))
+                {
+                    response.ErrorMessage = errorMsg ?? $"Payment failed. Response: {responseBody.Substring(0, Math.Min(500, responseBody.Length))}";
+                    _log?.LogWarning("Apple Pay: Payment failed - Full response: {Response}", responseBody);
                 }
 
                 response.Status = response.Success ? "Paid" : (response.IsPending ? "Pending" : "Failed");
