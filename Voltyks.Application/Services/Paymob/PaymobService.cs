@@ -2337,8 +2337,9 @@ namespace Voltyks.Application.Services.Paymob
 
             try
             {
-                // 1. Validate input
-                if (string.IsNullOrWhiteSpace(request.ApplePayToken))
+                // 1. Validate input - ApplePayToken is JsonElement, check if undefined/null
+                if (request.ApplePayToken.ValueKind == JsonValueKind.Undefined ||
+                    request.ApplePayToken.ValueKind == JsonValueKind.Null)
                 {
                     _log?.LogWarning("Apple Pay: Empty token received");
                     response.Success = false;
@@ -2531,10 +2532,11 @@ namespace Voltyks.Application.Services.Paymob
         /// Send Apple Pay token to Paymob for processing
         /// Paymob API: POST /api/acceptance/payments/pay
         /// SECURITY: Never log the applePayToken - it contains sensitive payment data
+        /// Accepts both JSON string and JSON object formats for applePayToken
         /// </summary>
         private async Task<ApiResponse<ApplePayProcessResponse>> SendApplePayTokenToPaymobAsync(
             string paymentKey,
-            string applePayToken,
+            JsonElement applePayToken,
             CancellationToken ct = default)
         {
             var response = new ApplePayProcessResponse();
@@ -2544,31 +2546,89 @@ namespace Voltyks.Application.Services.Paymob
                 // Paymob Apple Pay endpoint
                 var url = $"{_opt.ApiBase.TrimEnd('/')}/api/acceptance/payments/pay";
 
-                // Parse Apple Pay token from iOS (it's a JSON string that needs to be an object)
-                // iOS sends: "{\"header\":{...},\"data\":...}"
-                // We need: {"header":{...},"data":...} as a JSON object, not string
+                // Parse Apple Pay token - accept both string and object formats
                 JsonElement tokenObject;
-                try
+
+                // Case 1: Token is a JSON string (needs inner parsing)
+                if (applePayToken.ValueKind == JsonValueKind.String)
                 {
-                    using var tokenDoc = JsonDocument.Parse(applePayToken);
-                    tokenObject = tokenDoc.RootElement.Clone();
+                    var innerJson = applePayToken.GetString();
+                    if (string.IsNullOrWhiteSpace(innerJson))
+                    {
+                        response.Success = false;
+                        response.Status = "Failed";
+                        response.ErrorCode = "INVALID_TOKEN_FORMAT";
+                        response.ErrorMessage = "applePayToken must be valid JSON string";
+                        return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
+                    }
+
+                    try
+                    {
+                        using var innerDoc = JsonDocument.Parse(innerJson);
+                        tokenObject = innerDoc.RootElement.Clone();
+                    }
+                    catch (JsonException)
+                    {
+                        _log?.LogWarning("Apple Pay: Failed to parse inner JSON string");
+                        response.Success = false;
+                        response.Status = "Failed";
+                        response.ErrorCode = "INVALID_TOKEN_FORMAT";
+                        response.ErrorMessage = "applePayToken must be valid JSON string";
+                        return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
+                    }
                 }
-                catch (JsonException ex)
+                // Case 2: Token is already a JSON object (use directly)
+                else if (applePayToken.ValueKind == JsonValueKind.Object)
                 {
-                    _log?.LogError(ex, "Apple Pay: Failed to parse Apple Pay token as JSON");
+                    tokenObject = applePayToken.Clone();
+                }
+                else
+                {
                     response.Success = false;
                     response.Status = "Failed";
                     response.ErrorCode = "INVALID_TOKEN_FORMAT";
-                    response.ErrorMessage = "Apple Pay token is not valid JSON";
-                    return new ApiResponse<ApplePayProcessResponse>(response, "Invalid token format", false);
+                    response.ErrorMessage = $"applePayToken must be JSON string or object, got: {applePayToken.ValueKind}";
+                    return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
                 }
 
-                // Build request payload with token as object (not string)
+                // Validate required fields in token
+                var missingFields = new List<string>();
+
+                // Check root level fields
+                if (!tokenObject.TryGetProperty("data", out _)) missingFields.Add("data");
+                if (!tokenObject.TryGetProperty("signature", out _)) missingFields.Add("signature");
+                if (!tokenObject.TryGetProperty("version", out _)) missingFields.Add("version");
+
+                // Check header and its children
+                if (!tokenObject.TryGetProperty("header", out var headerEl))
+                {
+                    missingFields.Add("header");
+                }
+                else
+                {
+                    if (!headerEl.TryGetProperty("publicKeyHash", out _)) missingFields.Add("header.publicKeyHash");
+                    if (!headerEl.TryGetProperty("ephemeralPublicKey", out _)) missingFields.Add("header.ephemeralPublicKey");
+                    if (!headerEl.TryGetProperty("transactionId", out _)) missingFields.Add("header.transactionId");
+                }
+
+                if (missingFields.Any())
+                {
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = "MISSING_TOKEN_FIELDS";
+                    response.ErrorMessage = $"Apple Pay token missing required fields: {string.Join(", ", missingFields)}";
+                    _log?.LogWarning("Apple Pay: Token validation failed - Missing fields: {Fields}", string.Join(", ", missingFields));
+                    return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
+                }
+
+                _log?.LogInformation("Apple Pay: Token validated successfully");
+
+                // Build request payload with token as object (never string)
                 var payload = new
                 {
                     source = new
                     {
-                        identifier = tokenObject,
+                        identifier = tokenObject,  // Always Object
                         subtype = "APPLE_PAY"
                     },
                     payment_token = paymentKey

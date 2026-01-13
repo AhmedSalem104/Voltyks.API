@@ -1,11 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using Voltyks.Core.DTOs.Paymob.Core_API_DTOs;
 
 namespace Voltyks.Core.DTOs.Paymob.ApplePay
 {
     /// <summary>
     /// Request DTO for Server-to-Server Apple Pay processing.
-    /// Mobile app sends the Apple Pay token (Base64) from PKPayment.token.paymentData
+    /// Mobile app sends the Apple Pay token from PKPayment.token.paymentData
+    /// Accepts both JSON string and JSON object formats.
     /// </summary>
     public class ApplePayDirectRequest
     {
@@ -17,10 +19,14 @@ namespace Voltyks.Core.DTOs.Paymob.ApplePay
         public int AmountCents { get; set; }
 
         /// <summary>
-        /// Apple Pay token (Base64 encoded) from iOS PKPayment.token.paymentData
+        /// Apple Pay token from iOS PKPayment.token.paymentData.
+        /// Accepts both formats:
+        /// - JSON string: "{\"data\":\"...\",\"signature\":\"...\",\"header\":{...},\"version\":\"EC_v1\"}"
+        /// - JSON object: {"data":"...","signature":"...","header":{...},"version":"EC_v1"}
+        /// Required fields: data, signature, header (with publicKeyHash, ephemeralPublicKey, transactionId), version
         /// </summary>
         [Required(ErrorMessage = "Apple Pay token is required")]
-        public string ApplePayToken { get; set; } = string.Empty;
+        public JsonElement ApplePayToken { get; set; }
 
         /// <summary>
         /// Billing data for the transaction
