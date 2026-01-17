@@ -2492,6 +2492,15 @@ namespace Voltyks.Application.Services.Paymob
                             ? (paymobResponse.Message ?? "Payment failed")
                             : "Payment initiated - awaiting confirmation";
 
+                    // Copy error details from Paymob response
+                    if (isFailed)
+                    {
+                        response.ErrorCode = paymobResponse.ErrorCode;
+                        response.ErrorMessage = paymobResponse.ErrorMessage ?? paymobResponse.Message;
+                        _log?.LogWarning("Apple Pay: Payment failed - ErrorCode: {Code}, ErrorMessage: {Message}",
+                            response.ErrorCode, response.ErrorMessage);
+                    }
+
                     // 10. Record transaction in DB (Paid only if confirmed)
                     var txStatus = response.Status;
                     await AddTransactionAsync(merchantOrderId, paymobOrderId, request.AmountCents, currency, "ApplePay", txStatus, isConfirmedPaid);
