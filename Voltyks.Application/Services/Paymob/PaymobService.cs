@@ -2632,15 +2632,12 @@ namespace Voltyks.Application.Services.Paymob
 
                 _log?.LogInformation("Apple Pay: Token validated successfully");
 
-                // Build request payload - Paymob expects identifier as JSON STRING (not object)
-                // Convert the token object to its JSON string representation
-                var tokenJsonString = tokenObject.GetRawText();
-
+                // Build request payload - Send identifier as JSON OBJECT (not stringified)
                 var payload = new
                 {
                     source = new
                     {
-                        identifier = tokenJsonString,  // JSON string (stringified token)
+                        identifier = tokenObject,  // JSON object directly
                         subtype = "APPLE_PAY"
                     },
                     payment_token = paymentKey
@@ -2652,9 +2649,12 @@ namespace Voltyks.Application.Services.Paymob
                 using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
                 httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                // Log request structure (token masked for security)
-                _log?.LogInformation("Apple Pay: Sending request to Paymob - URL: {Url}, Structure: source.identifier=[JSON_STRING_LENGTH:{TokenLen}], source.subtype=APPLE_PAY, payment_token=[MASKED]",
-                    url, tokenJsonString.Length);
+                // Log request for debugging
+                _log?.LogInformation("Apple Pay: Sending request to Paymob - URL: {Url}, identifier type: OBJECT, subtype: APPLE_PAY",
+                    url);
+
+                // DEBUG: Log full payload (temporarily for debugging)
+                _log?.LogWarning("Apple Pay DEBUG: Full request payload: {Payload}", json);
 
                 var httpResponse = await _http.SendAsync(httpRequest, ct);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync(ct);
