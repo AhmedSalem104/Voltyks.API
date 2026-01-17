@@ -2544,7 +2544,7 @@ namespace Voltyks.Application.Services.Paymob
             try
             {
                 // Paymob Apple Pay endpoint
-                var url = $"{_opt.ApiBase.TrimEnd('/')}/api/acceptance/payments/pay";
+                var url = $"{_opt.ApiBase}/acceptance/payments/pay";
 
                 // Parse Apple Pay token - accept both string and object formats
                 JsonElement tokenObject;
