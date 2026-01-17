@@ -2632,12 +2632,15 @@ namespace Voltyks.Application.Services.Paymob
 
                 _log?.LogInformation("Apple Pay: Token validated successfully");
 
-                // Build request payload with token as object (never string)
+                // Build request payload - Paymob expects identifier as JSON STRING (not object)
+                // Convert the token object to its JSON string representation
+                var tokenJsonString = tokenObject.GetRawText();
+
                 var payload = new
                 {
                     source = new
                     {
-                        identifier = tokenObject,  // Always Object
+                        identifier = tokenJsonString,  // JSON string (stringified token)
                         subtype = "APPLE_PAY"
                     },
                     payment_token = paymentKey
@@ -2649,8 +2652,9 @@ namespace Voltyks.Application.Services.Paymob
                 using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
                 httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                // SECURITY: Only log URL, never log applePayToken or payload contents
-                _log?.LogInformation("Apple Pay: Sending request to Paymob - URL: {Url}", url);
+                // Log request structure (token masked for security)
+                _log?.LogInformation("Apple Pay: Sending request to Paymob - URL: {Url}, Structure: source.identifier=[JSON_STRING_LENGTH:{TokenLen}], source.subtype=APPLE_PAY, payment_token=[MASKED]",
+                    url, tokenJsonString.Length);
 
                 var httpResponse = await _http.SendAsync(httpRequest, ct);
                 var responseBody = await httpResponse.Content.ReadAsStringAsync(ct);
@@ -2666,9 +2670,13 @@ namespace Voltyks.Application.Services.Paymob
                     response.Success = false;
                     response.Status = "Failed";
                     response.ErrorCode = $"HTTP_{(int)httpResponse.StatusCode}";
-                    response.ErrorMessage = $"Paymob API error: {httpResponse.StatusCode}";
 
-                    // Try to parse error message from response - include full body for debugging
+                    // Always include full Paymob response for better debugging
+                    var paymobFullResponse = responseBody.Length > 1000
+                        ? responseBody.Substring(0, 1000) + "..."
+                        : responseBody;
+
+                    // Try to parse error message from response
                     try
                     {
                         using var errorDoc = JsonDocument.Parse(responseBody);
@@ -2684,32 +2692,21 @@ namespace Voltyks.Application.Services.Paymob
                         if (errorDoc.RootElement.TryGetProperty("errors", out var errorsProp))
                             errorDetails.Add($"errors: {errorsProp}");
 
-                        // Include full response if no specific error found
+                        // Build comprehensive error message
                         if (errorDetails.Count > 0)
                         {
-                            response.ErrorMessage = string.Join(" | ", errorDetails);
+                            response.ErrorMessage = $"Paymob Error ({httpResponse.StatusCode}): {string.Join(" | ", errorDetails)} | Full Response: {paymobFullResponse}";
                         }
                         else
                         {
-                            // Include truncated response body for debugging
-                            response.ErrorMessage = $"Paymob error: {responseBody.Substring(0, Math.Min(500, responseBody.Length))}";
-                        }
-
-                        // Legacy support for simple message extraction
-                        if (errorDoc.RootElement.TryGetProperty("message", out var msgProp))
-                        {
-                            var msgStr = msgProp.GetString();
-                            if (!string.IsNullOrEmpty(msgStr) && msgStr.Length < 200)
-                                response.ErrorMessage = msgStr;
-                        }
-                        else if (errorDoc.RootElement.TryGetProperty("detail", out var detProp))
-                        {
-                            var detStr = detProp.GetString();
-                            if (!string.IsNullOrEmpty(detStr) && detStr.Length < 200)
-                                response.ErrorMessage = detStr;
+                            response.ErrorMessage = $"Paymob Error ({httpResponse.StatusCode}): {paymobFullResponse}";
                         }
                     }
-                    catch { /* Ignore parsing errors */ }
+                    catch
+                    {
+                        // If JSON parsing fails, include raw response
+                        response.ErrorMessage = $"Paymob Error ({httpResponse.StatusCode}): {paymobFullResponse}";
+                    }
 
                     return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
                 }
