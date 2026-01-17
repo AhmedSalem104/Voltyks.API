@@ -2668,17 +2668,45 @@ namespace Voltyks.Application.Services.Paymob
                     response.ErrorCode = $"HTTP_{(int)httpResponse.StatusCode}";
                     response.ErrorMessage = $"Paymob API error: {httpResponse.StatusCode}";
 
-                    // Try to parse error message from response
+                    // Try to parse error message from response - include full body for debugging
                     try
                     {
                         using var errorDoc = JsonDocument.Parse(responseBody);
+                        var errorDetails = new List<string>();
+
+                        // Check common error fields
                         if (errorDoc.RootElement.TryGetProperty("message", out var errMsgProp))
+                            errorDetails.Add($"message: {errMsgProp}");
+                        if (errorDoc.RootElement.TryGetProperty("detail", out var errDetailProp))
+                            errorDetails.Add($"detail: {errDetailProp}");
+                        if (errorDoc.RootElement.TryGetProperty("error", out var errorProp))
+                            errorDetails.Add($"error: {errorProp}");
+                        if (errorDoc.RootElement.TryGetProperty("errors", out var errorsProp))
+                            errorDetails.Add($"errors: {errorsProp}");
+
+                        // Include full response if no specific error found
+                        if (errorDetails.Count > 0)
                         {
-                            response.ErrorMessage = errMsgProp.GetString() ?? response.ErrorMessage;
+                            response.ErrorMessage = string.Join(" | ", errorDetails);
                         }
-                        else if (errorDoc.RootElement.TryGetProperty("detail", out var errDetailProp))
+                        else
                         {
-                            response.ErrorMessage = errDetailProp.GetString() ?? response.ErrorMessage;
+                            // Include truncated response body for debugging
+                            response.ErrorMessage = $"Paymob error: {responseBody.Substring(0, Math.Min(500, responseBody.Length))}";
+                        }
+
+                        // Legacy support for simple message extraction
+                        if (errorDoc.RootElement.TryGetProperty("message", out var msgProp))
+                        {
+                            var msgStr = msgProp.GetString();
+                            if (!string.IsNullOrEmpty(msgStr) && msgStr.Length < 200)
+                                response.ErrorMessage = msgStr;
+                        }
+                        else if (errorDoc.RootElement.TryGetProperty("detail", out var detProp))
+                        {
+                            var detStr = detProp.GetString();
+                            if (!string.IsNullOrEmpty(detStr) && detStr.Length < 200)
+                                response.ErrorMessage = detStr;
                         }
                     }
                     catch { /* Ignore parsing errors */ }
