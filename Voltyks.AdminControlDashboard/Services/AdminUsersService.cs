@@ -8,6 +8,9 @@ using Voltyks.Core.DTOs;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Entities.Main;
+using Voltyks.Persistence.Entities.Main.Paymob;
+using Voltyks.Persistence.Entities.Main.Store;
 
 namespace Voltyks.AdminControlDashboard.Services
 {
@@ -329,38 +332,117 @@ namespace Voltyks.AdminControlDashboard.Services
                     return new ApiResponse<object>("Cannot delete yourself", false);
                 }
 
-                // Delete related entities first
+                // ========== DELETE RELATED ENTITIES ==========
+
+                // 1. Delete DeviceTokens
                 if (user.DeviceTokens?.Any() == true)
-                    _context.Set<Voltyks.Persistence.Entities.Main.DeviceToken>().RemoveRange(user.DeviceTokens);
+                    _context.Set<DeviceToken>().RemoveRange(user.DeviceTokens);
 
+                // 2. Delete Notifications
                 if (user.Notifications?.Any() == true)
-                    _context.Set<Voltyks.Persistence.Entities.Main.Notification>().RemoveRange(user.Notifications);
+                    _context.Set<Notification>().RemoveRange(user.Notifications);
 
+                // 3. Delete WalletTransactions
                 if (user.WalletTransactions?.Any() == true)
-                    _context.Set<Voltyks.Persistence.Entities.Main.WalletTransaction>().RemoveRange(user.WalletTransactions);
+                    _context.Set<WalletTransaction>().RemoveRange(user.WalletTransactions);
 
-                // Delete vehicles
-                var vehicles = await _context.Set<Voltyks.Persistence.Entities.Main.Vehicle>()
+                // 4. Delete Vehicles
+                var vehicles = await _context.Set<Vehicle>()
                     .Where(v => v.UserId == userId)
                     .ToListAsync(ct);
                 if (vehicles.Any())
-                    _context.Set<Voltyks.Persistence.Entities.Main.Vehicle>().RemoveRange(vehicles);
+                    _context.Set<Vehicle>().RemoveRange(vehicles);
 
-                // Delete complaints
-                var complaints = await _context.Set<Voltyks.Persistence.Entities.Main.UserGeneralComplaint>()
+                // 5. Delete UserGeneralComplaints
+                var complaints = await _context.Set<UserGeneralComplaint>()
                     .Where(c => c.UserId == userId)
                     .ToListAsync(ct);
                 if (complaints.Any())
-                    _context.Set<Voltyks.Persistence.Entities.Main.UserGeneralComplaint>().RemoveRange(complaints);
+                    _context.Set<UserGeneralComplaint>().RemoveRange(complaints);
 
-                // Delete user reports
-                var reports = await _context.Set<Voltyks.Persistence.Entities.Main.UserReport>()
+                // 6. Delete UserReports
+                var reports = await _context.Set<UserReport>()
                     .Where(r => r.UserId == userId)
                     .ToListAsync(ct);
                 if (reports.Any())
-                    _context.Set<Voltyks.Persistence.Entities.Main.UserReport>().RemoveRange(reports);
+                    _context.Set<UserReport>().RemoveRange(reports);
 
-                // Finally delete user
+                // ========== NEW: MISSING ENTITIES ==========
+
+                // 7. Delete ChargingRequests made BY the user
+                if (user.ChargingRequests?.Any() == true)
+                    _context.Set<ChargingRequest>().RemoveRange(user.ChargingRequests);
+
+                // 8. Delete ChargingRequests ON user's chargers (must delete before chargers)
+                if (user.Chargers?.Any() == true)
+                {
+                    var chargerIds = user.Chargers.Select(c => c.Id).ToList();
+                    var requestsOnUserChargers = await _context.Set<ChargingRequest>()
+                        .Where(r => chargerIds.Contains(r.ChargerId))
+                        .ToListAsync(ct);
+                    if (requestsOnUserChargers.Any())
+                        _context.Set<ChargingRequest>().RemoveRange(requestsOnUserChargers);
+
+                    // 9. Delete Chargers (must delete after their requests)
+                    _context.Set<Charger>().RemoveRange(user.Chargers);
+                }
+
+                // 10. Delete StoreReservations
+                var reservations = await _context.Set<StoreReservation>()
+                    .Where(r => r.UserId == userId)
+                    .ToListAsync(ct);
+                if (reservations.Any())
+                    _context.Set<StoreReservation>().RemoveRange(reservations);
+
+                // 11. Delete RatingsHistory (as Rater and Ratee)
+                var ratingsAsRater = await _context.Set<RatingsHistory>()
+                    .Where(r => r.RaterUserId == userId)
+                    .ToListAsync(ct);
+                if (ratingsAsRater.Any())
+                    _context.Set<RatingsHistory>().RemoveRange(ratingsAsRater);
+
+                var ratingsAsRatee = await _context.Set<RatingsHistory>()
+                    .Where(r => r.RateeUserId == userId)
+                    .ToListAsync(ct);
+                if (ratingsAsRatee.Any())
+                    _context.Set<RatingsHistory>().RemoveRange(ratingsAsRatee);
+
+                // 12. Delete UsersBanned
+                var bans = await _context.Set<UsersBanned>()
+                    .Where(b => b.UserId == userId)
+                    .ToListAsync(ct);
+                if (bans.Any())
+                    _context.Set<UsersBanned>().RemoveRange(bans);
+
+                // 13. Delete PaymentOrders
+                var paymentOrders = await _context.Set<PaymentOrder>()
+                    .Where(p => p.UserId == userId)
+                    .ToListAsync(ct);
+                if (paymentOrders.Any())
+                    _context.Set<PaymentOrder>().RemoveRange(paymentOrders);
+
+                // 14. Delete UserSavedCards
+                var savedCards = await _context.Set<UserSavedCard>()
+                    .Where(c => c.UserId == userId)
+                    .ToListAsync(ct);
+                if (savedCards.Any())
+                    _context.Set<UserSavedCard>().RemoveRange(savedCards);
+
+                // 15. Delete RevokedCardTokens
+                var revokedTokens = await _context.Set<RevokedCardToken>()
+                    .Where(t => t.UserId == userId)
+                    .ToListAsync(ct);
+                if (revokedTokens.Any())
+                    _context.Set<RevokedCardToken>().RemoveRange(revokedTokens);
+
+                // 16. Delete CardTokenWebhookLogs (nullable UserId)
+                var webhookLogs = await _context.Set<CardTokenWebhookLog>()
+                    .Where(l => l.UserId == userId)
+                    .ToListAsync(ct);
+                if (webhookLogs.Any())
+                    _context.Set<CardTokenWebhookLog>().RemoveRange(webhookLogs);
+
+                // ========== FINALLY DELETE USER ==========
                 _context.Users.Remove(user);
                 await _context.SaveChangesAsync(ct);
 
