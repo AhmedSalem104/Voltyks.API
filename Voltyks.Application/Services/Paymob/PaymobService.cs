@@ -2632,12 +2632,40 @@ namespace Voltyks.Application.Services.Paymob
 
                 _log?.LogInformation("Apple Pay: Token validated successfully");
 
-                // Build request payload - Send identifier as JSON OBJECT (not stringified)
+                // Extract just the base64 'data' field from Apple Pay token
+                // Paymob expects identifier to be a STRING (like phone for wallet, card number for cards)
+                // NOT a JSON object
+                if (!tokenObject.TryGetProperty("data", out var dataElement))
+                {
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = "MISSING_DATA_FIELD";
+                    response.ErrorMessage = "Apple Pay token missing 'data' field";
+                    _log?.LogWarning("Apple Pay: Token missing 'data' field");
+                    return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
+                }
+
+                var applePayData = dataElement.GetString();
+                if (string.IsNullOrEmpty(applePayData))
+                {
+                    response.Success = false;
+                    response.Status = "Failed";
+                    response.ErrorCode = "EMPTY_DATA_FIELD";
+                    response.ErrorMessage = "Apple Pay token 'data' field is empty";
+                    _log?.LogWarning("Apple Pay: Token 'data' field is empty");
+                    return new ApiResponse<ApplePayProcessResponse>(response, response.ErrorMessage, false);
+                }
+
+                // Build request payload - Send identifier as STRING (base64 data only)
+                // This matches the pattern for other payment types:
+                // - Wallet: identifier = "01XXXXXXXXX" (phone string)
+                // - Card: identifier = "4111111111111111" (card string)
+                // - Apple Pay: identifier = base64 encrypted data (string)
                 var payload = new
                 {
                     source = new
                     {
-                        identifier = tokenObject,  // JSON object directly
+                        identifier = applePayData,  // Just the base64 data STRING
                         subtype = "APPLE_PAY"
                     },
                     payment_token = paymentKey
@@ -2650,8 +2678,8 @@ namespace Voltyks.Application.Services.Paymob
                 httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 // Log request for debugging
-                _log?.LogInformation("Apple Pay: Sending request to Paymob - URL: {Url}, identifier type: OBJECT, subtype: APPLE_PAY",
-                    url);
+                _log?.LogInformation("Apple Pay: Sending request to Paymob - URL: {Url}, identifier: DATA_STRING (length: {Len}), subtype: APPLE_PAY",
+                    url, applePayData.Length);
 
                 // DEBUG: Log full payload (temporarily for debugging)
                 _log?.LogWarning("Apple Pay DEBUG: Full request payload: {Payload}", json);
