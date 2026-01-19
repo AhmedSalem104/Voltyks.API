@@ -23,9 +23,16 @@ namespace Voltyks.API.Controllers
 
         #region Products
 
+        /// <summary>
+        /// Get products with optional filtering
+        /// </summary>
+        /// <param name="categoryId">Filter by category ID</param>
+        /// <param name="search">Search in product name/description</param>
+        /// <param name="pageNumber">Page number (default: 1)</param>
+        /// <param name="pageSize">Items per page (default: 20)</param>
         [HttpGet("products")]
         public async Task<IActionResult> GetProducts(
-            [FromQuery] int? category_id,
+            [FromQuery] int? categoryId,
             [FromQuery] string? search,
             [FromQuery] int pageNumber = 1,
             [FromQuery] int pageSize = 20,
@@ -37,19 +44,19 @@ namespace Voltyks.API.Controllers
                 PageSize = pageSize
             };
 
-            var result = await _serviceManager.StoreService.GetProductsAsync(category_id, search, pagination, ct);
+            var result = await _serviceManager.StoreService.GetProductsAsync(categoryId, search, pagination, ct);
             return Ok(result);
         }
 
-        [HttpGet("products/{id:int}")]
-        public async Task<IActionResult> GetProductById(int id, CancellationToken ct)
+        [HttpGet("GetProductById")]
+        public async Task<IActionResult> GetProductById([FromQuery] int id, CancellationToken ct)
         {
             var result = await _serviceManager.StoreService.GetProductByIdAsync(id, ct);
             return Ok(result);
         }
 
-        [HttpGet("products/slug/{slug}")]
-        public async Task<IActionResult> GetProductBySlug(string slug, CancellationToken ct)
+        [HttpGet("GetProductBySlug")]
+        public async Task<IActionResult> GetProductBySlug([FromQuery] string slug, CancellationToken ct)
         {
             var result = await _serviceManager.StoreService.GetProductBySlugAsync(slug, ct);
             return Ok(result);
@@ -76,16 +83,16 @@ namespace Voltyks.API.Controllers
         }
 
         [Authorize]
-        [HttpPut("my-reservations/{id:int}")]
-        public async Task<IActionResult> UpdateReservation(int id, [FromBody] UpdateReservationDto dto, CancellationToken ct)
+        [HttpPut("UpdateMyReservation")]
+        public async Task<IActionResult> UpdateReservation([FromQuery] int id, [FromBody] UpdateReservationDto dto, CancellationToken ct)
         {
             var result = await _serviceManager.StoreService.UpdateReservationAsync(id, dto, ct);
             return Ok(result);
         }
 
         [Authorize]
-        [HttpDelete("my-reservations/{id:int}")]
-        public async Task<IActionResult> CancelReservation(int id, CancellationToken ct)
+        [HttpDelete("CancelMyReservation")]
+        public async Task<IActionResult> CancelReservation([FromQuery] int id, CancellationToken ct)
         {
             var result = await _serviceManager.StoreService.CancelReservationAsync(id, ct);
             return Ok(result);
