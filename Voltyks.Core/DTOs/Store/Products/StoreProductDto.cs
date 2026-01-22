@@ -16,5 +16,6 @@ namespace Voltyks.Core.DTOs.Store.Products
         public Dictionary<string, string>? Specifications { get; set; }
         public string Status { get; set; } = string.Empty;
         public bool IsReservable { get; set; }
+        public bool IsReserved { get; set; }
     }
 }

@@ -12,5 +12,6 @@ namespace Voltyks.Core.DTOs.Store.Products
         public string? ThumbnailImage { get; set; }
         public string Status { get; set; } = string.Empty;
         public bool IsReservable { get; set; }
+        public bool IsReserved { get; set; }
     }
 }

@@ -120,7 +120,8 @@ namespace Voltyks.Application.Services.Store
                         Currency = p.Currency,
                         ThumbnailImage = GetFirstImage(p.ImagesJson),
                         Status = p.Status,
-                        IsReservable = p.IsReservable
+                        IsReservable = p.IsReservable,
+                        IsReserved = p.Reservations.Any(r => r.Status != "cancelled" && r.Status != "completed")
                     })
                     .ToListAsync(ct);
 
@@ -143,6 +144,7 @@ namespace Voltyks.Application.Services.Store
                 var product = await _context.StoreProducts
                     .AsNoTracking()
                     .Include(p => p.Category)
+                    .Include(p => p.Reservations)
                     .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted && p.Status != "hidden", ct);
 
                 if (product == null)
@@ -150,7 +152,8 @@ namespace Voltyks.Application.Services.Store
                     return new ApiResponse<StoreProductDto>("Product not found", false);
                 }
 
-                var dto = MapToProductDto(product);
+                var isReserved = product.Reservations.Any(r => r.Status != "cancelled" && r.Status != "completed");
+                var dto = MapToProductDto(product, isReserved);
                 return new ApiResponse<StoreProductDto>(dto, "Product retrieved successfully", true);
             }
             catch (Exception ex)
@@ -169,6 +172,7 @@ namespace Voltyks.Application.Services.Store
                 var product = await _context.StoreProducts
                     .AsNoTracking()
                     .Include(p => p.Category)
+                    .Include(p => p.Reservations)
                     .FirstOrDefaultAsync(p => p.Slug == slug && !p.IsDeleted && p.Status != "hidden", ct);
 
                 if (product == null)
@@ -176,7 +180,8 @@ namespace Voltyks.Application.Services.Store
                     return new ApiResponse<StoreProductDto>("Product not found", false);
                 }
 
-                var dto = MapToProductDto(product);
+                var isReserved = product.Reservations.Any(r => r.Status != "cancelled" && r.Status != "completed");
+                var dto = MapToProductDto(product, isReserved);
                 return new ApiResponse<StoreProductDto>(dto, "Product retrieved successfully", true);
             }
             catch (Exception ex)
@@ -488,7 +493,7 @@ namespace Voltyks.Application.Services.Store
             }
         }
 
-        private static StoreProductDto MapToProductDto(StoreProduct product)
+        private static StoreProductDto MapToProductDto(StoreProduct product, bool isReserved)
         {
             return new StoreProductDto
             {
@@ -503,7 +508,8 @@ namespace Voltyks.Application.Services.Store
                 Images = ParseImages(product.ImagesJson),
                 Specifications = ParseSpecifications(product.SpecificationsJson),
                 Status = product.Status,
-                IsReservable = product.IsReservable
+                IsReservable = product.IsReservable,
+                IsReserved = isReserved
             };
         }
 
