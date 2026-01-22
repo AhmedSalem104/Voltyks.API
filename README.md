@@ -1,32 +1,21 @@
-<!-- Animated Header -->
-<div align="center">
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=200&section=header&text=Voltyks%20API&fontSize=80&fontAlignY=35&animation=twinkling&fontColor=fff&desc=Electric%20Vehicle%20Charging%20Platform&descAlignY=55&descSize=20" alt="Header" />
+</p>
 
-  ![Header](https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=200&section=header&text=Voltyks%20API&fontSize=80&fontAlignY=35&animation=twinkling&fontColor=fff&desc=Electric%20Vehicle%20Charging%20Platform&descAlignY=55&descSize=20)
-
-</div>
-
-<!-- Animated Typing -->
 <p align="center">
   <a href="https://git.io/typing-svg">
     <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=600&size=22&pause=1000&color=6C63FF&center=true&vCenter=true&multiline=true&repeat=false&width=600&height=100&lines=Powering+the+Future+of+EV+Charging;Built+with+.NET+8+%7C+Clean+Architecture+%7C+Azure" alt="Typing SVG" />
   </a>
 </p>
 
-<!-- Animated Badges -->
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-blue?style=for-the-badge&logo=semantic-release" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.2.0-blue?style=for-the-badge&logo=semantic-release" alt="Version" />
   <img src="https://img.shields.io/badge/license-Proprietary-red?style=for-the-badge" alt="License" />
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 8" />
   <img src="https://img.shields.io/badge/Azure-Deployed-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white" alt="Azure" />
+  <img src="https://img.shields.io/badge/Build-Passing-brightgreen?style=for-the-badge" alt="Build" />
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/github/stars/AhmedSalem104/Voltyks.API?style=social" alt="Stars" />
-  <img src="https://img.shields.io/github/forks/AhmedSalem104/Voltyks.API?style=social" alt="Forks" />
-  <img src="https://img.shields.io/github/watchers/AhmedSalem104/Voltyks.API?style=social" alt="Watchers" />
-</p>
-
-<!-- Quick Links -->
 <p align="center">
   <a href="#-features"><img src="https://img.shields.io/badge/Features-6C63FF?style=for-the-badge" alt="Features" /></a>
   <a href="#-tech-stack"><img src="https://img.shields.io/badge/Tech_Stack-FF6B6B?style=for-the-badge" alt="Tech Stack" /></a>
@@ -37,438 +26,458 @@
 
 ---
 
-## 🎯 Overview
-
-<img align="right" width="400" src="https://raw.githubusercontent.com/Platane/snk/output/github-contribution-grid-snake-dark.svg" alt="Snake animation" />
+## Overview
 
 **Voltyks** is an enterprise-grade API platform that revolutionizes how Electric Vehicle owners connect with charging station providers. Our platform orchestrates the complete charging lifecycle — from discovering nearby chargers to seamless payment processing.
 
-<br clear="right"/>
+### What Makes Voltyks Special?
 
-### 🎪 What Makes Voltyks Special?
-
-<table>
-<tr>
-<td width="50%">
-
-#### 🚗 For EV Owners
-- 📍 Find nearby chargers instantly
-- ⚡ Send real-time charging requests
-- 💳 Pay securely with cards or wallets
-- ⭐ Rate your charging experience
-
-</td>
-<td width="50%">
-
-#### 🔌 For Charger Owners
-- 📊 List and manage your chargers
-- 🔔 Get instant request notifications
-- 💰 Earn money from your chargers
-- 📈 Build your reputation
-
-</td>
-</tr>
-</table>
+| For EV Owners | For Charger Owners |
+|:--------------|:-------------------|
+| Find nearby chargers instantly | List and manage your chargers |
+| Send real-time charging requests | Get instant request notifications |
+| Pay securely with cards or wallets | Earn money from your chargers |
+| Rate your charging experience | Build your reputation |
+| Shop from our EV Store | Manage reservations |
 
 ---
 
-## 🆕 What's New in v2.1.0
-
-<div align="center">
+## What's New in v2.2.0
 
 | Category | Updates |
-|:--------:|:--------|
-| 💳 **Payment** | Paymob Intention API, TRANSACTION webhook handling, Saved cards management |
-| 🔒 **Security** | HMAC-SHA512 verification, PCI-compliant logging, Request size limits |
-| 🛡️ **Admin** | Wallet transaction history, Add/Deduct balance with notes |
-| 📋 **Protocols** | Full CRUD operations for charging protocols |
-| 📝 **Docs** | Complete payment flow documentation for frontend integration |
-
-</div>
+|:---------|:--------|
+| **Store Module** | Complete e-commerce with categories, products, reservations |
+| **Product Reservation** | IsReserved flag for real-time availability tracking |
+| **Payment** | Paymob Intention API, TRANSACTION webhook, Apple Pay |
+| **Security** | HMAC-SHA512 verification, PCI-compliant logging |
+| **Admin** | Complete store management, wallet transactions |
 
 ### Recent Changes
 
 ```diff
-+ Added TRANSACTION webhook handling for automatic payment status updates
++ Added IsReserved field to product endpoints for reservation status
++ Implemented Store module with categories, products, and reservations
++ Added product image management with Azure Blob Storage
++ Query parameter conversion for StoreController endpoints
++ Added TRANSACTION webhook handling for automatic payment updates
 + Implemented HMAC-SHA512 webhook signature verification
 + Added wallet transaction history with notes tracking
 + Created full CRUD endpoints for Protocols
-+ Added payment flow documentation for frontend developers
 + Removed sensitive data from logs (PCI compliance)
-+ Fixed retry loop structure for better reliability
-+ Added request size limits on webhook endpoints
 ```
 
 ---
 
-## ✨ Features
-
-<div align="center">
-
-| 🔋 Core | 🔐 Security | 💳 Payments | 📱 Mobile | 🛡️ Admin |
-|:-------:|:-----------:|:-----------:|:---------:|:--------:|
-| Geolocation Search | JWT + Refresh Tokens | Paymob Intention API | Push Notifications | User Management |
-| Real-time Requests | OAuth (Google/FB) | Card Tokenization | Device Management | Wallet Fees Control |
-| Two-way Ratings | OTP Verification | Saved Cards | Deep Linking | Complaints System |
-| Wallet System | HMAC Webhook Verify | Transaction Webhooks | Multi-language | Transaction History |
-
-</div>
-
-### 🎨 Feature Highlights
-
-```mermaid
-mindmap
-  root((Voltyks))
-    Charging
-      Find Chargers
-      Send Requests
-      Track Sessions
-      Rate Experience
-    Payments
-      Card Payments
-      Mobile Wallets
-      Saved Cards
-      Auto-billing
-    Security
-      JWT Auth
-      OAuth 2.0
-      OTP SMS
-      Rate Limiting
-    Admin
-      User Management
-      Fee Config
-      Analytics
-      Complaints
-```
-
----
-
-## 🛠 Tech Stack
-
-<div align="center">
-
-<!-- Animated Tech Icons -->
-<a href="https://dotnet.microsoft.com/"><img src="https://skillicons.dev/icons?i=dotnet" alt=".NET" /></a>
-<a href="https://docs.microsoft.com/en-us/dotnet/csharp/"><img src="https://skillicons.dev/icons?i=cs" alt="C#" /></a>
-<a href="https://azure.microsoft.com/"><img src="https://skillicons.dev/icons?i=azure" alt="Azure" /></a>
-<a href="https://redis.io/"><img src="https://skillicons.dev/icons?i=redis" alt="Redis" /></a>
-<a href="https://firebase.google.com/"><img src="https://skillicons.dev/icons?i=firebase" alt="Firebase" /></a>
-<a href="https://www.docker.com/"><img src="https://skillicons.dev/icons?i=docker" alt="Docker" /></a>
-<a href="https://git-scm.com/"><img src="https://skillicons.dev/icons?i=git" alt="Git" /></a>
-<a href="https://github.com/"><img src="https://skillicons.dev/icons?i=github" alt="GitHub" /></a>
-<a href="https://www.postman.com/"><img src="https://skillicons.dev/icons?i=postman" alt="Postman" /></a>
-<a href="https://code.visualstudio.com/"><img src="https://skillicons.dev/icons?i=vscode" alt="VS Code" /></a>
-
-</div>
-
-<br/>
-
-<details>
-<summary><b>🔥 View Detailed Tech Stack</b></summary>
-<br/>
-
-<div align="center">
-
-### Backend & Framework
-
-![.NET](https://img.shields.io/badge/.NET_8.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
-![C#](https://img.shields.io/badge/C%23_12-239120?style=for-the-badge&logo=csharp&logoColor=white)
-![ASP.NET Core](https://img.shields.io/badge/ASP.NET_Core_8-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
-![EF Core](https://img.shields.io/badge/Entity_Framework_Core_8-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
-
-### Database & Caching
-
-![Azure SQL](https://img.shields.io/badge/Azure_SQL_Database-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis_Cache-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-![Upstash](https://img.shields.io/badge/Upstash-00E9A3?style=for-the-badge&logo=upstash&logoColor=black)
-
-### Authentication & Security
-
-![JWT](https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)
-![OAuth2](https://img.shields.io/badge/OAuth_2.0-EB5424?style=for-the-badge&logo=auth0&logoColor=white)
-![Google](https://img.shields.io/badge/Google_Auth-4285F4?style=for-the-badge&logo=google&logoColor=white)
-![Facebook](https://img.shields.io/badge/Facebook_Auth-1877F2?style=for-the-badge&logo=facebook&logoColor=white)
-
-### Payment Integration
-
-![Paymob](https://img.shields.io/badge/Paymob-00C853?style=for-the-badge&logo=stripe&logoColor=white)
-![Visa](https://img.shields.io/badge/Visa-1A1F71?style=for-the-badge&logo=visa&logoColor=white)
-![Mastercard](https://img.shields.io/badge/Mastercard-EB001B?style=for-the-badge&logo=mastercard&logoColor=white)
-![Vodafone Cash](https://img.shields.io/badge/Vodafone_Cash-E60000?style=for-the-badge&logo=vodafone&logoColor=white)
-
-### SMS & Notifications
-
-![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio&logoColor=white)
-![Firebase](https://img.shields.io/badge/Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
-![SMS](https://img.shields.io/badge/SMS_Gateway-FF6B00?style=for-the-badge&logo=minutemailer&logoColor=white)
-
-### Cloud & DevOps
-
-![Azure](https://img.shields.io/badge/Microsoft_Azure-0078D4?style=for-the-badge&logo=microsoftazure&logoColor=white)
-![App Service](https://img.shields.io/badge/Azure_App_Service-0078D4?style=for-the-badge&logo=azurefunctions&logoColor=white)
-![Swagger](https://img.shields.io/badge/Swagger_OpenAPI-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)
-
-</div>
-
-</details>
-
----
-
-## 🏗 Architecture
-
-<div align="center">
-
-```mermaid
-graph TB
-    subgraph Client["📱 Client Layer"]
-        iOS[iOS App]
-        Android[Android App]
-        Web[Web Dashboard]
-    end
-
-    subgraph API["🚀 API Gateway"]
-        Controllers[Controllers]
-        Middleware[Middleware]
-        Auth[Auth Handler]
-    end
-
-    subgraph Services["⚙️ Business Logic"]
-        AuthSvc[Auth Service]
-        ChargerSvc[Charger Service]
-        PaymentSvc[Payment Service]
-        NotifySvc[Notification Service]
-    end
-
-    subgraph Data["💾 Data Layer"]
-        EF[Entity Framework]
-        Redis[(Redis Cache)]
-        SQL[(Azure SQL)]
-    end
-
-    subgraph External["🌐 External Services"]
-        Paymob[Paymob API]
-        Firebase[Firebase FCM]
-        SMS[SMS Providers]
-    end
-
-    Client --> API
-    API --> Services
-    Services --> Data
-    Services --> External
-
-    style Client fill:#6C63FF,color:#fff
-    style API fill:#FF6B6B,color:#fff
-    style Services fill:#4ECDC4,color:#fff
-    style Data fill:#45B7D1,color:#fff
-    style External fill:#96CEB4,color:#fff
-```
-
-</div>
-
-### 📁 Project Structure
-
-```
-📦 Voltyks.API
-├── 🎯 Voltyks.API                    # Presentation Layer
-│   ├── 📂 Controllers/               # API Endpoints
-│   ├── 📂 Middleware/                # Request Pipeline
-│   └── 📂 Extensions/                # DI Configuration
-│
-├── 💼 Voltyks.Application            # Business Logic
-│   ├── 📂 Services/                  # Core Services
-│   ├── 📂 Interfaces/                # Contracts
-│   └── 📂 Validators/                # Input Validation
-│
-├── 🎨 Voltyks.Core                   # Domain Layer
-│   ├── 📂 DTOs/                      # Data Transfer Objects
-│   ├── 📂 Enums/                     # Enumerations
-│   └── 📂 Exceptions/                # Custom Exceptions
-│
-├── 💾 Voltyks.Persistence            # Data Access
-│   ├── 📂 Entities/                  # Database Models
-│   ├── 📂 Configurations/            # EF Configurations
-│   └── 📂 Migrations/                # DB Migrations
-│
-├── 🔧 Voltyks.Infrastructure         # Infrastructure
-│   ├── 📂 Repositories/              # Data Repositories
-│   └── 📂 UnitOfWork/                # Transaction Management
-│
-└── 🛡️ Voltyks.AdminControlDashboard  # Admin Features
-    └── 📂 Services/                  # Admin Services
-```
-
----
-
-## 📡 API Reference
-
-<div align="center">
-
-### 🔐 Authentication
-
-</div>
-
-| Method | Endpoint | Description | Auth |
-|:------:|:---------|:------------|:----:|
-| `POST` | `/api/Auth/Login` | User login with JWT | ❌ |
-| `POST` | `/api/Auth/register` | Create new account | ❌ |
-| `POST` | `/api/Auth/RefreshToken` | Refresh JWT token | 🔑 |
-| `POST` | `/api/Auth/forget-password` | Request password reset | ❌ |
-| `POST` | `/api/Auth/reset-password` | Reset with OTP | ❌ |
-| `GET` | `/api/Auth/GetProfileDetails` | Get user profile | 🔑 |
-| `PUT` | `/api/Auth/toggle-availability` | Toggle availability | 🔑 |
-| `GET` | `/api/Auth/wallet` | Get wallet balance | 🔑 |
-
-<details>
-<summary><b>🔌 Chargers API</b></summary>
-
-| Method | Endpoint | Description | Auth |
-|:------:|:---------|:------------|:----:|
-| `GET` | `/api/Charger/GetCapacity` | Get capacities | ❌ |
-| `GET` | `/api/Charger/GetProtocol` | Get protocols | ❌ |
-| `GET` | `/api/Charger/GetPrices` | Get price list | ❌ |
-| `POST` | `/api/Charger/AddCharger` | Register charger | 🔑 |
-| `GET` | `/api/Charger/GetChargersByUser` | My chargers | 🔑 |
-| `POST` | `/api/Charger/GetNearChargers` | Find nearby | 🔑 |
-| `PUT` | `/api/Charger/ToggleStatus` | Toggle status | 🔑 |
-
-</details>
-
-<details>
-<summary><b>⚡ Charging Requests API</b></summary>
-
-| Method | Endpoint | Description | Auth |
-|:------:|:---------|:------------|:----:|
-| `POST` | `/api/ChargingRequest/sendChargingRequest` | Send request | 🔑 |
-| `PUT` | `/api/ChargingRequest/AcceptRequest` | Accept | 🔑 |
-| `PUT` | `/api/ChargingRequest/RejectRequest` | Reject | 🔑 |
-| `PUT` | `/api/ChargingRequest/ConfirmRequest` | Confirm start | 🔑 |
-| `PUT` | `/api/ChargingRequest/abortRequest` | Abort session | 🔑 |
-
-</details>
-
-<details>
-<summary><b>💳 Payments API</b></summary>
-
-| Method | Endpoint | Description | Auth |
-|:------:|:---------|:------------|:----:|
-| `POST` | `/api/payment/intention` | Create payment intention (Paymob SDK) | 🔑 |
-| `POST` | `/api/payment/webhook` | Paymob webhook (TRANSACTION/CARD_TOKEN) | ❌ |
-| `POST` | `/api/payment/getOrderStatus` | Check payment status | 🔑 |
-| `POST` | `/api/payment/tokenization` | Start card tokenization | 🔑 |
-| `GET` | `/api/payment/GetListOfCards` | List saved cards | 🔑 |
-| `POST` | `/api/payment/setDefault_Card` | Set default card | 🔑 |
-| `POST` | `/api/payment/payWithSavedCard` | Pay with saved card | 🔑 |
-| `DELETE` | `/api/payment/delete_Card` | Delete saved card | 🔑 |
-
-📖 **[View Full Payment Flow Documentation](./PAYMENT_FLOW_FRONTEND.md)**
-
-</details>
-
-<details>
-<summary><b>🛡️ Admin API</b></summary>
-
-| Method | Endpoint | Description | Auth |
-|:------:|:---------|:------------|:----:|
-| `GET` | `/api/admin/fees/wallet-transactions` | Get wallet transaction history | 🔑 |
-| `POST` | `/api/admin/fees/transfer` | Add/Deduct wallet balance | 🔑 |
-| `GET` | `/api/admin/complaints` | Get all complaints | 🔑 |
-| `GET` | `/api/admin/complaints/{id}` | Get complaint by ID | 🔑 |
-| `PATCH` | `/api/admin/complaints/{id}/status` | Update complaint status | 🔑 |
-| `GET` | `/api/admin/complaint-categories` | Get complaint categories | 🔑 |
-| `POST` | `/api/admin/complaint-categories` | Create category | 🔑 |
-| `PUT` | `/api/admin/complaint-categories/{id}` | Update category | 🔑 |
-| `DELETE` | `/api/admin/complaint-categories/{id}` | Delete category | 🔑 |
-
-</details>
-
-<details>
-<summary><b>📋 Protocols API</b></summary>
-
-| Method | Endpoint | Description | Auth |
-|:------:|:---------|:------------|:----:|
-| `GET` | `/api/protocol` | Get all protocols | ❌ |
-| `GET` | `/api/protocol/{id}` | Get protocol by ID | ❌ |
-| `POST` | `/api/protocol` | Create protocol | 🔑 |
-| `PUT` | `/api/protocol/{id}` | Update protocol | 🔑 |
-| `DELETE` | `/api/protocol/{id}` | Delete protocol | 🔑 |
-
-</details>
-
----
-
-## ⚡ Quick Start
-
-### Prerequisites
-
-<div align="center">
-
-![.NET SDK](https://img.shields.io/badge/.NET_SDK_8.0+-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
-![SQL Server](https://img.shields.io/badge/SQL_Server_2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white)
-![Redis](https://img.shields.io/badge/Redis_7.0+-DC382D?style=for-the-badge&logo=redis&logoColor=white)
-
-</div>
-
-### 🚀 Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/AhmedSalem104/Voltyks.API.git
-
-# Navigate to project
-cd Voltyks.API
-
-# Restore dependencies
-dotnet restore
-
-# Apply database migrations
-cd Voltyks.API
-dotnet ef database update
-
-# Run the application
-dotnet run
-```
-
-### 🔧 Configuration
-
-<details>
-<summary><b>📝 appsettings.json Example</b></summary>
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=your-server;Database=VoltyksDB;...",
-    "Redis": "your-redis-url:6379,password=***,ssl=True"
-  },
-  "JwtOptions": {
-    "Issuer": "https://your-domain.com",
-    "Audience": "YourAudience",
-    "SecurityKey": "your-super-secret-key-min-32-chars",
-    "ExpiresInMinutes": 43200
-  },
-  "Paymob": {
-    "ENV": "test",
-    "ApiKey": "your-api-key",
-    "SecretKey": "your-secret-key",
-    "PublicKey": "your-public-key"
-  },
-  "Firebase": {
-    "ProjectId": "your-project-id",
-    "ServiceAccountFile": "Firebase/service-account-key.json"
-  }
-}
-```
-
-</details>
-
----
-
-## 📊 API Response Format
+## Features
 
 <table>
 <tr>
-<td width="50%">
+<td width="20%" align="center"><b>Core</b></td>
+<td width="20%" align="center"><b>Security</b></td>
+<td width="20%" align="center"><b>Payments</b></td>
+<td width="20%" align="center"><b>Mobile</b></td>
+<td width="20%" align="center"><b>Admin</b></td>
+</tr>
+<tr>
+<td>Geolocation Search</td>
+<td>JWT + Refresh Tokens</td>
+<td>Paymob Intention API</td>
+<td>Push Notifications</td>
+<td>User Management</td>
+</tr>
+<tr>
+<td>Real-time Requests</td>
+<td>OAuth (Google/FB)</td>
+<td>Card Tokenization</td>
+<td>Device Management</td>
+<td>Wallet Control</td>
+</tr>
+<tr>
+<td>Two-way Ratings</td>
+<td>OTP Verification</td>
+<td>Saved Cards</td>
+<td>Deep Linking</td>
+<td>Complaints System</td>
+</tr>
+<tr>
+<td>Wallet System</td>
+<td>HMAC Webhook Verify</td>
+<td>Apple Pay</td>
+<td>Multi-language</td>
+<td>Store Management</td>
+</tr>
+<tr>
+<td>E-commerce Store</td>
+<td>Rate Limiting</td>
+<td>Mobile Wallets</td>
+<td>SignalR Real-time</td>
+<td>Reservations</td>
+</tr>
+</table>
 
-### ✅ Success Response
+### Feature Architecture
+
+```
+                                    VOLTYKS PLATFORM
+    ┌─────────────────────────────────────────────────────────────────┐
+    │                                                                 │
+    │   ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐  │
+    │   │  CHARGING   │   │  PAYMENTS   │   │      SECURITY       │  │
+    │   │             │   │             │   │                     │  │
+    │   │ • Find      │   │ • Cards     │   │ • JWT Auth          │  │
+    │   │ • Request   │   │ • Wallets   │   │ • OAuth 2.0         │  │
+    │   │ • Track     │   │ • Apple Pay │   │ • OTP SMS           │  │
+    │   │ • Rate      │   │ • Saved     │   │ • Rate Limiting     │  │
+    │   └─────────────┘   └─────────────┘   └─────────────────────┘  │
+    │                                                                 │
+    │   ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐  │
+    │   │    STORE    │   │   ADMIN     │   │    NOTIFICATIONS    │  │
+    │   │             │   │             │   │                     │  │
+    │   │ • Products  │   │ • Users     │   │ • Push (FCM)        │  │
+    │   │ • Categories│   │ • Wallets   │   │ • SignalR           │  │
+    │   │ • Reserve   │   │ • Fees      │   │ • SMS               │  │
+    │   │ • Images    │   │ • Reports   │   │ • In-App            │  │
+    │   └─────────────┘   └─────────────┘   └─────────────────────┘  │
+    │                                                                 │
+    └─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Tech Stack
+
+<p align="center">
+  <a href="https://dotnet.microsoft.com/"><img src="https://skillicons.dev/icons?i=dotnet" alt=".NET" /></a>
+  <a href="https://docs.microsoft.com/en-us/dotnet/csharp/"><img src="https://skillicons.dev/icons?i=cs" alt="C#" /></a>
+  <a href="https://azure.microsoft.com/"><img src="https://skillicons.dev/icons?i=azure" alt="Azure" /></a>
+  <a href="https://redis.io/"><img src="https://skillicons.dev/icons?i=redis" alt="Redis" /></a>
+  <a href="https://firebase.google.com/"><img src="https://skillicons.dev/icons?i=firebase" alt="Firebase" /></a>
+  <a href="https://git-scm.com/"><img src="https://skillicons.dev/icons?i=git" alt="Git" /></a>
+  <a href="https://github.com/"><img src="https://skillicons.dev/icons?i=github" alt="GitHub" /></a>
+  <a href="https://www.postman.com/"><img src="https://skillicons.dev/icons?i=postman" alt="Postman" /></a>
+</p>
+
+### Backend & Framework
+
+| Technology | Version | Purpose |
+|:-----------|:--------|:--------|
+| .NET | 8.0 | Runtime & SDK |
+| ASP.NET Core | 8.0 | Web API Framework |
+| Entity Framework Core | 8.0 | ORM & Migrations |
+| SignalR | 8.0 | Real-time Communication |
+| AutoMapper | 14.0.0 | Object Mapping |
+
+### Database & Caching
+
+| Technology | Purpose |
+|:-----------|:--------|
+| Azure SQL Server | Primary Database |
+| Redis (Upstash) | Distributed Caching |
+| Dapper | High-performance Queries |
+
+### Authentication & Security
+
+| Technology | Purpose |
+|:-----------|:--------|
+| JWT Bearer | Token Authentication |
+| ASP.NET Identity | User Management |
+| BCrypt | Password Hashing |
+| Google OAuth2 | Social Login |
+| Facebook OAuth2 | Social Login |
+
+### External Services
+
+| Service | Purpose |
+|:--------|:--------|
+| Paymob | Payment Gateway (Cards, Wallets, Apple Pay) |
+| Firebase (FCM) | Push Notifications |
+| SMS Egypt | OTP & SMS |
+| Twilio | SMS Fallback |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     PRESENTATION LAYER                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Controllers │  │ Middlewares │  │ SignalR Hubs            │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                     APPLICATION LAYER                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │  Services   │  │ Interfaces  │  │ Business Logic          │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                       DOMAIN LAYER                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │    DTOs     │  │    Enums    │  │ Mapping Profiles        │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                   INFRASTRUCTURE LAYER                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │ Repositories│  │ Unit of Work│  │ External Services       │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                    PERSISTENCE LAYER                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │  DbContext  │  │  Entities   │  │ Migrations & Seeding    │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Project Structure
+
+```
+Voltyks.API/
+│
+├── Voltyks.API/                       # Presentation Layer
+│   ├── Controllers/                   # API Endpoints
+│   │   ├── Admin/                     # Admin-specific endpoints
+│   │   ├── AuthController.cs          # Authentication
+│   │   ├── ChargerController.cs       # Charger management
+│   │   ├── ChargingRequestController.cs
+│   │   ├── PaymentController.cs       # Payment processing
+│   │   ├── StoreController.cs         # E-commerce store
+│   │   └── ...
+│   ├── Hubs/                          # SignalR Hubs
+│   ├── Middlewares/                   # Custom Middleware
+│   └── Program.cs                     # Application Entry Point
+│
+├── Voltyks.Application/               # Application Layer
+│   ├── Interfaces/                    # Service Contracts
+│   └── Services/                      # Business Logic
+│       ├── Auth/                      # Authentication Services
+│       ├── Payment/                   # Payment Processing
+│       ├── Store/                     # E-commerce Services
+│       └── ...
+│
+├── Voltyks.Core/                      # Domain Layer
+│   ├── DTOs/                          # Data Transfer Objects
+│   │   ├── Store/                     # Store DTOs
+│   │   │   ├── Products/
+│   │   │   ├── Categories/
+│   │   │   └── Reservations/
+│   │   └── ...
+│   ├── Enums/                         # Enumerations
+│   └── MappingProfiles/               # AutoMapper Profiles
+│
+├── Voltyks.Infrastructure/            # Infrastructure Layer
+│   ├── Repositories/                  # Data Access
+│   └── UnitOfWork/                    # Transaction Management
+│
+├── Voltyks.Persistence/               # Persistence Layer
+│   ├── Data/                          # DbContext & Seeding
+│   ├── Entities/                      # Database Entities
+│   │   ├── Main/
+│   │   │   ├── Store/                 # Store entities
+│   │   │   ├── Paymob/                # Payment entities
+│   │   │   └── ...
+│   └── Migrations/                    # EF Migrations
+│
+└── Voltyks.AdminControlDashboard/     # Admin Module
+    ├── DTOs/                          # Admin-specific DTOs
+    └── Services/                      # Admin Services
+```
+
+---
+
+## Database Schema
+
+### Entity Overview (40+ Entities)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      DATABASE ENTITIES                          │
+├──────────────────┬──────────────────┬───────────────────────────┤
+│   IDENTITY (4)   │   VEHICLES (5)   │      CHARGING (5+)        │
+├──────────────────┼──────────────────┼───────────────────────────┤
+│ • AppUser        │ • Vehicle        │ • ChargingRequest         │
+│ • Address        │ • Brand          │ • Process                 │
+│ • UserType       │ • Model          │ • Charger                 │
+│ • UsersBanned    │ • Capacity       │ • ChargerAddress          │
+│                  │ • Protocol       │ • RatingsHistory          │
+├──────────────────┼──────────────────┼───────────────────────────┤
+│   PAYMENT (8)    │    STORE (3)     │      SUPPORT (4+)         │
+├──────────────────┼──────────────────┼───────────────────────────┤
+│ • PaymentOrder   │ • StoreCategory  │ • Notification            │
+│ • PaymentTransaction│ • StoreProduct│ • UserGeneralComplaint    │
+│ • PaymentAction  │ • StoreReservation│ • ComplaintCategory      │
+│ • UserSavedCard  │                  │ • UserReport              │
+│ • WebhookLog     │                  │ • TermsDocument           │
+│ • CardTokenWebhookLog│              │ • DeviceToken             │
+│ • RevokedCardToken│                 │                           │
+│ • ProcessedWebhook│                 │                           │
+└──────────────────┴──────────────────┴───────────────────────────┘
+```
+
+### Key Relationships
+
+```
+AppUser ─────┬───── Vehicle (1:N)
+             ├───── Charger (1:N)
+             ├───── ChargingRequest (1:N)
+             ├───── UserSavedCard (1:N)
+             ├───── StoreReservation (1:N)
+             └───── Notification (1:N)
+
+Brand ───── Model ───── Vehicle
+
+StoreCategory ───── StoreProduct ───── StoreReservation
+
+ChargingRequest ───── Process ───── RatingsHistory
+```
+
+---
+
+## API Reference
+
+### Base URL
+```
+Production: https://voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net
+```
+
+### Authentication Endpoints `/api/auth`
+
+| Method | Endpoint | Description | Auth |
+|:------:|:---------|:------------|:----:|
+| `POST` | `/Login` | User login with JWT | - |
+| `POST` | `/register` | Create new account | - |
+| `POST` | `/RefreshToken` | Refresh JWT token | - |
+| `POST` | `/forget-password` | Request password reset | - |
+| `POST` | `/verify-forget-password-otp` | Verify OTP | - |
+| `POST` | `/reset-password` | Reset with OTP | - |
+| `GET` | `/GetProfileDetails` | Get user profile | Required |
+| `PUT` | `/toggle-availability` | Toggle availability | Required |
+| `GET` | `/wallet` | Get wallet balance | Required |
+| `POST` | `/general-complaints` | Submit complaint | Required |
+
+### Charger Endpoints `/api/charger`
+
+| Method | Endpoint | Description | Auth |
+|:------:|:---------|:------------|:----:|
+| `GET` | `/GetCapacity` | Get capacities (cached 1hr) | - |
+| `GET` | `/GetProtocol` | Get protocols (cached 1hr) | - |
+| `GET` | `/GetPrices` | Get price list (cached 30min) | - |
+| `POST` | `/AddCharger` | Register charger | Required |
+| `GET` | `/GetChargersByUser` | My chargers | Required |
+| `POST` | `/GetNearChargers` | Find nearby | Required |
+| `PUT` | `/ToggleStatus` | Toggle status | Required |
+| `PUT` | `/UpdateCharger` | Update details | Required |
+| `DELETE` | `/DeleteCharger` | Delete charger | Required |
+
+### Charging Request Endpoints `/api/chargingrequest`
+
+| Method | Endpoint | Description | Auth |
+|:------:|:---------|:------------|:----:|
+| `POST` | `/sendChargingRequest` | Send request | Required |
+| `PUT` | `/AcceptRequest` | Accept | Required |
+| `PUT` | `/RejectRequest` | Reject | Required |
+| `PUT` | `/ConfirmRequest` | Confirm start | Required |
+| `PUT` | `/abortRequest` | Abort session | Required |
+| `POST` | `/registerDeviceToken` | Register FCM token | Required |
+
+### Payment Endpoints `/api/payment`
+
+| Method | Endpoint | Description | Auth |
+|:------:|:---------|:------------|:----:|
+| `POST` | `/intention` | Create payment intention | Required |
+| `POST` | `/webhook` | Paymob webhook (TRANSACTION/TOKEN) | - |
+| `POST` | `/getOrderStatus` | Check payment status | Required |
+| `POST` | `/tokenization` | Start card tokenization | Required |
+| `GET` | `/GetListOfCards` | List saved cards | Required |
+| `POST` | `/setDefault_Card` | Set default card | Required |
+| `POST` | `/payWithSavedCard` | Pay with saved card | Required |
+| `DELETE` | `/delete_Card` | Delete saved card | Required |
+| `POST` | `/applepay/process` | Process Apple Pay | Required |
+
+### Store Endpoints `/api/store`
+
+| Method | Endpoint | Description | Auth |
+|:------:|:---------|:------------|:----:|
+| `GET` | `/categories` | List all categories | - |
+| `GET` | `/products` | List products with pagination | - |
+| `GET` | `/GetProductById?id={id}` | Get product by ID | - |
+| `GET` | `/GetProductBySlug?slug={slug}` | Get product by slug | - |
+| `POST` | `/reservations` | Create reservation | Required |
+| `GET` | `/my-reservations` | User's reservations | Required |
+| `PUT` | `/UpdateMyReservation?id={id}` | Update reservation | Required |
+| `DELETE` | `/CancelMyReservation?id={id}` | Cancel reservation | Required |
+
+#### Product Response with IsReserved
+
+```json
+{
+  "data": {
+    "id": 1,
+    "categoryId": 2,
+    "categoryName": "EV Accessories",
+    "name": "Portable Charger",
+    "slug": "portable-charger",
+    "description": "High-quality portable EV charger",
+    "price": 2500.00,
+    "currency": "EGP",
+    "images": ["url1", "url2"],
+    "status": "active",
+    "isReservable": true,
+    "isReserved": false
+  },
+  "message": "Product retrieved successfully",
+  "status": true
+}
+```
+
+### Admin Store Endpoints `/api/admin/store`
+
+| Method | Endpoint | Description |
+|:------:|:---------|:------------|
+| `GET` | `/categories` | List categories (with soft-delete filter) |
+| `GET` | `/categories/{id}` | Get category by ID |
+| `POST` | `/categories` | Create category |
+| `PUT` | `/categories/{id}` | Update category |
+| `DELETE` | `/categories/{id}` | Soft delete category |
+| `POST` | `/categories/{id}/restore` | Restore category |
+| `DELETE` | `/categories/{id}/force` | Hard delete category |
+| `GET` | `/products` | List products |
+| `GET` | `/products/{id}` | Get product by ID |
+| `POST` | `/products` | Create product |
+| `PUT` | `/products/{id}` | Update product |
+| `DELETE` | `/products/{id}` | Soft delete product |
+| `POST` | `/products/{id}/restore` | Restore product |
+| `DELETE` | `/products/{id}/force` | Hard delete product |
+| `POST` | `/products/{id}/images` | Upload images |
+| `DELETE` | `/products/{id}/images` | Delete image |
+| `DELETE` | `/products/{id}/images/all` | Delete all images |
+| `GET` | `/reservations` | List reservations |
+| `GET` | `/reservations/{id}` | Get reservation details |
+| `PUT` | `/reservations/{id}/contact` | Record contact |
+| `PUT` | `/reservations/{id}/payment` | Record payment |
+| `PUT` | `/reservations/{id}/delivery` | Record delivery |
+| `PUT` | `/reservations/{id}/complete` | Complete reservation |
+| `PUT` | `/reservations/{id}/cancel` | Cancel reservation |
+
+### Admin Endpoints `/api/admin/*`
+
+| Method | Endpoint | Description |
+|:------:|:---------|:------------|
+| `GET` | `/users` | List users with search |
+| `GET` | `/users/{id}` | Get user details |
+| `POST` | `/users/{id}/ban-toggle` | Toggle user ban |
+| `DELETE` | `/users/{id}` | Soft delete user |
+| `DELETE` | `/users/{id}/hard` | Hard delete user |
+| `GET` | `/fees/wallet-transactions` | Wallet history |
+| `POST` | `/fees/transfer` | Add/Deduct balance |
+| `GET` | `/complaints` | List complaints |
+| `PATCH` | `/complaints/{id}/status` | Update status |
+| `GET` | `/notifications` | List notifications |
+| `PATCH` | `/notifications/{id}/read` | Mark as read |
+
+---
+
+## API Response Format
+
+### Success Response
 ```json
 {
   "data": { ... },
@@ -478,10 +487,7 @@ dotnet run
 }
 ```
 
-</td>
-<td width="50%">
-
-### ❌ Error Response
+### Error Response
 ```json
 {
   "data": null,
@@ -491,12 +497,7 @@ dotnet run
 }
 ```
 
-</td>
-</tr>
-</table>
-
-### 📄 Paginated Response
-
+### Paginated Response
 ```json
 {
   "data": {
@@ -515,86 +516,126 @@ dotnet run
 
 ---
 
-## 🔄 Charging Workflow
+## Charging Workflow
 
-```mermaid
-sequenceDiagram
-    participant EV as 🚗 EV Owner
-    participant API as ⚡ Voltyks API
-    participant CO as 🔌 Charger Owner
-    participant Pay as 💳 Paymob
-
-    EV->>API: 1. Search nearby chargers
-    API-->>EV: Return available chargers
-
-    EV->>API: 2. Send charging request
-    API->>CO: 3. Push notification
-
-    CO->>API: 4. Accept request
-    API-->>EV: 5. Request accepted
-
-    EV->>API: 6. Confirm charging started
-    API->>CO: 7. Notify charging started
-
-    Note over EV,CO: ⚡ Charging in progress...
-
-    EV->>API: 8. Complete session
-    API->>Pay: 9. Process payment
-    Pay-->>API: Payment confirmed
-
-    EV->>API: 10. Submit rating
-    CO->>API: 11. Submit rating
-
-    API-->>EV: ✅ Session completed
-    API-->>CO: ✅ Payment received
+```
+    EV Owner                    Voltyks API               Charger Owner
+       │                            │                           │
+       │  1. Search nearby          │                           │
+       │ ─────────────────────────► │                           │
+       │                            │                           │
+       │  ◄──────────────────────── │                           │
+       │     Available chargers     │                           │
+       │                            │                           │
+       │  2. Send charging request  │                           │
+       │ ─────────────────────────► │  3. Push notification     │
+       │                            │ ─────────────────────────►│
+       │                            │                           │
+       │                            │  4. Accept request        │
+       │                            │ ◄─────────────────────────│
+       │  5. Request accepted       │                           │
+       │ ◄──────────────────────────│                           │
+       │                            │                           │
+       │  6. Confirm charging start │                           │
+       │ ─────────────────────────► │  7. Notify started        │
+       │                            │ ─────────────────────────►│
+       │                            │                           │
+       │         ⚡ CHARGING IN PROGRESS ⚡                      │
+       │                            │                           │
+       │  8. Complete session       │                           │
+       │ ─────────────────────────► │                           │
+       │                            │  9. Process payment       │
+       │                            │ ───────► Paymob ──────────│
+       │                            │                           │
+       │  10. Submit rating         │  11. Submit rating        │
+       │ ─────────────────────────► │ ◄─────────────────────────│
+       │                            │                           │
+       │  ✅ Session completed      │  ✅ Payment received      │
+       │ ◄──────────────────────────│ ─────────────────────────►│
 ```
 
 ---
 
-## 💰 Fee Structure
+## Quick Start
 
-<div align="center">
+### Prerequisites
 
+- .NET SDK 8.0+
+- SQL Server 2019+ or Azure SQL
+- Redis 7.0+ (optional, for caching)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://bitbucket.org/voltyks-global/voltyks-backend.git
+
+# Navigate to project
+cd voltyks-backend
+
+# Restore dependencies
+dotnet restore
+
+# Apply database migrations
+cd Voltyks.API
+dotnet ef database update
+
+# Run the application
+dotnet run
 ```
-┌─────────────────────────────────────────────────────┐
-│                  Fee Calculation                     │
-├─────────────────────────────────────────────────────┤
-│                                                      │
-│   Base Amount (Charger Owner)     =    100 EGP      │
-│   Minimum Platform Fee            =      5 EGP      │
-│   Percentage Fee (10%)            =     10 EGP      │
-│                                                      │
-│   Platform Fee = max(5, 100 × 10%) =    10 EGP      │
-│   ─────────────────────────────────────────────     │
-│   Total Charged to EV Owner       =   110 EGP      │
-│                                                      │
-└─────────────────────────────────────────────────────┘
-```
 
-</div>
+### Configuration
+
+Create `appsettings.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=your-server;Database=VoltyksDB;...",
+    "Redis": "your-redis-url:6379,password=***,ssl=True"
+  },
+  "JwtOptions": {
+    "Issuer": "https://your-domain.com",
+    "Audience": "YourAudience",
+    "SecurityKey": "your-super-secret-key-min-32-chars",
+    "ExpiresInMinutes": 43200
+  },
+  "Paymob": {
+    "ENV": "live",
+    "ApiKey": "your-api-key",
+    "SecretKey": "your-secret-key",
+    "PublicKey": "your-public-key",
+    "Integration": {
+      "Card": 5413127,
+      "Wallet": 5413126,
+      "ApplePay": 5458488
+    },
+    "HmacSecret": "your-hmac-secret"
+  },
+  "Firebase": {
+    "ProjectId": "your-project-id",
+    "ServiceAccountFile": "Firebase/service-account-key.json"
+  }
+}
+```
 
 ---
 
-## 🔒 Security
-
-<div align="center">
+## Security
 
 | Feature | Implementation |
-|:-------:|:--------------|
-| 🔐 | JWT tokens with configurable expiration (30 days default) |
-| 🔄 | Refresh tokens stored in Redis with secure rotation |
-| ✅ | HMAC-SHA512 webhook verification (Paymob) |
-| 🚫 | Rate limiting for OTP attempts (5 max) |
-| 🛡️ | User banning system with reason tracking |
-| 🔒 | HTTPS enforced in production |
-| 🔑 | OAuth 2.0 (Google, Facebook) integration |
-| 📝 | PCI-compliant card tokenization (no card data stored) |
-| ⏱️ | Request size limits on webhook endpoints (1MB) |
-| 🔍 | Safe JSON parsing with validation |
+|:--------|:---------------|
+| JWT tokens | Configurable expiration (30 days default) |
+| Refresh tokens | Stored in Redis with secure rotation |
+| HMAC-SHA512 | Webhook verification (Paymob) |
+| Rate limiting | OTP attempts (5 max) |
+| User banning | With reason tracking |
+| HTTPS | Enforced in production |
+| OAuth 2.0 | Google, Facebook integration |
+| Card tokenization | PCI-compliant (no card data stored) |
+| Request limits | 1MB on webhook endpoints |
 
-</div>
-
-### 🔐 Payment Security Features
+### Payment Security
 
 ```
 ✅ HMAC-SHA512 Webhook Signature Verification
@@ -608,61 +649,55 @@ sequenceDiagram
 
 ---
 
-## 📚 Documentation
+## Deployment
 
-<div align="center">
+### CI/CD with GitHub Actions
 
-| Document | Description |
-|:--------:|:------------|
-| [💳 Payment Flow (Frontend)](./PAYMENT_FLOW_FRONTEND.md) | Complete payment integration guide for mobile/web |
-| [📖 Payment System](./PAYMENT_SYSTEM.md) | Payment system architecture & flows |
-| [📖 PaginationAPI.md](./Docs/PaginationAPI.md) | Pagination implementation guide |
-| [📖 ComplaintSystemAPI.md](./Docs/ComplaintSystemAPI.md) | Complaint system documentation |
-| [📖 Swagger UI](https://voltyks-dqh6fzgwdndrdng7.canadacentral-01.azurewebsites.net/swagger) | Interactive API documentation |
+```yaml
+Triggers:
+  - Push to master branch
+  - Manual workflow dispatch
 
-</div>
-
----
-
-## 🚀 Deployment
-
-<div align="center">
-
-```mermaid
-graph LR
-    A[💻 Local Dev] --> B[🔧 Build]
-    B --> C[🧪 Test]
-    C --> D[📦 Publish]
-    D --> E[☁️ Azure App Service]
-
-    style A fill:#6C63FF,color:#fff
-    style B fill:#FF6B6B,color:#fff
-    style C fill:#4ECDC4,color:#fff
-    style D fill:#45B7D1,color:#fff
-    style E fill:#96CEB4,color:#fff
+Steps:
+  1. Checkout code
+  2. Setup .NET 8
+  3. Restore dependencies
+  4. Fix database schema
+  5. Apply database migrations
+  6. Build & Publish
+  7. Deploy to Azure App Service
 ```
 
-</div>
+### Manual Deployment
 
 ```bash
 # Build for production
-dotnet publish -c Release -r linux-x64 --self-contained false
+dotnet publish -c Release -o ./publish
+
+# Create deployment package
+Compress-Archive -Path ./publish/* -DestinationPath deploy.zip
 
 # Deploy via Azure CLI
-az webapp deploy --resource-group VoltyksAPI_RG --name Voltyks --src-path ./publish.zip
+az webapp deploy --resource-group Voltyks --name VoltyksApp --src-path deploy.zip
 ```
 
 ---
 
-## 🤝 Contributing
+## CORS Configuration
 
-<div align="center">
+```csharp
+AllowedOrigins:
+  - https://voltyks.com
+  - https://www.voltyks.com
+  - https://admin.voltyks.com
+  - https://voltyks.vercel.app
+  - http://localhost:3000 (dev)
+  - http://localhost:5173 (dev)
+```
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+---
 
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](http://makeapullrequest.com)
-
-</div>
+## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -672,38 +707,26 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
-## 📄 License
+## License
 
-<div align="center">
-
-This project is proprietary software. All rights reserved.
-
-[![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
-
-</div>
+This project is proprietary software. All rights reserved by **Voltyks Global**.
 
 ---
 
-## 👨‍💻 Author
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=100&section=footer" alt="Footer" />
+</p>
 
-<div align="center">
+<p align="center">
+  <strong>Voltyks</strong> — Powering the Future of EV Charging
+</p>
 
-**Ahmed Salem**
+<p align="center">
+  Built with .NET 8 | Deployed on Microsoft Azure
+</p>
 
-[![GitHub](https://img.shields.io/badge/GitHub-AhmedSalem104-181717?style=for-the-badge&logo=github)](https://github.com/AhmedSalem104)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/ahmedsalem104)
-
-</div>
-
----
-
-<!-- Animated Footer -->
-<div align="center">
-
-![Footer](https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=100&section=footer)
-
-**Voltyks** — Powering the Future of EV Charging ⚡
-
-<sub>Built with ❤️ using .NET 8 | Deployed on Microsoft Azure</sub>
-
-</div>
+<p align="center">
+  <a href="https://voltyks.com">Website</a> •
+  <a href="https://admin.voltyks.com">Admin Dashboard</a> •
+  <a href="mailto:support@voltyks.com">Support</a>
+</p>
