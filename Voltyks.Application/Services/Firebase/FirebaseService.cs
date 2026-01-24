@@ -101,7 +101,7 @@ namespace Voltyks.Application.Services.Firebase
                     }
                 }
 
-                // ✅ إعداد الـ payload النهائي
+                // ✅ إعداد الـ payload النهائي مع Sound + Android Channel + APNS
                 var payload = new
                 {
                     message = new
@@ -110,7 +110,29 @@ namespace Voltyks.Application.Services.Firebase
                         notification = new
                         {
                             title = title,
-                            body = body
+                            body = body,
+                            sound = "default"
+                        },
+                        android = new
+                        {
+                            priority = "high",
+                            notification = new
+                            {
+                                sound = "default",
+                                channel_id = "voltyks_notifications_v2",
+                                click_action = "FLUTTER_NOTIFICATION_CLICK"
+                            }
+                        },
+                        apns = new
+                        {
+                            payload = new
+                            {
+                                aps = new
+                                {
+                                    sound = "default",
+                                    badge = 1
+                                }
+                            }
                         },
                         data = data
                     }
