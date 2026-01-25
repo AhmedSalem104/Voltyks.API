@@ -164,7 +164,17 @@ namespace Voltyks.Application.Services.ChargingRequest
                     timerDurationMinutes = 10
                 });
 
-                return new ApiResponse<NotificationResultDto>(result, "Charging request accepted", true);
+                // إضافة معلومات التايمر في الـ response لصاحب الشاحن
+                var resultWithTimer = result with
+                {
+                    ExtraData = new
+                    {
+                        timerStartedAt = request.RespondedAt,
+                        timerDurationMinutes = 10
+                    }
+                };
+
+                return new ApiResponse<NotificationResultDto>(resultWithTimer, "Charging request accepted", true);
 
             }
             catch (Exception ex)
