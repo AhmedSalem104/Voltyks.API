@@ -55,18 +55,31 @@ namespace Voltyks.Presentation
             return Ok(result);
         }
 
+        // ========== REFRESH TOKEN DISABLED ==========
+        // تم تعطيل هذه الخاصية مؤقتاً
+        // [HttpPost("RefreshToken")]
+        // public async Task<IActionResult> RefreshJwtToken()
+        // {
+        //     var result = await serviceManager.AuthService.RefreshJwtTokenFromCookiesAsync();
+        //
+        //     if (!result.Status)
+        //     {
+        //         return Unauthorized(result);
+        //     }
+        //
+        //     return Ok(result);
+        // }
+
         [HttpPost("RefreshToken")]
-        public async Task<IActionResult> RefreshJwtToken()
+        public IActionResult RefreshJwtToken()
         {
-            var result = await serviceManager.AuthService.RefreshJwtTokenFromCookiesAsync();
-
-            if (!result.Status)
-            {
-                return Unauthorized(result);
-            }
-
-            return Ok(result);
+            return BadRequest(new ApiResponse<object>(
+                data: null,
+                message: "Refresh Token feature is temporarily disabled. Please login again.",
+                status: false
+            ));
         }
+        // ========== END REFRESH TOKEN DISABLED ==========
 
         [HttpPost("CheckPhoneNumberExists")]
         public async Task<IActionResult> CheckPhoneNumberExists([FromBody] PhoneNumberDto phoneNumberDto)

@@ -102,6 +102,7 @@ namespace Voltyks.Application.Services.Firebase
                 }
 
                 // ✅ إعداد الـ payload النهائي مع Sound + Android Channel + APNS
+                // ملاحظة: الـ sound يوضع في android.notification و apns فقط، وليس في notification مباشرة
                 var payload = new
                 {
                     message = new
@@ -110,8 +111,7 @@ namespace Voltyks.Application.Services.Firebase
                         notification = new
                         {
                             title = title,
-                            body = body,
-                            sound = "default"
+                            body = body
                         },
                         android = new
                         {

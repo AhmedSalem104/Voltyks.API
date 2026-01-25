@@ -256,13 +256,15 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
         private async Task<List<Charger>> GetChargersFromDbAsync(NearChargerSearchDto searchDto, string currentUserId)
         {
+            // فصل منطق عرض الشاحن عن Adapter فقط
+            // الـ Adapter تكون معلومة إضافية وليست شرط للظهور
+            // لكن IsAvailable و IsActive لازم يكونوا true
             return (await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
                c => !c.IsDeleted && c.IsActive &&
-                    (c.ProtocolId == searchDto.ProtocolId ||
-                     (c.Adaptor == true && c.ProtocolId != searchDto.ProtocolId)) &&
-                     c.User.IsAvailable == true &&
-                     c.User.IsBanned == false &&
-                     c.User.Id != currentUserId,
+                    c.ProtocolId == searchDto.ProtocolId &&
+                    c.User.IsAvailable == true &&
+                    c.User.IsBanned == false &&
+                    c.User.Id != currentUserId,
                false,
                c => c.Capacity,
                c => c.PriceOption,

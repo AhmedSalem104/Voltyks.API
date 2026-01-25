@@ -94,7 +94,8 @@ namespace Voltyks.Core.Mapping
                 .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption.Value))
                 .ForMember(dest => dest.Latitude, opt => opt.MapFrom(src => src.Address.Latitude))
                 .ForMember(dest => dest.Longitude, opt => opt.MapFrom(src => src.Address.Longitude))
-                .ForMember(dest => dest.DistanceInKm, opt => opt.Ignore()); // نحسبها يدوي
+                .ForMember(dest => dest.DistanceInKm, opt => opt.Ignore()) // نحسبها يدوي
+                .ForMember(dest => dest.AdapterAvailable, opt => opt.MapFrom(src => src.Adaptor));
 
 
 

@@ -30,7 +30,6 @@ namespace Voltyks.Persistence.Entities.Main
         public decimal VoltyksFees { get; set; }      // رسوم Voltyks
         public decimal EstimatedPrice { get; set; }  // المجموع الكلي (Base + Fee)
 
-
     }
 
 }

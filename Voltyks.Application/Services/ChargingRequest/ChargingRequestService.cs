@@ -53,6 +53,16 @@ namespace Voltyks.Application.Services.ChargingRequest
         {
             try
             {
+                // Safety net: التحقق من صحة الموقع - رفض (0,0) لأنه يعني فشل GPS
+                if (dto.Latitude == 0 && dto.Longitude == 0)
+                {
+                    return new ApiResponse<NotificationResultDto>(
+                        null,
+                        "Invalid location. Please enable GPS and try again.",
+                        false
+                    );
+                }
+
                 var charger = await GetChargerWithIncludes(dto.ChargerId);
                 if (charger == null)
                     return new ApiResponse<NotificationResultDto>(null, "Charger not found", false);
@@ -87,7 +97,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                     requestId = chargingRequest.Id,
                     chargerId = dto.ChargerId,
                     kwNeeded = dto.KwNeeded,
-                    status = "pending"
+                    status = "pending",
+                    timerStartedAt = DateTimeHelper.GetEgyptTime(),
+                    timerDurationMinutes = 5
                 });
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request sent successfully", true);
@@ -132,12 +144,24 @@ namespace Voltyks.Application.Services.ChargingRequest
                     userTypeId: 2 // VehicleOwner
                 );
 
-                // SignalR Real-time notification
+                // SignalR Real-time notification لصاحب العربية
                 await _signalRService.SendRequestAcceptedAsync(request.Id, recipientUserId!, new
                 {
                     requestId = request.Id,
                     chargerOwnerName = request.Charger?.User?.FullName,
-                    status = "accepted"
+                    status = "accepted",
+                    timerStartedAt = request.RespondedAt,
+                    timerDurationMinutes = 10
+                });
+
+                // SignalR لصاحب الشاحن أيضاً لتوحيد التايمر
+                await _signalRService.SendRequestAcceptedAsync(request.Id, request.Charger?.User?.Id!, new
+                {
+                    requestId = request.Id,
+                    carOwnerName = request.CarOwner?.FullName,
+                    status = "accepted",
+                    timerStartedAt = request.RespondedAt,
+                    timerDurationMinutes = 10
                 });
 
                 return new ApiResponse<NotificationResultDto>(result, "Charging request accepted", true);

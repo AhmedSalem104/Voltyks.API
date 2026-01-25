@@ -14,6 +14,7 @@ namespace Voltyks.Core.DTOs.Charger
         public double DistanceInKm { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+        public bool? AdapterAvailable { get; set; }  // معلومة إضافية فقط
     }
 
 }
