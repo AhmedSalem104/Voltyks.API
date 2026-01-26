@@ -135,13 +135,21 @@ namespace Voltyks.Application.Services.ChargingRequest
                 var body = $"Your request to charge at {request.Charger?.User?.FullName}'s station has been accepted.";
                 var notificationType = "ChargerOwner_AcceptRequest";
 
+                // Timer data للـ FCM notification
+                var timerData = new Dictionary<string, string>
+                {
+                    ["timerStartedAt"] = request.RespondedAt?.ToString("o") ?? "",
+                    ["timerDurationMinutes"] = "10"
+                };
+
                 var result = await SendAndPersistNotificationAsync(
                     receiverUserId: recipientUserId!,
                     requestId: request.Id,
                     title: title,
                     body: body,
                     notificationType: notificationType,
-                    userTypeId: 2 // VehicleOwner
+                    userTypeId: 2, // VehicleOwner
+                    extraData: timerData
                 );
 
                 // SignalR Real-time notification لصاحب العربية
@@ -771,7 +779,8 @@ namespace Voltyks.Application.Services.ChargingRequest
         string title,
         string body,
         string notificationType,
-        int userTypeId
+        int userTypeId,
+        Dictionary<string, string>? extraData = null
     )
         {
             if (string.IsNullOrWhiteSpace(receiverUserId))
@@ -783,7 +792,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             if (tokens.Count > 0)
             {
                 await System.Threading.Tasks.Task.WhenAll(tokens.Select(t =>
-                    _firebaseService.SendNotificationAsync(t, title, body, requestId, notificationType)
+                    _firebaseService.SendNotificationAsync(t, title, body, requestId, notificationType, extraData)
                 ));
             }
 
