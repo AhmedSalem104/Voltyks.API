@@ -21,6 +21,12 @@ namespace Voltyks.Persistence.Entities.Main
 
         public ProcessStatus Status { get; set; } = ProcessStatus.PendingCompleted;
 
+        /// <summary>
+        /// Fine-grained sub-state for active processes (e.g., "awaiting_completion", "charging_in_progress").
+        /// Null for final states (Completed, Aborted) or legacy records.
+        /// </summary>
+        public string? SubStatus { get; set; }
+
         public double? VehicleOwnerRating { get; set; }
         public double? ChargerOwnerRating { get; set; }
 

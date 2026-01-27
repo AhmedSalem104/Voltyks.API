@@ -126,7 +126,8 @@ namespace Voltyks.Core.DTOs.Processes
                 EstimatedPrice = dto.EstimatedPrice,
                 AmountCharged = dto.AmountCharged,
                 AmountPaid = dto.AmountPaid,
-                Status = ProcessStatus.PendingCompleted
+                Status = ProcessStatus.PendingCompleted,
+                SubStatus = "awaiting_completion"
             };
 
             using var tx = await _ctx.Database.BeginTransactionAsync(ct);
@@ -284,6 +285,7 @@ namespace Voltyks.Core.DTOs.Processes
                 else if (decision == "started")
                 {
                     request.Status = "Started";
+                    process.SubStatus = "charging_in_progress";
                 }
                 else if (decision == "aborted" || decision == "ended-by-report")
                 {
@@ -482,6 +484,8 @@ namespace Voltyks.Core.DTOs.Processes
                     // بدء العملية: بنعلّم الطلب إنها بدأت
                     // لو عندك ProcessStatus.Started استخدمه؛ غير كده هنسيب Status زي ما هو ونعلم الطلب
                     request.Status = "Started";
+                    process.SubStatus = "charging_in_progress";
+                    _ctx.Update(process);
                     _ctx.Update(request);
                     await _ctx.SaveChangesAsync(ct);
 
@@ -1013,7 +1017,292 @@ namespace Voltyks.Core.DTOs.Processes
             );
         }
 
+        public async Task<ApiResponse<PendingProcessesResponseDto>> GetPendingProcessesAsync(CancellationToken ct = default)
+        {
+            var me = CurrentUserId();
+            if (string.IsNullOrEmpty(me))
+                return new ApiResponse<PendingProcessesResponseDto>("Unauthorized", false);
 
+            // Statuses that indicate "pending" / active processes needing attention
+            // Excludes: completed, aborted, rejected, expired
+            var pendingStatuses = new[] { "pending", "accepted", "confirmed", "Started", "PendingCompleted" };
+
+            // Fetch all charging requests where user is involved and status is pending
+            var requests = await _ctx.Set<ChargingRequestEntity>()
+                .AsNoTracking()
+                .Include(r => r.CarOwner)
+                .Include(r => r.Charger).ThenInclude(c => c.User)
+                .Include(r => r.Charger).ThenInclude(c => c.Protocol)
+                .Include(r => r.Charger).ThenInclude(c => c.Capacity)
+                .Where(r =>
+                    (r.UserId == me || r.RecipientUserId == me) &&
+                    pendingStatuses.Contains(r.Status))
+                .OrderByDescending(r => r.RequestedAt)
+                .ToListAsync(ct);
+
+            // Fetch associated processes for these requests
+            var requestIds = requests.Select(r => r.Id).ToList();
+            var processes = await _ctx.Set<ProcessEntity>()
+                .AsNoTracking()
+                .Where(p => requestIds.Contains(p.ChargerRequestId))
+                .ToDictionaryAsync(p => p.ChargerRequestId, ct);
+
+            var items = new List<PendingProcessDto>();
+
+            foreach (var req in requests)
+            {
+                var isVehicleOwner = req.UserId == me;
+                var isChargerOwner = req.RecipientUserId == me;
+
+                processes.TryGetValue(req.Id, out var process);
+
+                // Read SubStatus from DB if available, otherwise compute it
+                var (computedSubStatus, screenKey, notificationType, availableActions) =
+                    DetermineStatusContext(req.Status, isVehicleOwner, isChargerOwner);
+
+                // Use persisted SubStatus from Process entity when available (for Process-backed states)
+                // Fallback to computed value for ChargingRequest-only states or legacy records
+                var subStatus = process?.SubStatus ?? computedSubStatus;
+
+                // Re-derive screenKey if SubStatus came from DB (ensures consistency)
+                if (process?.SubStatus != null)
+                {
+                    screenKey = DeriveScreenKeyFromSubStatus(process.SubStatus, isVehicleOwner, isChargerOwner);
+                }
+
+                // Consistency check: log warning if Process.Status and SubStatus don't match expected mapping
+                if (process != null)
+                {
+                    var expectedSubStatus = GetExpectedSubStatus(req.Status);
+                    if (expectedSubStatus != null && process.SubStatus != expectedSubStatus)
+                    {
+                        _logger.LogWarning(
+                            "SubStatus mismatch detected: ProcessId={ProcessId}, ChargingRequest.Status={Status}, " +
+                            "Process.SubStatus={SubStatus}, Expected={Expected}",
+                            process.Id, req.Status, process.SubStatus ?? "(null)", expectedSubStatus);
+                    }
+                }
+
+                var counterparty = isVehicleOwner ? req.Charger?.User : req.CarOwner;
+                var counterpartyName = counterparty?.FullName
+                    ?? $"{counterparty?.FirstName} {counterparty?.LastName}".Trim();
+
+                // Build uiContext that EXACTLY mirrors FCM notification data payload
+                var uiContext = BuildUiContext(req, process, notificationType);
+
+                var dto = new PendingProcessDto
+                {
+                    ProcessId = process?.Id,
+                    RequestId = req.Id,
+                    Type = "charging_request",
+                    Status = req.Status,
+                    SubStatus = subStatus,
+                    UserRole = isVehicleOwner ? "vehicle_owner" : "charger_owner",
+                    CreatedAt = req.RequestedAt,
+                    UpdatedAt = req.ConfirmedAt ?? req.RespondedAt,
+                    UiContext = uiContext,
+                    Resume = new ResumeContext
+                    {
+                        ScreenKey = screenKey,
+                        Params = BuildResumeParams(req.Id, process?.Id)
+                    },
+                    RenderData = new PendingProcessRenderData
+                    {
+                        CounterpartyUserId = counterparty?.Id ?? "",
+                        CounterpartyName = string.IsNullOrWhiteSpace(counterpartyName) ? "Unknown" : counterpartyName,
+                        CounterpartyPhone = counterparty?.PhoneNumber,
+                        ChargerId = req.ChargerId,
+                        ChargerProtocolName = req.Charger?.Protocol?.Name,
+                        ChargerCapacityKw = req.Charger?.Capacity?.kw,
+                        KwNeeded = req.KwNeeded,
+                        Latitude = req.Latitude,
+                        Longitude = req.Longitude,
+                        EstimatedPrice = process?.EstimatedPrice ?? req.EstimatedPrice,
+                        BaseAmount = req.BaseAmount,
+                        VoltyksFees = req.VoltyksFees,
+                        AmountCharged = process?.AmountCharged,
+                        AmountPaid = process?.AmountPaid,
+                        AvailableActions = availableActions
+                    }
+                };
+
+                items.Add(dto);
+            }
+
+            var response = new PendingProcessesResponseDto
+            {
+                Count = items.Count,
+                Processes = items
+            };
+
+            return new ApiResponse<PendingProcessesResponseDto>(response, "Pending processes fetched", true);
+        }
+
+        /// <summary>
+        /// Builds uiContext that EXACTLY mirrors the FCM notification data payload.
+        /// Keys and string formatting match what is sent via push notifications.
+        /// </summary>
+        private static PendingProcessUiContext BuildUiContext(ChargingRequestEntity req, ProcessEntity? process, string notificationType)
+        {
+            var statusLower = req.Status.ToLower();
+            var uiContext = new PendingProcessUiContext
+            {
+                // Base fields (always present in FCM data)
+                RequestId = req.Id.ToString(),
+                NotificationType = notificationType
+            };
+
+            // Timer fields - added for pending, accepted statuses (mirrors AcceptRequest notification)
+            if (statusLower == "pending" || statusLower == "accepted")
+            {
+                var timerStart = statusLower switch
+                {
+                    "pending" => req.RequestedAt,
+                    "accepted" => req.RespondedAt,
+                    _ => null
+                };
+                var timerDuration = statusLower switch
+                {
+                    "pending" => 5,
+                    "accepted" => 10,
+                    _ => (int?)null
+                };
+
+                if (timerStart.HasValue)
+                    uiContext.TimerStartedAt = timerStart.Value.ToString("o");
+                if (timerDuration.HasValue)
+                    uiContext.TimerDurationMinutes = timerDuration.Value.ToString();
+            }
+
+            // Process/payment fields - added for PendingCompleted, Started (mirrors CreateProcess notification)
+            if (process != null && (statusLower == "pendingcompleted" || statusLower == "started"))
+            {
+                uiContext.ProcessId = process.Id.ToString();
+                uiContext.EstimatedPrice = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                uiContext.AmountCharged = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                uiContext.AmountPaid = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            return uiContext;
+        }
+
+        private static (string subStatus, string screenKey, string notificationType, List<string> availableActions)
+            DetermineStatusContext(string status, bool isVehicleOwner, bool isChargerOwner)
+        {
+            var statusLower = status.ToLower();
+
+            // ScreenKey is derived STRICTLY from (status + userRole) - deterministic mapping
+            return statusLower switch
+            {
+                "pending" when isChargerOwner => (
+                    "awaiting_response",
+                    "INCOMING_REQUEST",
+                    NotificationTypes.VehicleOwner_RequestCharger,
+                    new List<string> { "accept", "reject" }
+                ),
+                "pending" when isVehicleOwner => (
+                    "awaiting_response",
+                    "WAITING_FOR_RESPONSE",
+                    "VehicleOwner_WaitingForResponse",
+                    new List<string> { "cancel" }
+                ),
+                "accepted" when isVehicleOwner => (
+                    "request_accepted",
+                    "CONFIRM_REQUEST",
+                    NotificationTypes.ChargerOwner_AcceptRequest,
+                    new List<string> { "confirm", "abort" }
+                ),
+                "accepted" when isChargerOwner => (
+                    "request_accepted",
+                    "WAITING_FOR_VEHICLE",
+                    "ChargerOwner_WaitingForVehicle",
+                    new List<string> { "abort" }
+                ),
+                "confirmed" when isChargerOwner => (
+                    "charging_confirmed",
+                    "START_CHARGING",
+                    "Charger_ConfirmedProcessSuccessfully",
+                    new List<string> { "start", "abort" }
+                ),
+                "confirmed" when isVehicleOwner => (
+                    "charging_confirmed",
+                    "WAITING_FOR_START",
+                    "VehicleOwner_Confirmed",
+                    new List<string> { "abort" }
+                ),
+                "started" when isVehicleOwner => (
+                    "charging_in_progress",
+                    "CHARGING_ACTIVE",
+                    "Process_Started",
+                    new List<string> { "create_process", "abort" }
+                ),
+                "started" when isChargerOwner => (
+                    "charging_in_progress",
+                    "CHARGING_ACTIVE",
+                    "Process_Started",
+                    new List<string> { "abort" }
+                ),
+                "pendingcompleted" when isChargerOwner => (
+                    "awaiting_completion",
+                    "CONFIRM_COMPLETION",
+                    NotificationTypes.VehicleOwner_CreateProcess,
+                    new List<string> { "complete", "report" }
+                ),
+                "pendingcompleted" when isVehicleOwner => (
+                    "awaiting_completion",
+                    "WAITING_FOR_COMPLETION",
+                    "VehicleOwner_WaitingForConfirmation",
+                    new List<string> { "report" }
+                ),
+                _ => (
+                    "unknown",
+                    "UNKNOWN",
+                    "Unknown",
+                    new List<string>()
+                )
+            };
+        }
+
+        /// <summary>
+        /// Derives ScreenKey from persisted SubStatus and user role.
+        /// Used when SubStatus is read from DB.
+        /// </summary>
+        private static string DeriveScreenKeyFromSubStatus(string subStatus, bool isVehicleOwner, bool isChargerOwner)
+        {
+            return subStatus switch
+            {
+                "awaiting_completion" when isChargerOwner => "CONFIRM_COMPLETION",
+                "awaiting_completion" when isVehicleOwner => "WAITING_FOR_COMPLETION",
+                "charging_in_progress" => "CHARGING_ACTIVE",
+                _ => "UNKNOWN"
+            };
+        }
+
+        /// <summary>
+        /// Returns the expected SubStatus for a given ChargingRequest status.
+        /// Used for consistency checking. Returns null for states where SubStatus is not expected.
+        /// </summary>
+        private static string? GetExpectedSubStatus(string chargingRequestStatus)
+        {
+            return chargingRequestStatus.ToLower() switch
+            {
+                "pendingcompleted" => "awaiting_completion",
+                "started" => "charging_in_progress",
+                // Final states (Completed, Aborted) and pre-process states don't have expected SubStatus
+                _ => null
+            };
+        }
+
+        private static Dictionary<string, object> BuildResumeParams(int requestId, int? processId)
+        {
+            var p = new Dictionary<string, object>
+            {
+                ["requestId"] = requestId
+            };
+            if (processId.HasValue)
+                p["processId"] = processId.Value;
+            return p;
+        }
 
 
     }

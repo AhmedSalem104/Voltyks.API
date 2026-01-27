@@ -43,6 +43,9 @@ namespace Voltyks.API.Controllers
         public async Task<IActionResult> GetRatingsSummary([FromBody] ProcessIdDTO dto, CancellationToken ct)
             => Ok(await _svc.ProcessesService.GetRatingsSummaryAsync(dto.Id , ct));
 
+        [HttpGet("pending")]
+        public async Task<IActionResult> GetPendingProcesses(CancellationToken ct)
+            => Ok(await _svc.ProcessesService.GetPendingProcessesAsync(ct));
 
 
     }
