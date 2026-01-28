@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.ServicesManager.ServicesManager;
+using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Process;
 
@@ -44,6 +45,7 @@ namespace Voltyks.API.Controllers
             => Ok(await _svc.ProcessesService.GetRatingsSummaryAsync(dto.Id , ct));
 
         [HttpGet("pending")]
+        [ProducesResponseType(typeof(ApiResponse<PendingProcessesResponseDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPendingProcesses(CancellationToken ct)
             => Ok(await _svc.ProcessesService.GetPendingProcessesAsync(ct));
 
