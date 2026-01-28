@@ -1083,10 +1083,6 @@ namespace Voltyks.Core.DTOs.Processes
                     }
                 }
 
-                var counterparty = isVehicleOwner ? req.Charger?.User : req.CarOwner;
-                var counterpartyName = counterparty?.FullName
-                    ?? $"{counterparty?.FirstName} {counterparty?.LastName}".Trim();
-
                 // Build uiContext that EXACTLY mirrors FCM notification data payload
                 var uiContext = BuildUiContext(req, process, notificationType);
 
@@ -1094,36 +1090,16 @@ namespace Voltyks.Core.DTOs.Processes
                 {
                     ProcessId = process?.Id,
                     RequestId = req.Id,
-                    Type = "charging_request",
                     Status = req.Status,
                     SubStatus = subStatus,
                     UserRole = isVehicleOwner ? "vehicle_owner" : "charger_owner",
-                    CreatedAt = req.RequestedAt,
-                    UpdatedAt = req.ConfirmedAt ?? req.RespondedAt,
                     UiContext = uiContext,
                     Resume = new ResumeContext
                     {
                         ScreenKey = screenKey,
                         Params = BuildResumeParams(req.Id, process?.Id)
                     },
-                    RenderData = new PendingProcessRenderData
-                    {
-                        CounterpartyUserId = counterparty?.Id ?? "",
-                        CounterpartyName = string.IsNullOrWhiteSpace(counterpartyName) ? "Unknown" : counterpartyName,
-                        CounterpartyPhone = counterparty?.PhoneNumber,
-                        ChargerId = req.ChargerId,
-                        ChargerProtocolName = req.Charger?.Protocol?.Name,
-                        ChargerCapacityKw = req.Charger?.Capacity?.kw,
-                        KwNeeded = req.KwNeeded,
-                        Latitude = req.Latitude,
-                        Longitude = req.Longitude,
-                        EstimatedPrice = process?.EstimatedPrice ?? req.EstimatedPrice,
-                        BaseAmount = req.BaseAmount,
-                        VoltyksFees = req.VoltyksFees,
-                        AmountCharged = process?.AmountCharged,
-                        AmountPaid = process?.AmountPaid,
-                        AvailableActions = availableActions
-                    }
+                    CreatedAt = req.RequestedAt
                 };
 
                 items.Add(dto);
@@ -1152,29 +1128,22 @@ namespace Voltyks.Core.DTOs.Processes
                 NotificationType = notificationType
             };
 
-            // Timer fields - added for pending, accepted statuses (mirrors AcceptRequest notification)
-            if (statusLower == "pending" || statusLower == "accepted")
+            // Timer fields - only for accepted (mirrors ChargerOwner_AcceptRequest FCM payload)
+            // and confirmed (mirrors Charger_ConfirmedProcessSuccessfully SignalR payload)
+            if (statusLower == "accepted")
             {
-                var timerStart = statusLower switch
-                {
-                    "pending" => req.RequestedAt,
-                    "accepted" => req.RespondedAt,
-                    _ => null
-                };
-                var timerDuration = statusLower switch
-                {
-                    "pending" => 5,
-                    "accepted" => 10,
-                    _ => (int?)null
-                };
-
-                if (timerStart.HasValue)
-                    uiContext.TimerStartedAt = timerStart.Value.ToString("o");
-                if (timerDuration.HasValue)
-                    uiContext.TimerDurationMinutes = timerDuration.Value.ToString();
+                if (req.RespondedAt.HasValue)
+                    uiContext.TimerStartedAt = req.RespondedAt.Value.ToString("o");
+                uiContext.TimerDurationMinutes = "10";
+            }
+            else if (statusLower == "confirmed")
+            {
+                if (req.ConfirmedAt.HasValue)
+                    uiContext.TimerStartedAt = req.ConfirmedAt.Value.ToString("o");
+                uiContext.TimerDurationMinutes = "15";
             }
 
-            // Process/payment fields - added for PendingCompleted, Started (mirrors CreateProcess notification)
+            // Process/payment fields - for PendingCompleted, Started (mirrors VehicleOwner_CreateProcess / VehicleOwner_UpdateProcess)
             if (process != null && (statusLower == "pendingcompleted" || statusLower == "started"))
             {
                 uiContext.ProcessId = process.Id.ToString();
@@ -1191,7 +1160,8 @@ namespace Voltyks.Core.DTOs.Processes
         {
             var statusLower = status.ToLower();
 
-            // ScreenKey is derived STRICTLY from (status + userRole) - deterministic mapping
+            // notificationType = the REAL type sent by the notification system (same for both roles)
+            // screenKey + availableActions = role-specific (different actions per user)
             return statusLower switch
             {
                 "pending" when isChargerOwner => (
@@ -1203,7 +1173,7 @@ namespace Voltyks.Core.DTOs.Processes
                 "pending" when isVehicleOwner => (
                     "awaiting_response",
                     "WAITING_FOR_RESPONSE",
-                    "VehicleOwner_WaitingForResponse",
+                    NotificationTypes.VehicleOwner_RequestCharger,
                     new List<string> { "cancel" }
                 ),
                 "accepted" when isVehicleOwner => (
@@ -1215,7 +1185,7 @@ namespace Voltyks.Core.DTOs.Processes
                 "accepted" when isChargerOwner => (
                     "request_accepted",
                     "WAITING_FOR_VEHICLE",
-                    "ChargerOwner_WaitingForVehicle",
+                    NotificationTypes.ChargerOwner_AcceptRequest,
                     new List<string> { "abort" }
                 ),
                 "confirmed" when isChargerOwner => (
@@ -1227,19 +1197,19 @@ namespace Voltyks.Core.DTOs.Processes
                 "confirmed" when isVehicleOwner => (
                     "charging_confirmed",
                     "WAITING_FOR_START",
-                    "VehicleOwner_Confirmed",
+                    "Charger_ConfirmedProcessSuccessfully",
                     new List<string> { "abort" }
                 ),
                 "started" when isVehicleOwner => (
                     "charging_in_progress",
                     "CHARGING_ACTIVE",
-                    "Process_Started",
+                    NotificationTypes.VehicleOwner_UpdateProcess,
                     new List<string> { "create_process", "abort" }
                 ),
                 "started" when isChargerOwner => (
                     "charging_in_progress",
                     "CHARGING_ACTIVE",
-                    "Process_Started",
+                    NotificationTypes.VehicleOwner_UpdateProcess,
                     new List<string> { "abort" }
                 ),
                 "pendingcompleted" when isChargerOwner => (
@@ -1251,7 +1221,7 @@ namespace Voltyks.Core.DTOs.Processes
                 "pendingcompleted" when isVehicleOwner => (
                     "awaiting_completion",
                     "WAITING_FOR_COMPLETION",
-                    "VehicleOwner_WaitingForConfirmation",
+                    NotificationTypes.VehicleOwner_CreateProcess,
                     new List<string> { "report" }
                 ),
                 _ => (
