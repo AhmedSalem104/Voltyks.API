@@ -45,7 +45,7 @@ namespace Voltyks.API.Controllers
             => Ok(await _svc.ProcessesService.GetRatingsSummaryAsync(dto.Id , ct));
 
         [HttpGet("pending")]
-        [ProducesResponseType(typeof(ApiResponse<PendingProcessesResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<PendingProcessDto>), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetPendingProcesses(CancellationToken ct)
             => Ok(await _svc.ProcessesService.GetPendingProcessesAsync(ct));
 

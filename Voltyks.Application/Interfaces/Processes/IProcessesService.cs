@@ -17,7 +17,7 @@ namespace Voltyks.Application.Interfaces.Processes
         Task<ApiResponse<object>> GetMyActivitiesAsync(PaginationParams? paginationParams, CancellationToken ct = default);
         Task<ApiResponse<object>> GetRatingsSummaryAsync(int Id, CancellationToken ct = default);
         Task<ApiResponse<object>> UpdateProcessAsync(UpdateProcessDto dto, CancellationToken ct = default);
-        Task<ApiResponse<PendingProcessesResponseDto>> GetPendingProcessesAsync(CancellationToken ct = default);
+        Task<ApiResponse<PendingProcessDto>> GetPendingProcessesAsync(CancellationToken ct = default);
 
 
     }

@@ -1017,18 +1017,15 @@ namespace Voltyks.Core.DTOs.Processes
             );
         }
 
-        public async Task<ApiResponse<PendingProcessesResponseDto>> GetPendingProcessesAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<PendingProcessDto>> GetPendingProcessesAsync(CancellationToken ct = default)
         {
             var me = CurrentUserId();
             if (string.IsNullOrEmpty(me))
-                return new ApiResponse<PendingProcessesResponseDto>("Unauthorized", false);
+                return new ApiResponse<PendingProcessDto>("Unauthorized", false);
 
-            // Statuses that indicate "pending" / active processes needing attention
-            // Excludes: completed, aborted, rejected, expired
             var pendingStatuses = new[] { "pending", "accepted", "confirmed", "Started", "PendingCompleted" };
 
-            // Fetch all charging requests where user is involved and status is pending
-            var requests = await _ctx.Set<ChargingRequestEntity>()
+            var req = await _ctx.Set<ChargingRequestEntity>()
                 .AsNoTracking()
                 .Include(r => r.CarOwner)
                 .Include(r => r.Charger).ThenInclude(c => c.User)
@@ -1038,80 +1035,57 @@ namespace Voltyks.Core.DTOs.Processes
                     (r.UserId == me || r.RecipientUserId == me) &&
                     pendingStatuses.Contains(r.Status))
                 .OrderByDescending(r => r.RequestedAt)
-                .ToListAsync(ct);
+                .FirstOrDefaultAsync(ct);
 
-            // Fetch associated processes for these requests
-            var requestIds = requests.Select(r => r.Id).ToList();
-            var processes = await _ctx.Set<ProcessEntity>()
+            if (req == null)
+                return new ApiResponse<PendingProcessDto>(null, "No active process", true);
+
+            var process = await _ctx.Set<ProcessEntity>()
                 .AsNoTracking()
-                .Where(p => requestIds.Contains(p.ChargerRequestId))
-                .ToDictionaryAsync(p => p.ChargerRequestId, ct);
+                .FirstOrDefaultAsync(p => p.ChargerRequestId == req.Id, ct);
 
-            var items = new List<PendingProcessDto>();
+            var isVehicleOwner = req.UserId == me;
+            var isChargerOwner = req.RecipientUserId == me;
 
-            foreach (var req in requests)
+            var (computedSubStatus, screenKey, notificationType, availableActions) =
+                DetermineStatusContext(req.Status, isVehicleOwner, isChargerOwner);
+
+            var subStatus = process?.SubStatus ?? computedSubStatus;
+
+            if (process?.SubStatus != null)
+                screenKey = DeriveScreenKeyFromSubStatus(process.SubStatus, isVehicleOwner, isChargerOwner);
+
+            if (process != null)
             {
-                var isVehicleOwner = req.UserId == me;
-                var isChargerOwner = req.RecipientUserId == me;
-
-                processes.TryGetValue(req.Id, out var process);
-
-                // Read SubStatus from DB if available, otherwise compute it
-                var (computedSubStatus, screenKey, notificationType, availableActions) =
-                    DetermineStatusContext(req.Status, isVehicleOwner, isChargerOwner);
-
-                // Use persisted SubStatus from Process entity when available (for Process-backed states)
-                // Fallback to computed value for ChargingRequest-only states or legacy records
-                var subStatus = process?.SubStatus ?? computedSubStatus;
-
-                // Re-derive screenKey if SubStatus came from DB (ensures consistency)
-                if (process?.SubStatus != null)
+                var expectedSubStatus = GetExpectedSubStatus(req.Status);
+                if (expectedSubStatus != null && process.SubStatus != expectedSubStatus)
                 {
-                    screenKey = DeriveScreenKeyFromSubStatus(process.SubStatus, isVehicleOwner, isChargerOwner);
+                    _logger.LogWarning(
+                        "SubStatus mismatch detected: ProcessId={ProcessId}, ChargingRequest.Status={Status}, " +
+                        "Process.SubStatus={SubStatus}, Expected={Expected}",
+                        process.Id, req.Status, process.SubStatus ?? "(null)", expectedSubStatus);
                 }
-
-                // Consistency check: log warning if Process.Status and SubStatus don't match expected mapping
-                if (process != null)
-                {
-                    var expectedSubStatus = GetExpectedSubStatus(req.Status);
-                    if (expectedSubStatus != null && process.SubStatus != expectedSubStatus)
-                    {
-                        _logger.LogWarning(
-                            "SubStatus mismatch detected: ProcessId={ProcessId}, ChargingRequest.Status={Status}, " +
-                            "Process.SubStatus={SubStatus}, Expected={Expected}",
-                            process.Id, req.Status, process.SubStatus ?? "(null)", expectedSubStatus);
-                    }
-                }
-
-                // Build uiContext that EXACTLY mirrors FCM notification data payload
-                var uiContext = BuildUiContext(req, process, notificationType);
-
-                var dto = new PendingProcessDto
-                {
-                    ProcessId = process?.Id,
-                    RequestId = req.Id,
-                    Status = req.Status,
-                    SubStatus = subStatus,
-                    UserRole = isVehicleOwner ? "vehicle_owner" : "charger_owner",
-                    UiContext = uiContext,
-                    Resume = new ResumeContext
-                    {
-                        ScreenKey = screenKey,
-                        Params = BuildResumeParams(req.Id, process?.Id)
-                    },
-                    CreatedAt = req.RequestedAt
-                };
-
-                items.Add(dto);
             }
 
-            var response = new PendingProcessesResponseDto
+            var uiContext = BuildUiContext(req, process, notificationType);
+
+            var dto = new PendingProcessDto
             {
-                Count = items.Count,
-                Processes = items
+                ProcessId = process?.Id,
+                RequestId = req.Id,
+                Status = req.Status,
+                SubStatus = subStatus,
+                UserRole = isVehicleOwner ? "vehicle_owner" : "charger_owner",
+                UiContext = uiContext,
+                Resume = new ResumeContext
+                {
+                    ScreenKey = screenKey,
+                    Params = BuildResumeParams(req.Id, process?.Id)
+                },
+                CreatedAt = req.RequestedAt
             };
 
-            return new ApiResponse<PendingProcessesResponseDto>(response, "Pending processes fetched", true);
+            return new ApiResponse<PendingProcessDto>(dto, "Pending process fetched", true);
         }
 
         /// <summary>
