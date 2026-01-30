@@ -756,6 +756,14 @@ namespace Voltyks.Core.DTOs.Processes
                 process.Status = ProcessStatus.Completed;
                 process.DateCompleted = DateTimeHelper.GetEgyptTime();
 
+                // Update ChargingRequest status to Completed
+                var request = await _ctx.Set<ChargingRequestEntity>()
+                    .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+                if (request != null)
+                {
+                    request.Status = "Completed";
+                }
+
                 // (اختياري) شيلها من CurrentActivities
                 foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
                 {
