@@ -9,6 +9,7 @@ using Voltyks.Core.DTOs.Report;
 using Voltyks.Core.DTOs;
 using Voltyks.Persistence.Data;
 using UserReportEntity = Voltyks.Persistence.Entities.Main.UserReport;
+using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
 using Microsoft.EntityFrameworkCore;
 using AutoMapper;
 using System.Security.Claims;
@@ -66,6 +67,38 @@ namespace Voltyks.Application.Services.UserReport
             };
 
             await _ctx.UserReports.AddAsync(report, ct);
+            await _ctx.SaveChangesAsync(ct);
+
+            // ===== Terminate Process and Cleanup =====
+            // Mark process as Aborted
+            process.Status = ProcessStatus.Aborted;
+
+            // Update ChargingRequest status
+            var chargingRequest = await _ctx.Set<ChargingRequestEntity>()
+                .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+            if (chargingRequest != null)
+            {
+                chargingRequest.Status = "Aborted";
+            }
+
+            // Cleanup CurrentActivities for both users
+            foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+            {
+                var u = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+                if (u != null)
+                {
+                    var list = u.CurrentActivities.ToList();
+                    if (list.Contains(process.Id))
+                    {
+                        list.Remove(process.Id);
+                        u.CurrentActivities = list;
+                    }
+                    if (u.CurrentActivities.Count == 0)
+                        u.IsAvailable = true;
+                    _ctx.Update(u);
+                }
+            }
+
             await _ctx.SaveChangesAsync(ct);
 
             // ===== Admin SignalR Notification (Real-time) =====
