@@ -71,6 +71,15 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (userId == null)
                     return new ApiResponse<NotificationResultDto>(null, "Car owner not found", false);
 
+                // Check if vehicle owner already has an active process
+                var vehicleOwner = await _db.Set<AppUser>().FindAsync(userId);
+                if (vehicleOwner?.CurrentActivities?.Count > 0)
+                    return new ApiResponse<NotificationResultDto>(null, "You already have an active charging process", false);
+
+                // Check if charger owner already has an active process
+                if (charger.User?.CurrentActivities?.Count > 0)
+                    return new ApiResponse<NotificationResultDto>(null, "Charger owner is currently busy", false);
+
                 // 1) أنشئ الطلب
                 var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage , dto.Latitude,dto.Longitude , charger.UserId ,  charger);
 

@@ -150,6 +150,7 @@ namespace Voltyks.Core.DTOs.Processes
                         list.Add(process.Id);
                         vo.CurrentActivities = list;
                     }
+                    vo.IsAvailable = false; // Hide from search during active process
                     _ctx.Update(vo);
                 }
 
@@ -161,6 +162,7 @@ namespace Voltyks.Core.DTOs.Processes
                         list.Add(process.Id);
                         co.CurrentActivities = list;
                     }
+                    co.IsAvailable = false; // Hide from search during active process
                     _ctx.Update(co);
                 }
 
@@ -775,8 +777,11 @@ namespace Voltyks.Core.DTOs.Processes
                         {
                             list.Remove(process.Id);
                             u.CurrentActivities = list;
-                            _ctx.Update(u);
                         }
+                        // Make user available again if no more active processes
+                        if (u.CurrentActivities.Count == 0)
+                            u.IsAvailable = true;
+                        _ctx.Update(u);
                     }
                 }
             }
