@@ -74,11 +74,42 @@ namespace Voltyks.Application.Services.ChargingRequest
                 // Check if vehicle owner already has an active process
                 var vehicleOwner = await _db.Set<AppUser>().FindAsync(userId);
                 if (vehicleOwner?.CurrentActivities?.Count > 0)
-                    return new ApiResponse<NotificationResultDto>(null, "You already have an active charging process", false);
+                {
+                    // Smart validation: verify the IDs are actually still active
+                    var activeProcessIds = vehicleOwner.CurrentActivities.ToList();
+                    var hasActuallyActiveProcess = await _db.Set<Process>()
+                        .AnyAsync(p => activeProcessIds.Contains(p.Id)
+                            && p.Status != ProcessStatus.Completed
+                            && p.Status != ProcessStatus.Aborted);
+
+                    if (hasActuallyActiveProcess)
+                        return new ApiResponse<NotificationResultDto>(null, "You already have an active charging process", false);
+
+                    // Auto-cleanup: remove stale entries
+                    vehicleOwner.CurrentActivities = new List<int>();
+                    vehicleOwner.IsAvailable = true;
+                    _db.Update(vehicleOwner);
+                    await _db.SaveChangesAsync();
+                }
 
                 // Check if charger owner already has an active process
                 if (charger.User?.CurrentActivities?.Count > 0)
-                    return new ApiResponse<NotificationResultDto>(null, "Charger owner is currently busy", false);
+                {
+                    var activeProcessIds = charger.User.CurrentActivities.ToList();
+                    var hasActuallyActiveProcess = await _db.Set<Process>()
+                        .AnyAsync(p => activeProcessIds.Contains(p.Id)
+                            && p.Status != ProcessStatus.Completed
+                            && p.Status != ProcessStatus.Aborted);
+
+                    if (hasActuallyActiveProcess)
+                        return new ApiResponse<NotificationResultDto>(null, "Charger owner is currently busy", false);
+
+                    // Auto-cleanup: remove stale entries
+                    charger.User.CurrentActivities = new List<int>();
+                    charger.User.IsAvailable = true;
+                    _db.Update(charger.User);
+                    await _db.SaveChangesAsync();
+                }
 
                 // 1) أنشئ الطلب
                 var chargingRequest = await CreateChargingRequest(userId, dto.ChargerId, dto.KwNeeded, dto.CurrentBatteryPercentage , dto.Latitude,dto.Longitude , charger.UserId ,  charger);
