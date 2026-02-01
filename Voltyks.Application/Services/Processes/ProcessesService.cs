@@ -519,42 +519,24 @@ namespace Voltyks.Core.DTOs.Processes
                     _ctx.Update(request);
                     await _ctx.SaveChangesAsync(ct);
 
-                    if (isChargerOwner)
+                    // ✅ Cleanup CurrentActivities + Send Process_Terminated to BOTH users
+                    var reason = decision.ToLower().Contains("report") ? "report" : "aborted";
+                    await TerminateProcessAndNotifyAsync(
+                        process.Id,
+                        request.Id,
+                        process.VehicleOwnerId,
+                        process.ChargerOwnerId,
+                        reason,
+                        ct);
+
+                    // SignalR Real-time to counterparty
+                    var receiverId = isChargerOwner ? process.VehicleOwnerId : process.ChargerOwnerId;
+                    await _signalRService.SendPaymentAbortedAsync(process.Id, receiverId, new
                     {
-                        await SendToUserAsync(
-                            process.VehicleOwnerId,
-                            "Process reported",
-                            "Charger owner reported/aborted this session.",
-                            request.Id,
-                            "ChargerOwner_ReportProcess",
-                            ct
-                        );
-                        // SignalR Real-time
-                        await _signalRService.SendPaymentAbortedAsync(process.Id, process.VehicleOwnerId, new
-                        {
-                            processId = process.Id,
-                            status = "Aborted",
-                            abortedBy = "charger_owner"
-                        }, ct);
-                    }
-                    else // Vehicle Owner
-                    {
-                        await SendToUserAsync(
-                            process.ChargerOwnerId,
-                            "Process reported",
-                            "Vehicle owner reported/aborted this session.",
-                            request.Id,
-                            "VehicleOwner_ReportProcess",
-                            ct
-                        );
-                        // SignalR Real-time
-                        await _signalRService.SendPaymentAbortedAsync(process.Id, process.ChargerOwnerId, new
-                        {
-                            processId = process.Id,
-                            status = "Aborted",
-                            abortedBy = "vehicle_owner"
-                        }, ct);
-                    }
+                        processId = process.Id,
+                        status = "Aborted",
+                        abortedBy = isChargerOwner ? "charger_owner" : "vehicle_owner"
+                    }, ct);
                 }
 
                 await tx.CommitAsync(ct);
@@ -1261,6 +1243,80 @@ namespace Voltyks.Core.DTOs.Processes
             return p;
         }
 
+        /// <summary>
+        /// Cleans up CurrentActivities, resets IsAvailable, and sends Process_Terminated notification to both users.
+        /// Call this after setting Process.Status = Aborted and saving changes.
+        /// </summary>
+        private async Task TerminateProcessAndNotifyAsync(
+            int processId,
+            int requestId,
+            string vehicleOwnerId,
+            string chargerOwnerId,
+            string terminationReason,
+            CancellationToken ct = default)
+        {
+            foreach (var uid in new[] { vehicleOwnerId, chargerOwnerId })
+            {
+                var user = await _ctx.Set<AppUser>()
+                    .Include(u => u.DeviceTokens)
+                    .FirstOrDefaultAsync(u => u.Id == uid, ct);
+
+                if (user != null)
+                {
+                    // Remove from CurrentActivities
+                    var list = user.CurrentActivities.ToList();
+                    if (list.Contains(processId))
+                    {
+                        list.Remove(processId);
+                        user.CurrentActivities = list;
+                    }
+
+                    // Reset availability if no more active processes
+                    if (user.CurrentActivities.Count == 0)
+                        user.IsAvailable = true;
+
+                    _ctx.Update(user);
+
+                    // Send Process_Terminated notification via FCM
+                    if (user.DeviceTokens?.Any() == true)
+                    {
+                        var extraData = new Dictionary<string, string>
+                        {
+                            ["processId"] = processId.ToString(),
+                            ["requestId"] = requestId.ToString(),
+                            ["terminationReason"] = terminationReason,
+                            ["terminatedAt"] = DateTime.UtcNow.ToString("o")
+                        };
+
+                        foreach (var token in user.DeviceTokens)
+                        {
+                            try
+                            {
+                                await _firebase.SendNotificationAsync(
+                                    token.Token,
+                                    "تم إنهاء العملية",
+                                    GetTerminationMessage(terminationReason),
+                                    requestId,
+                                    NotificationTypes.Process_Terminated,
+                                    extraData);
+                            }
+                            catch { /* Log but don't fail */ }
+                        }
+                    }
+                }
+            }
+
+            await _ctx.SaveChangesAsync(ct);
+        }
+
+        private static string GetTerminationMessage(string reason) => reason switch
+        {
+            "aborted" => "تم إلغاء عملية الشحن",
+            "report" => "تم إنهاء العملية بسبب بلاغ",
+            "expired" => "انتهت صلاحية العملية",
+            "rejected" => "تم رفض الطلب",
+            _ => "تم إنهاء العملية"
+        };
 
     }
 }

@@ -458,6 +458,69 @@ namespace Voltyks.Application.Services.ChargingRequest
                     status = "aborted"
                 });
 
+                // ✅ Find and terminate associated process + cleanup users
+                var process = await _db.Set<Process>()
+                    .FirstOrDefaultAsync(p => p.ChargerRequestId == request.Id);
+
+                if (process != null)
+                {
+                    process.Status = ProcessStatus.Aborted;
+
+                    // Cleanup CurrentActivities + Send Process_Terminated to BOTH users
+                    foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+                    {
+                        var user = await _db.Set<AppUser>()
+                            .Include(u => u.DeviceTokens)
+                            .FirstOrDefaultAsync(u => u.Id == uid);
+
+                        if (user != null)
+                        {
+                            // Remove from CurrentActivities
+                            var list = user.CurrentActivities.ToList();
+                            if (list.Contains(process.Id))
+                            {
+                                list.Remove(process.Id);
+                                user.CurrentActivities = list;
+                            }
+
+                            // Reset availability
+                            if (user.CurrentActivities.Count == 0)
+                                user.IsAvailable = true;
+
+                            _db.Update(user);
+
+                            // Send Process_Terminated notification to this user
+                            if (user.DeviceTokens?.Any() == true)
+                            {
+                                var extraData = new Dictionary<string, string>
+                                {
+                                    ["processId"] = process.Id.ToString(),
+                                    ["requestId"] = request.Id.ToString(),
+                                    ["terminationReason"] = "aborted",
+                                    ["terminatedAt"] = DateTime.UtcNow.ToString("o")
+                                };
+
+                                foreach (var token in user.DeviceTokens)
+                                {
+                                    try
+                                    {
+                                        await _firebaseService.SendNotificationAsync(
+                                            token.Token,
+                                            "تم إنهاء العملية",
+                                            "تم إلغاء عملية الشحن",
+                                            request.Id,
+                                            NotificationTypes.Process_Terminated,
+                                            extraData);
+                                    }
+                                    catch { /* Log but don't fail */ }
+                                }
+                            }
+                        }
+                    }
+
+                    await _db.SaveChangesAsync();
+                }
+
                 return new ApiResponse<NotificationResultDto>(result, "Charging request aborted", true);
             }
             catch (Exception ex)

@@ -81,21 +81,55 @@ namespace Voltyks.Application.Services.UserReport
                 chargingRequest.Status = "Aborted";
             }
 
-            // Cleanup CurrentActivities for both users
+            // Cleanup CurrentActivities + Send Process_Terminated to BOTH users
             foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
             {
-                var u = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+                var u = await _ctx.Set<AppUser>()
+                    .Include(x => x.DeviceTokens)
+                    .FirstOrDefaultAsync(x => x.Id == uid, ct);
+
                 if (u != null)
                 {
+                    // Remove from CurrentActivities
                     var list = u.CurrentActivities.ToList();
                     if (list.Contains(process.Id))
                     {
                         list.Remove(process.Id);
                         u.CurrentActivities = list;
                     }
+
+                    // Reset availability
                     if (u.CurrentActivities.Count == 0)
                         u.IsAvailable = true;
+
                     _ctx.Update(u);
+
+                    // ✅ Send Process_Terminated notification
+                    if (u.DeviceTokens?.Any() == true)
+                    {
+                        var terminationData = new Dictionary<string, string>
+                        {
+                            ["processId"] = process.Id.ToString(),
+                            ["requestId"] = process.ChargerRequestId.ToString(),
+                            ["terminationReason"] = "report",
+                            ["terminatedAt"] = DateTime.UtcNow.ToString("o")
+                        };
+
+                        foreach (var token in u.DeviceTokens)
+                        {
+                            try
+                            {
+                                await _firebase.SendNotificationAsync(
+                                    token.Token,
+                                    "تم إنهاء العملية",
+                                    "تم إنهاء العملية بسبب بلاغ",
+                                    process.ChargerRequestId,
+                                    NotificationTypes.Process_Terminated,
+                                    terminationData);
+                            }
+                            catch { /* Log but don't fail */ }
+                        }
+                    }
                 }
             }
 
