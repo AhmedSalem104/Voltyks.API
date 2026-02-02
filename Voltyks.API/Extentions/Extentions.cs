@@ -51,6 +51,9 @@ using Voltyks.Application.Services.ImageUpload;
 using Voltyks.API.Services;
 using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Services.AppSettings;
+using Voltyks.Application.Services.Background;
+using Voltyks.Application.Interfaces.Processes;
+using Voltyks.Core.DTOs.Processes;
 
 
 namespace Voltyks.API.Extentions
@@ -398,6 +401,12 @@ namespace Voltyks.API.Extentions
 
             // Product Image Service
             services.AddScoped<IProductImageService, ProductImageService>();
+
+            // Processes Service
+            services.AddScoped<IProcessesService, ProcessesService>();
+
+            // Background cleanup service for stale processes
+            services.AddHostedService<StaleProcessCleanupService>();
 
             return services;
 

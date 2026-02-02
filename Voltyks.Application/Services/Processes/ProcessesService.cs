@@ -113,6 +113,14 @@ namespace Voltyks.Core.DTOs.Processes
 
             if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
 
+            // ✅ Prevent confirming aborted/rejected requests
+            if (req.Status == "Aborted" || req.Status == "Rejected")
+                return new ApiResponse<object>($"Cannot confirm: request was {req.Status}", false);
+
+            // ✅ Only allow confirm when request is in valid state
+            if (req.Status != "accepted" && req.Status != "Confirmed")
+                return new ApiResponse<object>($"Cannot confirm: request status is {req.Status}", false);
+
             var exists = await _ctx.Set<ProcessEntity>()
                                    .AsNoTracking()
                                    .AnyAsync(p => p.ChargerRequestId == req.Id, ct);
@@ -291,8 +299,11 @@ namespace Voltyks.Core.DTOs.Processes
                 }
                 else if (decision == "aborted" || decision == "ended-by-report")
                 {
-                    process.Status = ProcessStatus.Aborted;
-                    request.Status = "Aborted";
+                    // ✅ Use unified termination method
+                    var reason = decision == "ended-by-report" ? "report" : "aborted";
+                    var status = reason == "report" ? ProcessStatus.Disputed : ProcessStatus.Aborted;
+
+                    await TerminateProcessAsync(process.Id, status, reason, me, ct);
                 }
 
                 _ctx.Update(process);
@@ -420,14 +431,14 @@ namespace Voltyks.Core.DTOs.Processes
             if (!isChargerOwner && !isVehicleOwner)
                 return new ApiResponse<object>("Forbidden", false);
 
-            // ⚙️ تطبيع القرار على القيم الجديدة
+            // ⚙️ تطبيع القرار على القيم الجديدة - مرن لقبول أشكال متعددة
             var raw = (dto.Decision ?? "Process-Completed").Trim();
-            // نقارن Case-Insensitive
-            var decision = raw.Equals("Process-Completed", StringComparison.OrdinalIgnoreCase) ? "completed"
-                         : raw.Equals("Process-Ended-By-Report", StringComparison.OrdinalIgnoreCase) ? "ended-by-report"
-                         : raw.Equals("Process-Started", StringComparison.OrdinalIgnoreCase) ? "started"
-                         : raw.Equals("Process-Aborted", StringComparison.OrdinalIgnoreCase) ? "aborted"
-                         : "completed"; // الافتراضي
+            // Flexible normalization - accepts multiple formats
+            var decision = raw.Contains("abort", StringComparison.OrdinalIgnoreCase)
+                             || raw.Contains("cancel", StringComparison.OrdinalIgnoreCase) ? "aborted"
+                         : raw.Contains("report", StringComparison.OrdinalIgnoreCase) ? "ended-by-report"
+                         : raw.Contains("start", StringComparison.OrdinalIgnoreCase) ? "started"
+                         : "completed"; // Default for completed/confirm/etc.
 
             using var tx = await _ctx.Database.BeginTransactionAsync(ct);
             try
@@ -512,29 +523,19 @@ namespace Voltyks.Core.DTOs.Processes
                 }
                 else // ended-by-report | aborted  -> نفس مسار الإنهاء/التبليغ
                 {
-                    process.Status = ProcessStatus.Aborted;
-                    request.Status = "Aborted";
-
-                    _ctx.Update(process);
-                    _ctx.Update(request);
-                    await _ctx.SaveChangesAsync(ct);
-
-                    // ✅ Cleanup CurrentActivities + Send Process_Terminated to BOTH users
+                    // ✅ Use unified termination method
                     var reason = decision.ToLower().Contains("report") ? "report" : "aborted";
-                    await TerminateProcessAndNotifyAsync(
-                        process.Id,
-                        request.Id,
-                        process.VehicleOwnerId,
-                        process.ChargerOwnerId,
-                        reason,
-                        ct);
+                    var status = reason == "report" ? ProcessStatus.Disputed : ProcessStatus.Aborted;
+
+                    await TerminateProcessAsync(process.Id, status, reason, me, ct);
+                    await _ctx.SaveChangesAsync(ct);
 
                     // SignalR Real-time to counterparty
                     var receiverId = isChargerOwner ? process.VehicleOwnerId : process.ChargerOwnerId;
                     await _signalRService.SendPaymentAbortedAsync(process.Id, receiverId, new
                     {
                         processId = process.Id,
-                        status = "Aborted",
+                        status = status.ToString(),
                         abortedBy = isChargerOwner ? "charger_owner" : "vehicle_owner"
                     }, ct);
                 }
@@ -1244,18 +1245,62 @@ namespace Voltyks.Core.DTOs.Processes
         }
 
         /// <summary>
-        /// Cleans up CurrentActivities, resets IsAvailable, and sends Process_Terminated notification to both users.
-        /// Call this after setting Process.Status = Aborted and saving changes.
+        /// Unified termination path for all process exits.
+        /// - Idempotent: safe to call even if process already terminal
+        /// - Sets Process.Status and ChargingRequest.Status
+        /// - Cleans up CurrentActivities for both users
+        /// - Resets IsAvailable if no other activities
+        /// - Sends Process_Terminated notification to both users
         /// </summary>
-        private async Task TerminateProcessAndNotifyAsync(
+        public async Task TerminateProcessAsync(
             int processId,
-            int requestId,
-            string vehicleOwnerId,
-            string chargerOwnerId,
+            ProcessStatus targetStatus,
             string terminationReason,
+            string? actorUserId = null,
             CancellationToken ct = default)
         {
-            foreach (var uid in new[] { vehicleOwnerId, chargerOwnerId })
+            var process = await _ctx.Set<ProcessEntity>()
+                .FirstOrDefaultAsync(p => p.Id == processId, ct);
+
+            if (process == null)
+            {
+                _logger.LogWarning("TerminateProcessAsync: Process {ProcessId} not found", processId);
+                return;
+            }
+
+            // Idempotency: if already terminal, just ensure cleanup
+            var isAlreadyTerminal = process.Status == ProcessStatus.Completed
+                                 || process.Status == ProcessStatus.Aborted
+                                 || process.Status == ProcessStatus.Disputed;
+
+            if (!isAlreadyTerminal)
+            {
+                process.Status = targetStatus;
+                process.DateCompleted = DateTimeHelper.GetEgyptTime();
+                _ctx.Entry(process).State = EntityState.Modified;
+            }
+
+            // Update ChargingRequest status
+            var request = await _ctx.Set<ChargingRequestEntity>()
+                .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+
+            if (request != null)
+            {
+                var reqStatus = targetStatus switch
+                {
+                    ProcessStatus.Completed => "Completed",
+                    ProcessStatus.Disputed => "Disputed",
+                    _ => "Aborted"
+                };
+                if (request.Status != reqStatus && !isAlreadyTerminal)
+                {
+                    request.Status = reqStatus;
+                    _ctx.Entry(request).State = EntityState.Modified;
+                }
+            }
+
+            // Cleanup users + send notifications
+            foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
             {
                 var user = await _ctx.Set<AppUser>()
                     .Include(u => u.DeviceTokens)
@@ -1269,21 +1314,23 @@ namespace Voltyks.Core.DTOs.Processes
                     {
                         list.Remove(processId);
                         user.CurrentActivities = list;
+                        _ctx.Entry(user).Property(u => u.CurrentActivitiesJson).IsModified = true;
                     }
 
                     // Reset availability if no more active processes
-                    if (user.CurrentActivities.Count == 0)
+                    if (user.CurrentActivities.Count == 0 && !user.IsAvailable)
+                    {
                         user.IsAvailable = true;
+                        _ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
+                    }
 
-                    _ctx.Update(user);
-
-                    // Send Process_Terminated notification via FCM
-                    if (user.DeviceTokens?.Any() == true)
+                    // Send Process_Terminated notification via FCM (only if not already terminal)
+                    if (!isAlreadyTerminal && user.DeviceTokens?.Any() == true)
                     {
                         var extraData = new Dictionary<string, string>
                         {
                             ["processId"] = processId.ToString(),
-                            ["requestId"] = requestId.ToString(),
+                            ["requestId"] = process.ChargerRequestId.ToString(),
                             ["terminationReason"] = terminationReason,
                             ["terminatedAt"] = DateTime.UtcNow.ToString("o")
                         };
@@ -1296,23 +1343,27 @@ namespace Voltyks.Core.DTOs.Processes
                                     token.Token,
                                     "تم إنهاء العملية",
                                     GetTerminationMessage(terminationReason),
-                                    requestId,
+                                    process.ChargerRequestId,
                                     NotificationTypes.Process_Terminated,
                                     extraData);
                             }
-                            catch { /* Log but don't fail */ }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to send termination notification to token");
+                            }
                         }
                     }
                 }
             }
 
-            await _ctx.SaveChangesAsync(ct);
+            // Note: Caller should call SaveChangesAsync after this method
         }
 
         private static string GetTerminationMessage(string reason) => reason switch
         {
             "aborted" => "تم إلغاء عملية الشحن",
             "report" => "تم إنهاء العملية بسبب بلاغ",
+            "timeout" => "تم إنهاء العملية",
             "expired" => "انتهت صلاحية العملية",
             "rejected" => "تم رفض الطلب",
             _ => "تم إنهاء العملية"

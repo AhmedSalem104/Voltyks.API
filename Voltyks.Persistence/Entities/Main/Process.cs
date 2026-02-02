@@ -7,7 +7,7 @@ using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
 
 namespace Voltyks.Persistence.Entities.Main
 {
-    public enum ProcessStatus { PendingCompleted = 0, Completed = 1, Aborted = 2 }
+    public enum ProcessStatus { PendingCompleted = 0, Completed = 1, Aborted = 2, Disputed = 3 }
 
     public class Process :BaseEntity<int>
     {        

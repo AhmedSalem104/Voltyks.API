@@ -21,6 +21,7 @@ using Voltyks.Core.DTOs.Charger;
 using Voltyks.Core.Enums;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Utilities;
 using Voltyks.Application.Interfaces.SignalR;
 
@@ -34,8 +35,9 @@ namespace Voltyks.Application.Services.UserReport
         private readonly IHttpContextAccessor _httpContext;
         private readonly IFirebaseService _firebase;
         private readonly ISignalRService _signalRService;
+        private readonly IProcessesService _processesService;
 
-        public UserReportService(VoltyksDbContext ctx, IMapper mapper, IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase, ISignalRService signalRService)
+        public UserReportService(VoltyksDbContext ctx, IMapper mapper, IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase, ISignalRService signalRService, IProcessesService processesService)
         {
             _ctx = ctx;
             _mapper = mapper;
@@ -43,6 +45,7 @@ namespace Voltyks.Application.Services.UserReport
             _httpContext = httpContextAccessor;
             _firebase = firebase;
             _signalRService = signalRService;
+            _processesService = processesService;
         }
 
         public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
@@ -69,70 +72,14 @@ namespace Voltyks.Application.Services.UserReport
             await _ctx.UserReports.AddAsync(report, ct);
             await _ctx.SaveChangesAsync(ct);
 
-            // ===== Terminate Process and Cleanup =====
-            // Mark process as Aborted
-            process.Status = ProcessStatus.Aborted;
-
-            // Update ChargingRequest status
-            var chargingRequest = await _ctx.Set<ChargingRequestEntity>()
-                .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
-            if (chargingRequest != null)
-            {
-                chargingRequest.Status = "Aborted";
-            }
-
-            // Cleanup CurrentActivities + Send Process_Terminated to BOTH users
-            foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
-            {
-                var u = await _ctx.Set<AppUser>()
-                    .Include(x => x.DeviceTokens)
-                    .FirstOrDefaultAsync(x => x.Id == uid, ct);
-
-                if (u != null)
-                {
-                    // Remove from CurrentActivities
-                    var list = u.CurrentActivities.ToList();
-                    if (list.Contains(process.Id))
-                    {
-                        list.Remove(process.Id);
-                        u.CurrentActivities = list;
-                    }
-
-                    // Reset availability
-                    if (u.CurrentActivities.Count == 0)
-                        u.IsAvailable = true;
-
-                    _ctx.Update(u);
-
-                    // ✅ Send Process_Terminated notification
-                    if (u.DeviceTokens?.Any() == true)
-                    {
-                        var terminationData = new Dictionary<string, string>
-                        {
-                            ["processId"] = process.Id.ToString(),
-                            ["requestId"] = process.ChargerRequestId.ToString(),
-                            ["terminationReason"] = "report",
-                            ["terminatedAt"] = DateTime.UtcNow.ToString("o")
-                        };
-
-                        foreach (var token in u.DeviceTokens)
-                        {
-                            try
-                            {
-                                await _firebase.SendNotificationAsync(
-                                    token.Token,
-                                    "تم إنهاء العملية",
-                                    "تم إنهاء العملية بسبب بلاغ",
-                                    process.ChargerRequestId,
-                                    NotificationTypes.Process_Terminated,
-                                    terminationData);
-                            }
-                            catch { /* Log but don't fail */ }
-                        }
-                    }
-                }
-            }
-
+            // ===== Terminate Process and Cleanup using unified method =====
+            // Use Disputed status (not Aborted) for report-initiated terminations
+            await _processesService.TerminateProcessAsync(
+                process.Id,
+                ProcessStatus.Disputed,
+                "report",
+                user.Id,
+                ct);
             await _ctx.SaveChangesAsync(ct);
 
             // ===== Admin SignalR Notification (Real-time) =====

@@ -112,8 +112,9 @@ namespace Voltyks.Core.Mapping
                 .ForMember(d => d.Protocol, o => o.MapFrom(s => s.Charger.Protocol != null ? s.Charger.Protocol.Name : "Unknown"))
                 .ForMember(d => d.CapacityKw, o => o.MapFrom(s => s.Charger.Capacity != null ? s.Charger.Capacity.kw : 0))
                 .ForMember(d => d.PricePerHour, o => o.MapFrom(s => s.Charger.PriceOption != null ? s.Charger.PriceOption.Value : 0))
+                // TimeNeeded in MINUTES (unified with ChargerService)
                 .ForMember(d => d.TimeNeeded, o => o.MapFrom(s => s.Charger.Capacity != null && s.Charger.Capacity.kw > 0
-                    ? Math.Round(s.KwNeeded / s.Charger.Capacity.kw, 2) : 0))
+                    ? Math.Round((s.KwNeeded / s.Charger.Capacity.kw) * 60, 0) : 0))
                 .ForMember(d => d.AdapterNeeded, o => o.MapFrom(s => s.Charger.Adaptor == true))
                 .ForMember(d => d.AdapterAvailability, o => o.MapFrom(s => s.Charger.Adaptor == true ? "Available" : "Not Available"))
                 .ForMember(d => d.ChargerArea, o => o.MapFrom(s => s.Charger.Address != null ? s.Charger.Address.Area : "N/A"))

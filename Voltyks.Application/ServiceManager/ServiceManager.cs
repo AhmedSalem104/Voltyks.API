@@ -65,21 +65,22 @@ namespace Voltyks.Application.ServicesManager
     ILogger<ProcessesService> processesLogger,
     IPaginationService paginationService,
     ISignalRService signalRService,
-    IAppSettingsService appSettingsService) : IServiceManager
+    IAppSettingsService appSettingsService,
+    IProcessesService processesService) : IServiceManager
     {
-      
+
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService);
         public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager);
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor, appSettingsService);
-        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory, signalRService);
+        public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory, signalRService, processesService);
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager, redisService);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
         public ITermsService TermsService { get; } = new TermsService(context);
-        public IProcessesService ProcessesService  { get; } = new ProcessesService(context, httpContextAccessor, firebaseService, processesLogger, redisService, paginationService, signalRService);
-        public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService);
+        public IProcessesService ProcessesService  { get; } = processesService;
+        public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService, processesService);
         public IMobileAppConfigService MobileAppConfigService { get; } = new MobileAppConfigService(unitOfWork);
         public IStoreService StoreService { get; } = new StoreService(context, httpContextAccessor, signalRService);
 

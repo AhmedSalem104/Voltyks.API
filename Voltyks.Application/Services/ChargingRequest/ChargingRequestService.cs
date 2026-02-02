@@ -9,6 +9,7 @@ using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs;
@@ -34,10 +35,11 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly VoltyksDbContext _db;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ISignalRService _signalRService;
+        private readonly IProcessesService _processesService;
 
 
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
@@ -47,6 +49,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             _db = db;
             _httpClientFactory = httpClientFactory;
             _signalRService = signalRService;
+            _processesService = processesService;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -458,66 +461,17 @@ namespace Voltyks.Application.Services.ChargingRequest
                     status = "aborted"
                 });
 
-                // ✅ Find and terminate associated process + cleanup users
+                // ✅ Find and terminate associated process using unified method
                 var process = await _db.Set<Process>()
                     .FirstOrDefaultAsync(p => p.ChargerRequestId == request.Id);
 
                 if (process != null)
                 {
-                    process.Status = ProcessStatus.Aborted;
-
-                    // Cleanup CurrentActivities + Send Process_Terminated to BOTH users
-                    foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
-                    {
-                        var user = await _db.Set<AppUser>()
-                            .Include(u => u.DeviceTokens)
-                            .FirstOrDefaultAsync(u => u.Id == uid);
-
-                        if (user != null)
-                        {
-                            // Remove from CurrentActivities
-                            var list = user.CurrentActivities.ToList();
-                            if (list.Contains(process.Id))
-                            {
-                                list.Remove(process.Id);
-                                user.CurrentActivities = list;
-                            }
-
-                            // Reset availability
-                            if (user.CurrentActivities.Count == 0)
-                                user.IsAvailable = true;
-
-                            _db.Update(user);
-
-                            // Send Process_Terminated notification to this user
-                            if (user.DeviceTokens?.Any() == true)
-                            {
-                                var extraData = new Dictionary<string, string>
-                                {
-                                    ["processId"] = process.Id.ToString(),
-                                    ["requestId"] = request.Id.ToString(),
-                                    ["terminationReason"] = "aborted",
-                                    ["terminatedAt"] = DateTime.UtcNow.ToString("o")
-                                };
-
-                                foreach (var token in user.DeviceTokens)
-                                {
-                                    try
-                                    {
-                                        await _firebaseService.SendNotificationAsync(
-                                            token.Token,
-                                            "تم إنهاء العملية",
-                                            "تم إلغاء عملية الشحن",
-                                            request.Id,
-                                            NotificationTypes.Process_Terminated,
-                                            extraData);
-                                    }
-                                    catch { /* Log but don't fail */ }
-                                }
-                            }
-                        }
-                    }
-
+                    await _processesService.TerminateProcessAsync(
+                        process.Id,
+                        ProcessStatus.Aborted,
+                        "aborted",
+                        userId);
                     await _db.SaveChangesAsync();
                 }
 
@@ -587,8 +541,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                         request.Charger.Address.Longitude
                     );
 
-                    double estimatedMinutes = (distanceKm / 60.0) * 60.0;
-                    estimatedArrival =  Math.Ceiling(estimatedMinutes);
+                    // Calculate ETA based on variable speed (faster for longer distances)
+                    double speedKmPerHour = 30 + (distanceKm * 1.2);
+                    if (speedKmPerHour > 80) speedKmPerHour = 80; // Cap at 80 km/h
+                    double timeInMinutes = (distanceKm / speedKmPerHour) * 60;
+                    estimatedArrival = Math.Ceiling(timeInMinutes);
                 }
 
 
@@ -668,8 +625,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
                     PricePerHour = request.Charger.PriceOption?.Value ?? 0,
+                    // TimeNeeded in MINUTES (unified with ChargerService)
                     TimeNeeded = request.Charger.Capacity?.kw > 0
-                        ? Math.Round(request.KwNeeded / request.Charger.Capacity.kw, 2)
+                        ? Math.Round((request.KwNeeded / request.Charger.Capacity.kw) * 60, 0)
                         : 0,
                     AdapterNeeded = request.Charger.Adaptor == true,
                     AdapterAvailability = request.Charger.Adaptor == true ? "Available" : "Not Available",
