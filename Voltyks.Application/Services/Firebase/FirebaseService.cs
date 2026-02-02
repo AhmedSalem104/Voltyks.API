@@ -120,7 +120,7 @@ namespace Voltyks.Application.Services.Firebase
                             {
                                 sound = "default",
                                 channel_id = "voltyks_notifications_v2",
-                                click_action = "FLUTTER_NOTIFICATION_CLICK"
+                                click_action = "OPEN_MAIN_ACTIVITY"
                             }
                         },
                         apns = new
