@@ -360,8 +360,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             double speedKmPerHour = 30 + (distanceKm * 1.2);
 
             // Upper limit (realistic)
-            if (speedKmPerHour > 90)
-                speedKmPerHour = 90;
+            if (speedKmPerHour > 80)
+                speedKmPerHour = 80;
 
             // Convert to minutes
             double timeMinutes = (distanceKm / speedKmPerHour) * 60;

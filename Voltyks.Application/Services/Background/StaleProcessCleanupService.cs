@@ -2,10 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Processes;
+using Voltyks.Core.Enums;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
+using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
 
 namespace Voltyks.Application.Services.Background
 {
@@ -56,8 +59,12 @@ namespace Voltyks.Application.Services.Background
             using var scope = _scopeFactory.CreateScope();
             var ctx = scope.ServiceProvider.GetRequiredService<VoltyksDbContext>();
             var processesService = scope.ServiceProvider.GetRequiredService<IProcessesService>();
+            var firebaseService = scope.ServiceProvider.GetRequiredService<IFirebaseService>();
 
-            // Find users with IsAvailable=false or non-empty CurrentActivities
+            // 1. Cleanup orphaned ChargingRequests (pending/accepted without Process)
+            await CleanupOrphanedRequestsAsync(ctx, firebaseService, ct);
+
+            // 2. Cleanup stale user activities
             var usersToCheck = await ctx.Set<AppUser>()
                 .Where(u => !u.IsAvailable || (u.CurrentActivitiesJson != null && u.CurrentActivitiesJson != "[]"))
                 .ToListAsync(ct);
@@ -154,6 +161,74 @@ namespace Voltyks.Application.Services.Background
                 user.IsAvailable = true;
                 ctx.Update(user);
             }
+        }
+
+        private async Task CleanupOrphanedRequestsAsync(
+            VoltyksDbContext ctx,
+            IFirebaseService firebaseService,
+            CancellationToken ct)
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-10);
+
+            var orphanedRequests = await ctx.Set<ChargingRequestEntity>()
+                .Where(r =>
+                    (r.Status == "pending" || r.Status == "accepted") &&
+                    r.RequestedAt < cutoff &&
+                    !ctx.Set<Process>().Any(p => p.ChargerRequestId == r.Id))
+                .ToListAsync(ct);
+
+            if (orphanedRequests.Count == 0)
+                return;
+
+            _logger.LogInformation("Found {Count} orphaned requests to expire", orphanedRequests.Count);
+
+            foreach (var req in orphanedRequests)
+            {
+                var previousStatus = req.Status;
+                req.Status = "Expired";
+
+                var extraData = new Dictionary<string, string>
+                {
+                    ["requestId"] = req.Id.ToString(),
+                    ["NotificationType"] = NotificationTypes.Process_Terminated,
+                    ["terminationReason"] = "expired",
+                    ["terminatedAt"] = DateTime.UtcNow.ToString("o")
+                };
+
+                // Send notification to both users
+                foreach (var userId in new[] { req.UserId, req.RecipientUserId })
+                {
+                    if (string.IsNullOrWhiteSpace(userId)) continue;
+
+                    var user = await ctx.Set<AppUser>()
+                        .Include(u => u.DeviceTokens)
+                        .FirstOrDefaultAsync(u => u.Id == userId, ct);
+
+                    if (user?.DeviceTokens?.Any() != true) continue;
+
+                    foreach (var token in user.DeviceTokens)
+                    {
+                        try
+                        {
+                            await firebaseService.SendNotificationAsync(
+                                token.Token,
+                                "تم إنهاء العملية",
+                                "انتهت صلاحية الطلب",
+                                req.Id,
+                                NotificationTypes.Process_Terminated,
+                                extraData);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to send expiry notification to token for request {RequestId}", req.Id);
+                        }
+                    }
+                }
+
+                _logger.LogWarning("Expired orphaned request {RequestId} (was: {Status})", req.Id, previousStatus);
+            }
+
+            await ctx.SaveChangesAsync(ct);
         }
     }
 }
