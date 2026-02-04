@@ -682,12 +682,18 @@ namespace Voltyks.Application.Services.Auth
                     dto.EstimatedArrival = Math.Ceiling((dto.DistanceInKm / 60.0) * 60.0);
                 }
 
-                // تقدير السعر
-                if (req.Charger?.PriceOption != null && req.Charger.Capacity?.kw > 0)
+                // تقدير السعر (خصم الرسوم من المبلغ الأساسي)
                 {
-                    dto.EstimatedPrice = req.Charger.PriceOption.Value
-                                         * (decimal)req.KwNeeded
-                                         / (decimal)req.Charger.Capacity.kw;
+                    decimal baseAmt = req.BaseAmount;
+                    if (baseAmt <= 0 && req.Charger?.PriceOption != null && req.Charger.Capacity?.kw > 0)
+                    {
+                        baseAmt = req.Charger.PriceOption.Value
+                                  * (decimal)req.KwNeeded
+                                  / (decimal)req.Charger.Capacity.kw;
+                    }
+                    dto.BaseAmount = baseAmt;
+                    dto.VoltyksFees = req.VoltyksFees;
+                    dto.EstimatedPrice = Math.Max(baseAmt - req.VoltyksFees, 0m);
                 }
                 // (6) عنوان موقع السيارة (اختياري)
                 string vehicleArea = "N/A";

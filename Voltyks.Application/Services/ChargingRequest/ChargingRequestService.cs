@@ -553,7 +553,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 // (4) السعر التقديري
 
-                // (4) السعر التقديري النهائي (Total = Base + Fee)
+                // (4) السعر التقديري النهائي (Total = Base - Fee)
                 decimal estimatedPriceFinal = request.EstimatedPrice;
 
                 // fallback لو الطلب قديم/القيم صفر
@@ -578,8 +578,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                         voltyksFee = ApplyRules(baseAmount, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
                     }
 
-                    // 3) اجمع الإجمالي
-                    estimatedPriceFinal = baseAmount + voltyksFee;
+                    // 3) الإجمالي (خصم الرسوم من المبلغ الأساسي)
+                    estimatedPriceFinal = Math.Max(baseAmount - voltyksFee, 0m);
                 }
 
 
@@ -921,8 +921,8 @@ namespace Voltyks.Application.Services.ChargingRequest
             var feesCfg = await _feesConfigService.GetAsync();
             decimal voltyksFee = ApplyRules(baseAmount, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
 
-            // 3) المجموع الكلي
-            decimal totalEstimatedPrice = baseAmount + voltyksFee;
+            // 3) المجموع الكلي (خصم الرسوم من المبلغ الأساسي)
+            decimal totalEstimatedPrice = Math.Max(baseAmount - voltyksFee, 0m);
 
 
 
