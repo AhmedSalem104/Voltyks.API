@@ -329,17 +329,17 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             double chargerCapacity = charger.Capacity.kw;
             double sessionDurationHr = kwNeed / chargerCapacity;
 
-            // حساب BaseAmount
-            decimal baseAmount = charger.PriceOption.Value * (decimal)sessionDurationHr;
-            dto.BaseAmount = Math.Round(baseAmount, 2);
+            // 1) حساب PriceEstimated (السعر الأصلي)
+            decimal priceEstimated = charger.PriceOption.Value * (decimal)sessionDurationHr;
+            dto.PriceEstimated = (double)Math.Round(priceEstimated, 2);
 
-            // حساب VoltyksFees
+            // 2) حساب VoltyksFees من PriceEstimated
             var feesCfg = await _feesConfigService.GetAsync();
-            decimal voltyksFee = ApplyFeesRules(baseAmount, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
+            decimal voltyksFee = ApplyFeesRules(priceEstimated, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
             dto.VoltyksFees = voltyksFee;
 
-            // حساب PriceEstimated (خصم الرسوم من المبلغ الأساسي)
-            dto.PriceEstimated = (double)Math.Max(baseAmount - voltyksFee, 0m);
+            // 3) حساب BaseAmount = PriceEstimated - VoltyksFees
+            dto.BaseAmount = Math.Max(priceEstimated - voltyksFee, 0m);
 
             // TimeNeeded is already set in GetChargerByIdAsync
         }
