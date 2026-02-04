@@ -34,6 +34,16 @@ namespace Voltyks.Core.DTOs.Charger
         public double PriceEstimated { get; set; }
 
         /// <summary>
+        /// Base charging cost before fees (PricePerHour × ChargingTimeInHours)
+        /// </summary>
+        public decimal BaseAmount { get; set; }
+
+        /// <summary>
+        /// Voltyks platform fees
+        /// </summary>
+        public decimal VoltyksFees { get; set; }
+
+        /// <summary>
         /// Estimated charging time in MINUTES based on KwNeed and charger capacity
         /// </summary>
         public double TimeNeeded { get; set; }

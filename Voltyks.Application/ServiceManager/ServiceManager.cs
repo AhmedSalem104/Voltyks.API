@@ -74,7 +74,7 @@ namespace Voltyks.Application.ServicesManager
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
-        public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor, appSettingsService);
+        public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor, appSettingsService, feesConfigService);
         public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory, signalRService, processesService);
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager, redisService);
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);

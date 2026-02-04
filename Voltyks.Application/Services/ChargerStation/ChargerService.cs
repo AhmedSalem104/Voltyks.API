@@ -14,6 +14,7 @@ using Voltyks.Persistence.Entities;
 using System.Threading.Channels;
 using static System.Net.Mime.MediaTypeNames;
 using Voltyks.Application.Interfaces.AppSettings;
+using Voltyks.Application.Interfaces.FeesConfig;
 
 namespace Voltyks.Application.Interfaces.ChargerStation
 {
@@ -23,13 +24,15 @@ namespace Voltyks.Application.Interfaces.ChargerStation
         private readonly IMapper _mapper;
         private readonly IHttpContextAccessor _httpContext;
         private readonly IAppSettingsService _appSettingsService;
+        private readonly IFeesConfigService _feesConfigService;
 
-        public ChargerService(IUnitOfWork unitOfWork, IMapper mapper, IHttpContextAccessor httpContext, IAppSettingsService appSettingsService)
+        public ChargerService(IUnitOfWork unitOfWork, IMapper mapper, IHttpContextAccessor httpContext, IAppSettingsService appSettingsService, IFeesConfigService feesConfigService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _httpContext = httpContext;
             _appSettingsService = appSettingsService;
+            _feesConfigService = feesConfigService;
         }
         public async Task<ApiResponse<IEnumerable<CapacityDto>>> GetAllCapacitiesAsync()
         {
@@ -246,8 +249,8 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             };
 
 
-                  CalculateDistanceAndArrival(request.UserLat, request.UserLon, charger, dto);
-                   SetEstimatedPrice(request.KwNeed, charger, dto);
+            CalculateDistanceAndArrival(request.UserLat, request.UserLon, charger, dto);
+            await SetEstimatedPriceAsync(request.KwNeed, charger, dto);
 
             return new ApiResponse<ChargerDetailsDto>(dto, "Success", true);
         }
@@ -321,14 +324,32 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             dto.DistanceInKm = Math.Round(distance, 2);
             dto.EstimatedArrival = EstimateTime(distance);
         }
-        private void SetEstimatedPrice(double kwNeed, Charger charger, ChargerDetailsDto dto)
+        private async Task SetEstimatedPriceAsync(double kwNeed, Charger charger, ChargerDetailsDto dto)
         {
             double chargerCapacity = charger.Capacity.kw;
             double sessionDurationHr = kwNeed / chargerCapacity;
-            double estimatedCost = EstimatePrice(sessionDurationHr, charger.PriceOption.Value);
-            dto.PriceEstimated = estimatedCost;
+
+            // حساب BaseAmount
+            decimal baseAmount = charger.PriceOption.Value * (decimal)sessionDurationHr;
+            dto.BaseAmount = Math.Round(baseAmount, 2);
+
+            // حساب VoltyksFees
+            var feesCfg = await _feesConfigService.GetAsync();
+            decimal voltyksFee = ApplyFeesRules(baseAmount, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
+            dto.VoltyksFees = voltyksFee;
+
+            // حساب PriceEstimated (خصم الرسوم من المبلغ الأساسي)
+            dto.PriceEstimated = (double)Math.Max(baseAmount - voltyksFee, 0m);
 
             // TimeNeeded is already set in GetChargerByIdAsync
+        }
+
+        private static decimal ApplyFeesRules(decimal baseAmount, decimal percentage, decimal minimumFee)
+        {
+            if (baseAmount < 0) baseAmount = 0;
+            var pctValue = Math.Round(baseAmount * (percentage / 100m), 2, MidpointRounding.AwayFromZero);
+            var result = pctValue < minimumFee ? minimumFee : pctValue;
+            return Math.Round(result, 2, MidpointRounding.AwayFromZero);
         }
         private double CalculateDistanceInKm(double lat1, double lon1, double lat2, double lon2)
         {
