@@ -30,6 +30,16 @@ namespace Voltyks.Persistence.Entities.Main
         public double? VehicleOwnerRating { get; set; }
         public double? ChargerOwnerRating { get; set; }
 
+        /// <summary>
+        /// UTC timestamp when the rating window was first opened (set once, idempotent).
+        /// </summary>
+        public DateTime? RatingWindowOpenedAt { get; set; }
+
+        /// <summary>
+        /// True if the background service applied default 3-star ratings after the window expired.
+        /// </summary>
+        public bool DefaultRatingApplied { get; set; }
+
         public DateTime DateCreated { get; set; } = DateTime.UtcNow;
         public DateTime? DateCompleted { get; set; }
 

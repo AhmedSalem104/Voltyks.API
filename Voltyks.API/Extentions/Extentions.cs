@@ -408,6 +408,9 @@ namespace Voltyks.API.Extentions
             // Background cleanup service for stale processes
             services.AddHostedService<StaleProcessCleanupService>();
 
+            // Background service for rating window expiry (applies default 3★ after 5 min)
+            services.AddHostedService<RatingWindowService>();
+
             return services;
 
 

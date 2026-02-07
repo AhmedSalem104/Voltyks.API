@@ -446,6 +446,7 @@ namespace Voltyks.Core.DTOs.Processes
                 if (decision == "completed")
                 {
                     process.Status = ProcessStatus.Completed;
+                    process.SubStatus = "awaiting_rating";
                     if (process.DateCompleted == null)
                         process.DateCompleted = DateTimeHelper.GetEgyptTime();
                     request.Status = "Completed";
@@ -739,6 +740,7 @@ namespace Voltyks.Core.DTOs.Processes
             if (process.VehicleOwnerRating.HasValue && process.ChargerOwnerRating.HasValue)
             {
                 process.Status = ProcessStatus.Completed;
+                process.SubStatus = null; // rating stage complete
                 process.DateCompleted = DateTimeHelper.GetEgyptTime();
 
                 // Update ChargingRequest status to Completed
@@ -875,6 +877,72 @@ namespace Voltyks.Core.DTOs.Processes
             }, "Ratings summary", true);
         }
 
+        private static readonly TimeSpan RatingWindowDuration = TimeSpan.FromMinutes(5);
+
+        public async Task<ApiResponse<object>> OpenRatingWindowAsync(OpenRatingWindowDto dto, CancellationToken ct = default)
+        {
+            var me = CurrentUserId();
+            if (string.IsNullOrEmpty(me))
+                return new ApiResponse<object>("Unauthorized", false);
+
+            var process = await _ctx.Set<ProcessEntity>()
+                .FirstOrDefaultAsync(p => p.Id == dto.ProcessId, ct);
+
+            if (process is null)
+                return new ApiResponse<object>("Process not found", false);
+
+            // Auth: user must be VO or CO
+            if (process.VehicleOwnerId != me && process.ChargerOwnerId != me)
+                return new ApiResponse<object>("Forbidden", false);
+
+            // Status gating
+            if (process.Status == ProcessStatus.Aborted || process.Status == ProcessStatus.Disputed)
+                return new ApiResponse<object>("Process is terminated", false);
+
+            if (process.DefaultRatingApplied)
+                return new ApiResponse<object>("Rating window has expired", false);
+
+            if (process.VehicleOwnerRating.HasValue && process.ChargerOwnerRating.HasValue)
+                return new ApiResponse<object>("Both ratings already submitted", false);
+
+            // Strict SubStatus check:
+            // ALLOW: Completed && SubStatus == "awaiting_rating" (normal flow)
+            // ALLOW: PendingCompleted (lenient — frontend opened rating screen early)
+            // REJECT: Completed && SubStatus == null (already finalized)
+            var isCompleted = process.Status == ProcessStatus.Completed;
+            var isPendingCompleted = process.Status == ProcessStatus.PendingCompleted;
+
+            if (isCompleted && process.SubStatus != "awaiting_rating")
+                return new ApiResponse<object>("Process is already finalized", false);
+
+            if (!isCompleted && !isPendingCompleted)
+                return new ApiResponse<object>("Process is not in a ratable state", false);
+
+            // Idempotency: if window already opened, return existing info without DB write
+            if (process.RatingWindowOpenedAt.HasValue)
+            {
+                return new ApiResponse<object>(new
+                {
+                    processId = process.Id,
+                    ratingWindowOpenedAt = process.RatingWindowOpenedAt.Value,
+                    ratingWindowExpiresAt = process.RatingWindowOpenedAt.Value.Add(RatingWindowDuration),
+                    alreadyOpened = true
+                }, "Rating window already open", true);
+            }
+
+            // Open the rating window
+            process.RatingWindowOpenedAt = DateTime.UtcNow;
+            _ctx.Update(process);
+            await _ctx.SaveChangesAsync(ct);
+
+            return new ApiResponse<object>(new
+            {
+                processId = process.Id,
+                ratingWindowOpenedAt = process.RatingWindowOpenedAt.Value,
+                ratingWindowExpiresAt = process.RatingWindowOpenedAt.Value.Add(RatingWindowDuration),
+                alreadyOpened = false
+            }, "Rating window opened", true);
+        }
 
         public async Task<ApiResponse<object>> GetMyActivitiesAsync(PaginationParams? paginationParams, CancellationToken ct = default)
         {
@@ -1214,6 +1282,7 @@ namespace Voltyks.Core.DTOs.Processes
                 "awaiting_completion" when isChargerOwner => "CONFIRM_COMPLETION",
                 "awaiting_completion" when isVehicleOwner => "WAITING_FOR_COMPLETION",
                 "charging_in_progress" => "CHARGING_ACTIVE",
+                "awaiting_rating" => "RATING_SCREEN",
                 _ => "UNKNOWN"
             };
         }

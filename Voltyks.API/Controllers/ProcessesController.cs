@@ -39,6 +39,10 @@ namespace Voltyks.API.Controllers
         public async Task<IActionResult> MyActivities([FromQuery] PaginationParams? paginationParams, CancellationToken ct)
             => Ok(await _svc.ProcessesService.GetMyActivitiesAsync(paginationParams, ct));
 
+        [HttpPost("open-rating-window")]
+        public async Task<IActionResult> OpenRatingWindow([FromBody] OpenRatingWindowDto dto, CancellationToken ct)
+            => Ok(await _svc.ProcessesService.OpenRatingWindowAsync(dto, ct));
+
         [HttpPost("Get-Two-Way-Rating")]
         [Authorize]
         public async Task<IActionResult> GetRatingsSummary([FromBody] ProcessIdDTO dto, CancellationToken ct)
