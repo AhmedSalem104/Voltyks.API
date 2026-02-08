@@ -380,22 +380,35 @@ namespace Voltyks.Core.DTOs.Processes
                     }, ct);
                 }
 
-                // نفس شكل create في الـ response
                 var responseData = new
                 {
-                    notificationId = notifDto.NotificationId,
-                    requestId = notifDto.RequestId,
-                    recipientUserId = notifDto.RecipientUserId,
-                    title = notifDto.Title,
-                    body = notifDto.Body,
-                    notificationType = notifDto.NotificationType,
-                    sentAt = notifDto.SentAt,
-                    pushSentCount = notifDto.PushSentCount,
-
-                    processId = process.Id,
-                    estimatedPrice = process.EstimatedPrice,
-                    amountCharged = process.AmountCharged,
-                    amountPaid = process.AmountPaid
+                    process = new
+                    {
+                        processId          = process.Id,
+                        chargerRequestId   = process.ChargerRequestId,
+                        vehicleOwnerId     = process.VehicleOwnerId,
+                        chargerOwnerId     = process.ChargerOwnerId,
+                        status             = process.Status.ToString(),
+                        subStatus          = process.SubStatus,
+                        estimatedPrice     = process.EstimatedPrice,
+                        amountCharged      = process.AmountCharged,
+                        amountPaid         = process.AmountPaid,
+                        vehicleOwnerRating = process.VehicleOwnerRating,
+                        chargerOwnerRating = process.ChargerOwnerRating,
+                        dateCreated        = process.DateCreated,
+                        dateCompleted      = process.DateCompleted
+                    },
+                    notification = new
+                    {
+                        notificationId   = notifDto.NotificationId,
+                        requestId        = notifDto.RequestId,
+                        recipientUserId  = notifDto.RecipientUserId,
+                        title            = notifDto.Title,
+                        body             = notifDto.Body,
+                        notificationType = notifDto.NotificationType,
+                        sentAt           = notifDto.SentAt,
+                        pushSentCount    = notifDto.PushSentCount
+                    }
                 };
 
                 return new ApiResponse<object>(
