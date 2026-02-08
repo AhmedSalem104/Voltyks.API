@@ -1423,7 +1423,7 @@ namespace Voltyks.Core.DTOs.Processes
                             {
                                 await _firebase.SendNotificationAsync(
                                     token.Token,
-                                    "تم إنهاء العملية",
+                                    "Process terminated",
                                     GetTerminationMessage(terminationReason),
                                     process.ChargerRequestId,
                                     NotificationTypes.Process_Terminated,
@@ -1443,12 +1443,12 @@ namespace Voltyks.Core.DTOs.Processes
 
         private static string GetTerminationMessage(string reason) => reason switch
         {
-            "aborted" => "تم إلغاء عملية الشحن",
-            "report" => "تم إنهاء العملية بسبب بلاغ",
-            "timeout" => "تم إنهاء العملية",
-            "expired" => "انتهت صلاحية العملية",
-            "rejected" => "تم رفض الطلب",
-            _ => "تم إنهاء العملية"
+            "aborted" => "Charging process has been cancelled",
+            "report" => "Process terminated due to a report",
+            "timeout" => "Process terminated",
+            "expired" => "Process has expired",
+            "rejected" => "Request rejected",
+            _ => "Process terminated"
         };
 
     }
