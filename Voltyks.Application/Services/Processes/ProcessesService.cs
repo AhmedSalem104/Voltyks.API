@@ -1266,13 +1266,13 @@ namespace Voltyks.Core.DTOs.Processes
                 "pendingcompleted" when isChargerOwner => (
                     "awaiting_completion",
                     "CONFIRM_COMPLETION",
-                    NotificationTypes.VehicleOwner_UpdateProcess,
+                    NotificationTypes.VehicleOwner_CreateProcess,
                     new List<string> { "complete", "report" }
                 ),
                 "pendingcompleted" when isVehicleOwner => (
                     "awaiting_completion",
                     "WAITING_FOR_COMPLETION",
-                    NotificationTypes.VehicleOwner_UpdateProcess,
+                    NotificationTypes.VehicleOwner_CreateProcess,
                     new List<string> { "report" }
                 ),
                 _ => (
