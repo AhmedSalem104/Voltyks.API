@@ -85,8 +85,8 @@ namespace Voltyks.Application.Services.UserReport
             // ===== Admin SignalR Notification (Real-time) =====
             var adminNotification = new Notification
             {
-                Title = "بلاغ جديد",
-                Body = $"تم إنشاء بلاغ جديد من {user.FullName ?? user.UserName ?? "مستخدم"}",
+                Title = "New Report",
+                Body = $"A new report has been submitted by {user.FullName ?? user.UserName ?? "User"}",
                 IsRead = false,
                 SentAt = DateTimeHelper.GetEgyptTime(),
                 UserId = null,
@@ -100,15 +100,15 @@ namespace Voltyks.Application.Services.UserReport
 
             // Broadcast to Admin Dashboard via SignalR
             await _signalRService.SendBroadcastAsync(
-                "بلاغ جديد",
-                $"تم إنشاء بلاغ جديد من {user.FullName ?? user.UserName ?? "مستخدم"}",
+                "New Report",
+                $"A new report has been submitted by {user.FullName ?? user.UserName ?? "User"}",
                 new
                 {
                     id = $"report_{report.Id}",
                     type = "report",
                     originalId = report.Id,
-                    title = "بلاغ جديد",
-                    message = $"تم إنشاء بلاغ جديد من {user.FullName ?? user.UserName ?? "مستخدم"}",
+                    title = "New Report",
+                    message = $"A new report has been submitted by {user.FullName ?? user.UserName ?? "User"}",
                     userName = user.FullName ?? user.UserName ?? "",
                     timestamp = adminNotification.SentAt.ToString("O")
                 },

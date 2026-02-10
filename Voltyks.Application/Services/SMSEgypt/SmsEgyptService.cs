@@ -310,7 +310,7 @@ namespace Voltyks.Application.Services.SMSEgypt
         {
             var normalizedPhone = NormalizePhoneNumber(phoneNumber);
             await _redisService.RemoveAsync($"otp_daily_limit:{normalizedPhone}");
-            return new ApiResponse<string>("تم مسح الحد اليومي بنجاح", true);
+            return new ApiResponse<string>("Daily OTP limit cleared successfully", true);
         }
 
     }

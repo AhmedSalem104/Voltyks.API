@@ -894,7 +894,7 @@ namespace Voltyks.Application.Services.Auth
                 if (waitTime > TimeSpan.Zero)
                 {
                     return new ApiResponse<object>(
-                        $"يمكنك تقديم شكوى جديدة بعد {waitTime.Hours} ساعة و {waitTime.Minutes} دقيقة",
+                        $"You can submit a new complaint after {waitTime.Hours} hours and {waitTime.Minutes} minutes",
                         status: false,
                         errors: new() { "Rate limit exceeded. Only 1 complaint per 6 hours allowed." }
                     );
@@ -926,12 +926,12 @@ namespace Voltyks.Application.Services.Auth
 
             // ===== Admin SignalR Notification (Real-time) =====
             var user = await userManager.FindByIdAsync(userId);
-            var userName = user?.FullName ?? user?.UserName ?? "مستخدم";
+            var userName = user?.FullName ?? user?.UserName ?? "User";
 
             var adminNotification = new Notification
             {
-                Title = "شكوى جديدة",
-                Body = $"تم إنشاء شكوى جديدة من {userName}",
+                Title = "New Complaint",
+                Body = $"A new complaint has been submitted by {userName}",
                 IsRead = false,
                 SentAt = DateTimeHelper.GetEgyptTime(),
                 UserId = null,
@@ -945,15 +945,15 @@ namespace Voltyks.Application.Services.Auth
 
             // Broadcast to Admin Dashboard via SignalR
             await signalRService.SendBroadcastAsync(
-                "شكوى جديدة",
-                $"تم إنشاء شكوى جديدة من {userName}",
+                "New Complaint",
+                $"A new complaint has been submitted by {userName}",
                 new
                 {
                     id = $"complaint_{complaint.Id}",
                     type = "complaint",
                     originalId = complaint.Id,
-                    title = "شكوى جديدة",
-                    message = $"تم إنشاء شكوى جديدة من {userName}",
+                    title = "New Complaint",
+                    message = $"A new complaint has been submitted by {userName}",
                     userName = userName,
                     timestamp = adminNotification.SentAt.ToString("O")
                 },
@@ -984,7 +984,7 @@ namespace Voltyks.Application.Services.Auth
             {
                 return new ApiResponse<CanSubmitComplaintDto>(
                     data: new CanSubmitComplaintDto { CanSubmit = true, HoursRemaining = 0, MinutesRemaining = 0 },
-                    message: "يمكنك تقديم شكوى",
+                    message: "You can submit a complaint",
                     status: true
                 );
             }
@@ -996,7 +996,7 @@ namespace Voltyks.Application.Services.Auth
             {
                 return new ApiResponse<CanSubmitComplaintDto>(
                     data: new CanSubmitComplaintDto { CanSubmit = true, HoursRemaining = 0, MinutesRemaining = 0 },
-                    message: "يمكنك تقديم شكوى",
+                    message: "You can submit a complaint",
                     status: true
                 );
             }
@@ -1009,7 +1009,7 @@ namespace Voltyks.Application.Services.Auth
                     MinutesRemaining = waitTime.Minutes,
                     SecondsRemaining = waitTime.Seconds
                 },
-                message: $"يمكنك تقديم شكوى جديدة بعد {(int)waitTime.TotalHours} ساعة و {waitTime.Minutes} دقيقة",
+                message: $"You can submit a new complaint after {(int)waitTime.TotalHours} hours and {waitTime.Minutes} minutes",
                 status: true
             );
         }

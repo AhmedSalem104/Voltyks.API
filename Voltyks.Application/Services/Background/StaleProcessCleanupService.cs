@@ -220,8 +220,8 @@ namespace Voltyks.Application.Services.Background
                         {
                             await firebaseService.SendNotificationAsync(
                                 token.Token,
-                                "تم إنهاء العملية",
-                                "انتهت صلاحية الطلب",
+                                "Process Terminated",
+                                "The request has expired",
                                 req.Id,
                                 NotificationTypes.Process_Terminated,
                                 extraData);
