@@ -584,57 +584,85 @@ namespace Voltyks.AdminControlDashboard.Services
                 if (existingByEmail != null)
                     return new ApiResponse<object>("Email already registered", false);
 
-                // Set session context flag to allow the SQL trigger to pass
-                await _context.Database.ExecuteSqlRawAsync(
-                    "EXEC sp_set_session_context @key = N'AllowAdminRoleInsert', @value = 1", ct);
+                // Begin transaction — keeps the SAME SQL connection open for all operations.
+                // This ensures sp_set_session_context is visible to the trigger.
+                await using var transaction = await _context.Database.BeginTransactionAsync(ct);
 
-                // Create new admin user
-                var nameParts = dto.FullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-                var newAdmin = new AppUser
+                try
                 {
-                    FullName = dto.FullName,
-                    FirstName = nameParts.Length > 0 ? nameParts[0] : dto.FullName,
-                    LastName = nameParts.Length > 1 ? nameParts[1] : "",
-                    Email = dto.Email,
-                    UserName = dto.Email.Split('@')[0],
-                    PhoneNumber = newPhone,
-                    EmailConfirmed = true,
-                    PhoneNumberConfirmed = true,
-                    Address = new Address
+                    // Set session context flag on this connection (trigger will see it)
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "EXEC sp_set_session_context @key = N'AllowAdminRoleInsert', @value = 1", ct);
+
+                    // Create new admin user
+                    var nameParts = dto.FullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                    var newAdmin = new AppUser
                     {
-                        City = "Cairo",
-                        Country = "Egypt",
-                        Street = "Admin Street"
+                        FullName = dto.FullName,
+                        FirstName = nameParts.Length > 0 ? nameParts[0] : dto.FullName,
+                        LastName = nameParts.Length > 1 ? nameParts[1] : "",
+                        Email = dto.Email,
+                        UserName = dto.Email.Split('@')[0],
+                        PhoneNumber = newPhone,
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Admin Street"
+                        }
+                    };
+
+                    var result = await _userManager.CreateAsync(newAdmin, dto.Password);
+                    if (!result.Succeeded)
+                    {
+                        await transaction.RollbackAsync(ct);
+                        var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                        return new ApiResponse<object>($"Failed to create admin: {errors}", false);
                     }
-                };
 
-                var result = await _userManager.CreateAsync(newAdmin, dto.Password);
-                if (!result.Succeeded)
-                {
-                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                    return new ApiResponse<object>($"Failed to create admin: {errors}", false);
-                }
-
-                await _userManager.AddToRoleAsync(newAdmin, "Admin");
-                await _userManager.AddClaimsAsync(newAdmin, new[]
-                {
-                    new Claim("role-level", "admin"),
-                    new Claim("can-manage-terms-fees", "true"),
-                    new Claim("can-transfer-fees", "true"),
-                });
-
-                // Clean up OTP
-                await _redisService.RemoveAsync($"{AdminOtpPrefix}{adminPhone}");
-
-                return new ApiResponse<object>(
-                    new
+                    var roleResult = await _userManager.AddToRoleAsync(newAdmin, "Admin");
+                    if (!roleResult.Succeeded)
                     {
-                        id = newAdmin.Id,
-                        fullName = newAdmin.FullName,
-                        email = newAdmin.Email,
-                        phoneNumber = newAdmin.PhoneNumber
-                    },
-                    "Admin created successfully", true);
+                        await transaction.RollbackAsync(ct);
+                        var errors = string.Join(", ", roleResult.Errors.Select(e => e.Description));
+                        return new ApiResponse<object>($"Failed to assign Admin role: {errors}", false);
+                    }
+
+                    var claimsResult = await _userManager.AddClaimsAsync(newAdmin, new[]
+                    {
+                        new Claim("role-level", "admin"),
+                        new Claim("can-manage-terms-fees", "true"),
+                        new Claim("can-transfer-fees", "true"),
+                    });
+                    if (!claimsResult.Succeeded)
+                    {
+                        await transaction.RollbackAsync(ct);
+                        var errors = string.Join(", ", claimsResult.Errors.Select(e => e.Description));
+                        return new ApiResponse<object>($"Failed to assign claims: {errors}", false);
+                    }
+
+                    await transaction.CommitAsync(ct);
+
+                    // Clean up OTP (only after successful commit)
+                    await _redisService.RemoveAsync($"{AdminOtpPrefix}{adminPhone}");
+
+                    return new ApiResponse<object>(
+                        new
+                        {
+                            id = newAdmin.Id,
+                            fullName = newAdmin.FullName,
+                            email = newAdmin.Email,
+                            phoneNumber = newAdmin.PhoneNumber
+                        },
+                        "Admin created successfully", true);
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync(ct);
+                    throw;
+                }
             }
             catch (Exception ex)
             {
