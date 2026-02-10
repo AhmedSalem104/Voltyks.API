@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.AdminControlDashboard;
+using Voltyks.AdminControlDashboard.Dtos.Users;
 
 namespace Voltyks.API.Controllers.Admin
 {
@@ -122,6 +123,29 @@ namespace Voltyks.API.Controllers.Admin
             CancellationToken ct = default)
         {
             var result = await _adminServiceManager.AdminUsersService.RestoreUserAsync(id, ct);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// POST /api/admin/users/create-admin/send-otp - Send OTP to current admin's phone
+        /// </summary>
+        [HttpPost("create-admin/send-otp")]
+        public async Task<IActionResult> SendCreateAdminOtp(
+            CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminUsersService.SendCreateAdminOtpAsync(ct);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// POST /api/admin/users/create-admin - Create new admin (requires OTP verification)
+        /// </summary>
+        [HttpPost("create-admin")]
+        public async Task<IActionResult> CreateAdmin(
+            [FromBody] CreateAdminDto dto,
+            CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminUsersService.CreateAdminAsync(dto, ct);
             return Ok(result);
         }
     }

@@ -18,12 +18,8 @@ namespace Voltyks.API
 
             var app = builder.Build();
 
-            // Auto-apply pending migrations
-            using (var scope = app.Services.CreateScope())
-            {
-                var db = scope.ServiceProvider.GetRequiredService<VoltyksDbContext>();
-                db.Database.Migrate();
-            }
+            // Migrations are applied separately via CLI with admin connection:
+            // dotnet ef database update --connection "Server=...;User ID=voltyksadmin;..."
 
             await app.ConfigurMiddleWares();
 

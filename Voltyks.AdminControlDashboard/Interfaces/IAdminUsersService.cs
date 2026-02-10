@@ -16,5 +16,9 @@ namespace Voltyks.AdminControlDashboard.Interfaces
         Task<ApiResponse<object>> SoftDeleteUserAsync(string userId, CancellationToken ct = default);
         Task<ApiResponse<object>> HardDeleteUserAsync(string userId, CancellationToken ct = default);
         Task<ApiResponse<object>> RestoreUserAsync(string userId, CancellationToken ct = default);
+
+        // Admin creation (OTP-protected)
+        Task<ApiResponse<object>> SendCreateAdminOtpAsync(CancellationToken ct = default);
+        Task<ApiResponse<object>> CreateAdminAsync(CreateAdminDto dto, CancellationToken ct = default);
     }
 }

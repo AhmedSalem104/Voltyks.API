@@ -1,9 +1,12 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Voltyks.AdminControlDashboard.Dtos.Users;
 using Voltyks.AdminControlDashboard.Interfaces;
+using Voltyks.Application.Interfaces.Redis;
+using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Core.DTOs;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
@@ -20,17 +23,26 @@ namespace Voltyks.AdminControlDashboard.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly UserManager<AppUser> _userManager;
+        private readonly ISmsEgyptService _smsEgyptService;
+        private readonly IRedisService _redisService;
 
         public AdminUsersService(
             VoltyksDbContext context,
             IUnitOfWork unitOfWork,
             IMapper mapper,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            UserManager<AppUser> userManager,
+            ISmsEgyptService smsEgyptService,
+            IRedisService redisService)
         {
             _context = context;
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _httpContextAccessor = httpContextAccessor;
+            _userManager = userManager;
+            _smsEgyptService = smsEgyptService;
+            _redisService = redisService;
         }
 
         private string? GetCurrentUserId()
@@ -489,6 +501,144 @@ namespace Voltyks.AdminControlDashboard.Services
             {
                 return new ApiResponse<object>(
                     message: "Failed to restore user",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
+
+        private const string AdminOtpPrefix = "admin_create_otp:";
+
+        public async Task<ApiResponse<object>> SendCreateAdminOtpAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                var adminId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(adminId))
+                    return new ApiResponse<object>("Unauthorized", false);
+
+                var admin = await _userManager.FindByIdAsync(adminId);
+                if (admin == null)
+                    return new ApiResponse<object>("Admin not found", false);
+
+                var phone = admin.PhoneNumber;
+                if (string.IsNullOrEmpty(phone))
+                    return new ApiResponse<object>("Admin phone number not configured", false);
+
+                var otp = _smsEgyptService.GenerateOtp();
+                await _redisService.SetAsync($"{AdminOtpPrefix}{phone}", otp, TimeSpan.FromMinutes(5));
+
+                var sent = await _smsEgyptService.SendOtpMessageAsync(phone, otp);
+                if (!sent)
+                    return new ApiResponse<object>("Failed to send OTP", false);
+
+                return new ApiResponse<object>(
+                    new { phoneHint = $"***{phone[^4..]}" },
+                    "OTP sent to your phone", true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<object>(
+                    message: "Failed to send OTP",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
+
+        public async Task<ApiResponse<object>> CreateAdminAsync(CreateAdminDto dto, CancellationToken ct = default)
+        {
+            try
+            {
+                var adminId = GetCurrentUserId();
+                if (string.IsNullOrEmpty(adminId))
+                    return new ApiResponse<object>("Unauthorized", false);
+
+                var currentAdmin = await _userManager.FindByIdAsync(adminId);
+                if (currentAdmin == null)
+                    return new ApiResponse<object>("Admin not found", false);
+
+                var adminPhone = currentAdmin.PhoneNumber;
+                if (string.IsNullOrEmpty(adminPhone))
+                    return new ApiResponse<object>("Admin phone number not configured", false);
+
+                // Verify OTP
+                var cachedOtp = await _redisService.GetAsync($"{AdminOtpPrefix}{adminPhone}");
+                if (string.IsNullOrEmpty(cachedOtp))
+                    return new ApiResponse<object>("OTP expired or not found. Request a new one.", false);
+
+                if (cachedOtp != dto.OtpCode)
+                    return new ApiResponse<object>("Invalid OTP code", false);
+
+                // Normalize phone number (Egyptian format)
+                var newPhone = dto.PhoneNumber;
+                if (!newPhone.StartsWith("+"))
+                    newPhone = $"+2{newPhone}";
+
+                // Validate new admin doesn't already exist
+                var existingByPhone = await _userManager.Users
+                    .FirstOrDefaultAsync(u => u.PhoneNumber == newPhone, ct);
+                if (existingByPhone != null)
+                    return new ApiResponse<object>("Phone number already registered", false);
+
+                var existingByEmail = await _userManager.FindByEmailAsync(dto.Email);
+                if (existingByEmail != null)
+                    return new ApiResponse<object>("Email already registered", false);
+
+                // Set session context flag to allow the SQL trigger to pass
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC sp_set_session_context @key = N'AllowAdminRoleInsert', @value = 1", ct);
+
+                // Create new admin user
+                var nameParts = dto.FullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                var newAdmin = new AppUser
+                {
+                    FullName = dto.FullName,
+                    FirstName = nameParts.Length > 0 ? nameParts[0] : dto.FullName,
+                    LastName = nameParts.Length > 1 ? nameParts[1] : "",
+                    Email = dto.Email,
+                    UserName = dto.Email.Split('@')[0],
+                    PhoneNumber = newPhone,
+                    EmailConfirmed = true,
+                    PhoneNumberConfirmed = true,
+                    Address = new Address
+                    {
+                        City = "Cairo",
+                        Country = "Egypt",
+                        Street = "Admin Street"
+                    }
+                };
+
+                var result = await _userManager.CreateAsync(newAdmin, dto.Password);
+                if (!result.Succeeded)
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    return new ApiResponse<object>($"Failed to create admin: {errors}", false);
+                }
+
+                await _userManager.AddToRoleAsync(newAdmin, "Admin");
+                await _userManager.AddClaimsAsync(newAdmin, new[]
+                {
+                    new Claim("role-level", "admin"),
+                    new Claim("can-manage-terms-fees", "true"),
+                    new Claim("can-transfer-fees", "true"),
+                });
+
+                // Clean up OTP
+                await _redisService.RemoveAsync($"{AdminOtpPrefix}{adminPhone}");
+
+                return new ApiResponse<object>(
+                    new
+                    {
+                        id = newAdmin.Id,
+                        fullName = newAdmin.FullName,
+                        email = newAdmin.Email,
+                        phoneNumber = newAdmin.PhoneNumber
+                    },
+                    "Admin created successfully", true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<object>(
+                    message: "Failed to create admin",
                     status: false,
                     errors: new List<string> { ex.Message });
             }

@@ -1,14 +1,18 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.AdminControlDashboard.Interfaces.Complaints;
 using Voltyks.AdminControlDashboard.Interfaces.Notifications;
 using Voltyks.AdminControlDashboard.Services;
 using Voltyks.AdminControlDashboard.Services.Complaints;
 using Voltyks.AdminControlDashboard.Services.Notifications;
+using Voltyks.Application.Interfaces.Redis;
+using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
+using Voltyks.Persistence.Entities.Identity;
 
 namespace Voltyks.AdminControlDashboard
 {
@@ -19,9 +23,12 @@ namespace Voltyks.AdminControlDashboard
             IUnitOfWork unitOfWork,
             IMapper mapper,
             IHttpContextAccessor httpContextAccessor,
-            IServiceManager serviceManager)
+            IServiceManager serviceManager,
+            UserManager<AppUser> userManager,
+            ISmsEgyptService smsEgyptService,
+            IRedisService redisService)
         {
-            AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor);
+            AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor, userManager, smsEgyptService, redisService);
             AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context, httpContextAccessor);
             AdminTermsService = new AdminTermsService(serviceManager.TermsService, context);
             AdminProtocolService = new AdminProtocolService(context);
