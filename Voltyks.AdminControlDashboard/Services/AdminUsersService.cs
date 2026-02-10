@@ -527,7 +527,8 @@ namespace Voltyks.AdminControlDashboard.Services
                 var otp = _smsEgyptService.GenerateOtp();
                 await _redisService.SetAsync($"{AdminOtpPrefix}{phone}", otp, TimeSpan.FromMinutes(5));
 
-                var sent = await _smsEgyptService.SendOtpMessageAsync(phone, otp);
+                var adminMessage = $"Voltyks Admin Panel: Your verification code to create a new admin account is {otp}. This code expires in 5 minutes. If you did not request this, please ignore this message.";
+                var sent = await _smsEgyptService.SendOtpMessageAsync(phone, otp, adminMessage);
                 if (!sent)
                     return new ApiResponse<object>("Failed to send OTP", false);
 

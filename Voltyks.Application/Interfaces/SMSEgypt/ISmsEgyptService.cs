@@ -23,7 +23,7 @@ namespace Voltyks.Application.Interfaces.SMSEgypt
         Task SaveOtpAsync(string phoneNumber, string otp);
 
         // إرسال رسالة OTP عبر API SMS
-        Task<bool> SendOtpMessageAsync(string phoneNumber, string otp);
+        Task<bool> SendOtpMessageAsync(string phoneNumber, string otp, string? customMessage = null);
 
 
         // --------------- New methods for Forget Password OTP -----------------

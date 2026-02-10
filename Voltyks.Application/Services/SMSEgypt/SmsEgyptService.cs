@@ -204,9 +204,9 @@ namespace Voltyks.Application.Services.SMSEgypt
         {
             await _redisService.SetAsync($"otp:{phoneNumber}", otp, TimeSpan.FromMinutes(5));
         }
-        public async Task<bool> SendOtpMessageAsync(string phoneNumber, string otp)
+        public async Task<bool> SendOtpMessageAsync(string phoneNumber, string otp, string? customMessage = null)
         {
-            string message = $"Your OTP is {otp}";
+            string message = customMessage ?? $"Your OTP is {otp}";
             string fullUrl = $"{_smsSettings.Value.BaseUrl}?username={_smsSettings.Value.Username}&password={_smsSettings.Value.Password}&sendername={_smsSettings.Value.SenderName}&message={Uri.EscapeDataString(message)}&mobiles={phoneNumber}";
 
             var client = _httpClientFactory.CreateClient();
