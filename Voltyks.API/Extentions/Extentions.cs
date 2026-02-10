@@ -52,6 +52,7 @@ using Voltyks.API.Services;
 using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Services.AppSettings;
 using Voltyks.Application.Services.Background;
+using Voltyks.Application.Services.Background.Backup;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Core.DTOs.Processes;
 
@@ -179,6 +180,9 @@ namespace Voltyks.API.Extentions
             services.AddHttpClient<PaymobService>();
             services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
             services.AddScoped<PaymobService>();
+
+            // Database backup options
+            services.Configure<DatabaseBackupOptions>(configuration.GetSection(DatabaseBackupOptions.SectionName));
 
 
             services.AddAuthentication()
@@ -410,6 +414,9 @@ namespace Voltyks.API.Extentions
 
             // Background service for rating window expiry (applies default 3★ after 5 min)
             services.AddHostedService<RatingWindowService>();
+
+            // Daily database backup service
+            services.AddHostedService<DatabaseBackupService>();
 
             return services;
 

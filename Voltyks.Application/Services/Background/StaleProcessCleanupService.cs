@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Processes;
+using Voltyks.Application.Utilities;
 using Voltyks.Core.Enums;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
@@ -168,13 +169,20 @@ namespace Voltyks.Application.Services.Background
             IFirebaseService firebaseService,
             CancellationToken ct)
         {
-            var cutoff = DateTime.UtcNow.AddMinutes(-10);
+            var now = DateTimeHelper.GetEgyptTime();
+            var pendingCutoff = now.AddMinutes(-5);     // 5 min for unanswered requests
+            var acceptedCutoff = now.AddMinutes(-10);   // 10 min for unpaid accepted requests
 
             var orphanedRequests = await ctx.Set<ChargingRequestEntity>()
                 .Where(r =>
-                    (r.Status == "pending" || r.Status == "accepted") &&
-                    r.RequestedAt < cutoff &&
-                    !ctx.Set<Process>().Any(p => p.ChargerRequestId == r.Id))
+                    !ctx.Set<Process>().Any(p => p.ChargerRequestId == r.Id) &&
+                    (
+                        (r.Status == "pending" && r.RequestedAt < pendingCutoff) ||
+                        (r.Status == "accepted" && (
+                            (r.RespondedAt != null && r.RespondedAt < acceptedCutoff) ||
+                            (r.RespondedAt == null && r.RequestedAt < acceptedCutoff)
+                        ))
+                    ))
                 .ToListAsync(ct);
 
             if (orphanedRequests.Count == 0)

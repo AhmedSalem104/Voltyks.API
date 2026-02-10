@@ -135,14 +135,14 @@ namespace Voltyks.Core.DTOs.Processes
                 AmountCharged = dto.AmountCharged,
                 AmountPaid = dto.AmountPaid,
                 Status = ProcessStatus.PendingCompleted,
-                SubStatus = "awaiting_completion"
+                SubStatus = "charging_in_progress"
             };
 
             using var tx = await _ctx.Database.BeginTransactionAsync(ct);
             try
             {
                 await _ctx.AddAsync(process, ct);
-                req.Status = "PendingCompleted";
+                req.Status = "Started";
                 _ctx.Update(req);
 
                 await _ctx.SaveChangesAsync(ct);
@@ -284,6 +284,10 @@ namespace Voltyks.Core.DTOs.Processes
                 if (dto.EstimatedPrice.HasValue) process.EstimatedPrice = dto.EstimatedPrice;
                 if (dto.AmountCharged.HasValue) process.AmountCharged = dto.AmountCharged;
                 if (dto.AmountPaid.HasValue) process.AmountPaid = dto.AmountPaid;
+
+                // Mark as updated so pending endpoint returns UpdateProcess
+                if (dto.EstimatedPrice.HasValue || dto.AmountCharged.HasValue || dto.AmountPaid.HasValue)
+                    process.SubStatus = "process_updated";
 
                 // حالة العملية
                 if (decision == "completed")
@@ -908,8 +912,8 @@ namespace Voltyks.Core.DTOs.Processes
             if (process.VehicleOwnerId != me && process.ChargerOwnerId != me)
                 return new ApiResponse<object>("Forbidden", false);
 
-            // Status gating
-            if (process.Status == ProcessStatus.Aborted || process.Status == ProcessStatus.Disputed)
+            // Status gating - Aborted is terminal, Disputed allows rating (after report)
+            if (process.Status == ProcessStatus.Aborted)
                 return new ApiResponse<object>("Process is terminated", false);
 
             if (process.DefaultRatingApplied)
@@ -921,14 +925,16 @@ namespace Voltyks.Core.DTOs.Processes
             // Strict SubStatus check:
             // ALLOW: Completed && SubStatus == "awaiting_rating" (normal flow)
             // ALLOW: PendingCompleted (lenient — frontend opened rating screen early)
+            // ALLOW: Disputed (after report — allow rating)
             // REJECT: Completed && SubStatus == null (already finalized)
             var isCompleted = process.Status == ProcessStatus.Completed;
             var isPendingCompleted = process.Status == ProcessStatus.PendingCompleted;
+            var isDisputed = process.Status == ProcessStatus.Disputed;
 
             if (isCompleted && process.SubStatus != "awaiting_rating")
                 return new ApiResponse<object>("Process is already finalized", false);
 
-            if (!isCompleted && !isPendingCompleted)
+            if (!isCompleted && !isPendingCompleted && !isDisputed)
                 return new ApiResponse<object>("Process is not in a ratable state", false);
 
             // Idempotency: if window already opened, return existing info without DB write
@@ -1127,6 +1133,10 @@ namespace Voltyks.Core.DTOs.Processes
             var (computedSubStatus, screenKey, notificationType, availableActions) =
                 DetermineStatusContext(req.Status, isVehicleOwner, isChargerOwner);
 
+            // Override notification type if process has been updated
+            if (process?.SubStatus == "process_updated")
+                notificationType = NotificationTypes.VehicleOwner_UpdateProcess;
+
             var subStatus = process?.SubStatus ?? computedSubStatus;
 
             if (process?.SubStatus != null)
@@ -1254,13 +1264,13 @@ namespace Voltyks.Core.DTOs.Processes
                 "started" when isVehicleOwner => (
                     "charging_in_progress",
                     "CHARGING_ACTIVE",
-                    NotificationTypes.VehicleOwner_UpdateProcess,
+                    NotificationTypes.VehicleOwner_CreateProcess,
                     new List<string> { "create_process", "abort" }
                 ),
                 "started" when isChargerOwner => (
                     "charging_in_progress",
                     "CHARGING_ACTIVE",
-                    NotificationTypes.VehicleOwner_UpdateProcess,
+                    NotificationTypes.VehicleOwner_CreateProcess,
                     new List<string> { "abort" }
                 ),
                 "pendingcompleted" when isChargerOwner => (
@@ -1295,6 +1305,7 @@ namespace Voltyks.Core.DTOs.Processes
                 "awaiting_completion" when isChargerOwner => "CONFIRM_COMPLETION",
                 "awaiting_completion" when isVehicleOwner => "WAITING_FOR_COMPLETION",
                 "charging_in_progress" => "CHARGING_ACTIVE",
+                "process_updated" => "CHARGING_ACTIVE",
                 "awaiting_rating" => "RATING_SCREEN",
                 _ => "UNKNOWN"
             };
@@ -1309,7 +1320,8 @@ namespace Voltyks.Core.DTOs.Processes
             return chargingRequestStatus.ToLower() switch
             {
                 "pendingcompleted" => "awaiting_completion",
-                "started" => "charging_in_progress",
+                // Started can be "charging_in_progress" or "process_updated", skip consistency check
+                "started" => null,
                 // Final states (Completed, Aborted) and pre-process states don't have expected SubStatus
                 _ => null
             };
