@@ -23,7 +23,7 @@ namespace Voltyks.Application.Services.Background
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<StaleProcessCleanupService> _logger;
-        private readonly TimeSpan _interval = TimeSpan.FromMinutes(5);
+        private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);
         private readonly TimeSpan _processTimeout = TimeSpan.FromMinutes(10);
 
         public StaleProcessCleanupService(
@@ -140,6 +140,10 @@ namespace Voltyks.Application.Services.Background
                 }
                 else
                 {
+                    // Skip if payment was made — timer no longer applies
+                    if (process.AmountPaid != null && process.AmountPaid > 0)
+                        continue;
+
                     // Check if process is stale (too old and still active)
                     var age = DateTime.UtcNow - process.DateCreated;
                     if (age > _processTimeout)
@@ -178,7 +182,7 @@ namespace Voltyks.Application.Services.Background
                     !ctx.Set<Process>().Any(p => p.ChargerRequestId == r.Id) &&
                     (
                         (r.Status == "pending" && r.RequestedAt < pendingCutoff) ||
-                        (r.Status == "accepted" && (
+                        ((r.Status == "accepted" || r.Status == "confirmed") && (
                             (r.RespondedAt != null && r.RespondedAt < acceptedCutoff) ||
                             (r.RespondedAt == null && r.RequestedAt < acceptedCutoff)
                         ))

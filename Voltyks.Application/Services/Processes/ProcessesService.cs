@@ -1028,6 +1028,7 @@ namespace Voltyks.Core.DTOs.Processes
     string title,
     string body,
     int userTypeId,
+    string notificationType,
     CancellationToken ct)
         {
             var notification = new Notification
@@ -1038,7 +1039,8 @@ namespace Voltyks.Core.DTOs.Processes
                 SentAt = DateTimeHelper.GetEgyptTime(),
                 UserId = receiverUserId,
                 RelatedRequestId = relatedRequestId,
-                UserTypeId = userTypeId
+                UserTypeId = userTypeId,
+                Type = notificationType
             };
 
             await _ctx.AddAsync(notification, ct);
@@ -1083,7 +1085,7 @@ namespace Voltyks.Core.DTOs.Processes
             }
 
             var notification = await AddNotificationAsync(
-                receiverUserId, requestId, title, body, userTypeId, ct
+                receiverUserId, requestId, title, body, userTypeId, notificationType, ct
             );
 
             // ⬅️ خزّن نسخة من الـ data داخل نتيجة الإشعار (اختياري لكنه عملي للديبج)
@@ -1252,13 +1254,13 @@ namespace Voltyks.Core.DTOs.Processes
                 "confirmed" when isChargerOwner => (
                     "charging_confirmed",
                     "START_CHARGING",
-                    "Charger_ConfirmedProcessSuccessfully",
+                    NotificationTypes.Charger_ConfirmedProcessSuccessfully,
                     new List<string> { "start", "abort" }
                 ),
                 "confirmed" when isVehicleOwner => (
                     "charging_confirmed",
                     "WAITING_FOR_START",
-                    "Charger_ConfirmedProcessSuccessfully",
+                    NotificationTypes.Charger_ConfirmedProcessSuccessfully,
                     new List<string> { "abort" }
                 ),
                 "started" when isVehicleOwner => (

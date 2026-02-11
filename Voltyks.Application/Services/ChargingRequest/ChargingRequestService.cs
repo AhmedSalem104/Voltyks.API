@@ -545,7 +545,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     double speedKmPerHour = 30 + (distanceKm * 1.2);
                     if (speedKmPerHour > 80) speedKmPerHour = 80; // Cap at 80 km/h
                     double timeInMinutes = (distanceKm / speedKmPerHour) * 60;
-                    estimatedArrival = Math.Ceiling(timeInMinutes);
+                    estimatedArrival = Math.Round(timeInMinutes);
                 }
 
 
@@ -813,7 +813,8 @@ namespace Voltyks.Application.Services.ChargingRequest
             int relatedRequestId,
             string title,
             string body,
-            int userTypeId // 1 = ChargerOwner, 2 = VehicleOwner
+            int userTypeId, // 1 = ChargerOwner, 2 = VehicleOwner
+            string notificationType
         )
         {
             var notification = new Notification
@@ -824,7 +825,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                 SentAt = DateTimeHelper.GetEgyptTime(),
                 UserId = receiverUserId,
                 RelatedRequestId = relatedRequestId,
-                UserTypeId = userTypeId
+                UserTypeId = userTypeId,
+                Type = notificationType
             };
 
             await _unitOfWork.GetRepository<Notification, int>().AddAsync(notification);
@@ -862,7 +864,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                 relatedRequestId: requestId,
                 title: title,
                 body: body,
-                userTypeId: userTypeId
+                userTypeId: userTypeId,
+                notificationType: notificationType
             );
 
             return new NotificationResultDto(
