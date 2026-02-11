@@ -524,6 +524,10 @@ namespace Voltyks.AdminControlDashboard.Services
                 if (string.IsNullOrEmpty(phone))
                     return new ApiResponse<object>("Admin phone number not configured", false);
 
+                // Normalize to international format (matches SmsEgyptService.NormalizePhoneNumber)
+                if (System.Text.RegularExpressions.Regex.IsMatch(phone, @"^01[0-9]{9}$"))
+                    phone = $"+2{phone}";
+
                 var otp = _smsEgyptService.GenerateOtp();
                 await _redisService.SetAsync($"{AdminOtpPrefix}{phone}", otp, TimeSpan.FromMinutes(5));
 
@@ -560,6 +564,10 @@ namespace Voltyks.AdminControlDashboard.Services
                 var adminPhone = currentAdmin.PhoneNumber;
                 if (string.IsNullOrEmpty(adminPhone))
                     return new ApiResponse<object>("Admin phone number not configured", false);
+
+                // Normalize to match the key used when storing the OTP
+                if (System.Text.RegularExpressions.Regex.IsMatch(adminPhone, @"^01[0-9]{9}$"))
+                    adminPhone = $"+2{adminPhone}";
 
                 // Verify OTP
                 var cachedOtp = await _redisService.GetAsync($"{AdminOtpPrefix}{adminPhone}");

@@ -17,6 +17,7 @@ using Voltyks.Core.DTOs.SmsEgyptDTOs;
 using Voltyks.Core.Exceptions;
 using Voltyks.Persistence.Entities;
 using Voltyks.Persistence.Entities.Identity;
+using Microsoft.Extensions.Logging;
 using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Application.Services.SMSEgypt
@@ -27,15 +28,17 @@ namespace Voltyks.Application.Services.SMSEgypt
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IOptions<SmsEgyptSettings> _smsSettings;
         private readonly UserManager<AppUser> _userManager;
+        private readonly ILogger<SmsEgyptService> _logger;
         private const int MaxAttempts = 10;
         private readonly TimeSpan BlockDuration = TimeSpan.FromMinutes(10);
 
-        public SmsEgyptService(IRedisService redisService, IHttpClientFactory httpClientFactory, IOptions<SmsEgyptSettings> smsSettings , UserManager<AppUser> userManager)
+        public SmsEgyptService(IRedisService redisService, IHttpClientFactory httpClientFactory, IOptions<SmsEgyptSettings> smsSettings, UserManager<AppUser> userManager, ILogger<SmsEgyptService> logger)
         {
             _redisService = redisService;
             _httpClientFactory = httpClientFactory;
             _smsSettings = smsSettings;
             _userManager = userManager;
+            _logger = logger;
         }
 
         public async Task<ApiResponse<string>> SendOtpAsync(SendOtpDto dto)
@@ -211,8 +214,17 @@ namespace Voltyks.Application.Services.SMSEgypt
 
             var client = _httpClientFactory.CreateClient();
             var response = await client.GetAsync(fullUrl);
+            var responseBody = await response.Content.ReadAsStringAsync();
 
-            return response.IsSuccessStatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("SMS Egypt API returned HTTP {StatusCode} for phone {Phone}. Body: {Body}",
+                    (int)response.StatusCode, phoneNumber, responseBody);
+                return false;
+            }
+
+            _logger.LogInformation("SMS Egypt response for phone {Phone}: {Body}", phoneNumber, responseBody);
+            return true;
         }
 
         // ---------- Private Methods ----------

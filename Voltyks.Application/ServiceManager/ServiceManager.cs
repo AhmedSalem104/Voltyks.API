@@ -66,11 +66,12 @@ namespace Voltyks.Application.ServicesManager
     IPaginationService paginationService,
     ISignalRService signalRService,
     IAppSettingsService appSettingsService,
-    IProcessesService processesService) : IServiceManager
+    IProcessesService processesService,
+    ILogger<SmsEgyptService> smsLogger) : IServiceManager
     {
 
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService);
-        public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager);
+        public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager, smsLogger);
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
         public IVehicleService VehicleService { get; } = new VehicleService(unitOfWork, mapper , httpContextAccessor);
