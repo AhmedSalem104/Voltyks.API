@@ -380,6 +380,11 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (request == null)
                     return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
+                // Set ConfirmedAt for timer on confirmed screen
+                request.ConfirmedAt = DateTimeHelper.GetEgyptTime();
+                _db.Update(request);
+                await _db.SaveChangesAsync();
+
                 // التأكد أن المستخدم هو الـ ChargerOwner
                 if (request.Charger?.User?.Id != userId)
                     return new ApiResponse<NotificationResultDto>(null, "Not your request", false);

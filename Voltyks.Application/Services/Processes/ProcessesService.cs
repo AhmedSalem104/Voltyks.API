@@ -135,14 +135,14 @@ namespace Voltyks.Core.DTOs.Processes
                 AmountCharged = dto.AmountCharged,
                 AmountPaid = dto.AmountPaid,
                 Status = ProcessStatus.PendingCompleted,
-                SubStatus = "charging_in_progress"
+                SubStatus = "awaiting_completion"
             };
 
             using var tx = await _ctx.Database.BeginTransactionAsync(ct);
             try
             {
                 await _ctx.AddAsync(process, ct);
-                req.Status = "Started";
+                req.Status = "PendingCompleted";
                 _ctx.Update(req);
 
                 await _ctx.SaveChangesAsync(ct);
@@ -336,13 +336,20 @@ namespace Voltyks.Core.DTOs.Processes
                     ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
                 };
 
+                var updateNotifType = decision switch
+                {
+                    "completed" => NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                    "aborted" or "ended-by-report" => NotificationTypes.Process_Terminated,
+                    _ => NotificationTypes.VehicleOwner_UpdateProcess
+                };
+
                 var notifDto = await SendAndPersistNotificationAsync(
                     receiverUserId: process.ChargerOwnerId,
                     requestId: process.ChargerRequestId,
                     processId: process.Id,
                     title: title,
                     body: body,
-                    notificationType: NotificationTypes.VehicleOwner_UpdateProcess,
+                    notificationType: updateNotifType,
                     userTypeId: 1,
                     ct: ct,
                     extraData: extraData
@@ -1236,7 +1243,7 @@ namespace Voltyks.Core.DTOs.Processes
             }
 
             // Process/payment fields - for PendingCompleted, Started (mirrors VehicleOwner_CreateProcess / VehicleOwner_UpdateProcess)
-            if (process != null && (statusLower == "pendingcompleted" || statusLower == "started"))
+            if (process != null && (statusLower == "pendingcompleted" || statusLower == "started" || statusLower == "completed"))
             {
                 uiContext.ProcessId = process.Id.ToString();
                 uiContext.EstimatedPrice = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
@@ -1296,7 +1303,7 @@ namespace Voltyks.Core.DTOs.Processes
                     "charging_in_progress",
                     "CHARGING_ACTIVE",
                     NotificationTypes.VehicleOwner_CreateProcess,
-                    new List<string> { "create_process", "abort" }
+                    new List<string> { "abort" }
                 ),
                 "started" when isChargerOwner => (
                     "charging_in_progress",
