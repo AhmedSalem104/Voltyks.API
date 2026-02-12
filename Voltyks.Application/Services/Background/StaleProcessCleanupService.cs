@@ -129,6 +129,15 @@ namespace Voltyks.Application.Services.Background
 
                 if (isTerminal)
                 {
+                    // Skip processes still in rating phase — let RatingWindowService handle them
+                    if (process.SubStatus == "awaiting_rating")
+                    {
+                        _logger.LogDebug(
+                            "Skipping process {ProcessId} for user {UserId}: awaiting_rating (handled by RatingWindowService)",
+                            processId, user.Id);
+                        continue;
+                    }
+
                     // Process is terminal - cleanup immediately (idempotent call)
                     await processesService.TerminateProcessAsync(
                         processId,

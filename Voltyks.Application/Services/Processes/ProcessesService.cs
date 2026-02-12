@@ -293,6 +293,8 @@ namespace Voltyks.Core.DTOs.Processes
                 if (decision == "completed")
                 {
                     process.Status = ProcessStatus.Completed;
+                    process.SubStatus = "awaiting_rating";
+                    process.RatingWindowOpenedAt = DateTime.UtcNow;
                     process.DateCompleted = DateTimeHelper.GetEgyptTime();
                     request.Status = "Completed";
                 }
@@ -466,6 +468,8 @@ namespace Voltyks.Core.DTOs.Processes
                     process.SubStatus = "awaiting_rating";
                     if (process.DateCompleted == null)
                         process.DateCompleted = DateTimeHelper.GetEgyptTime();
+                    if (process.RatingWindowOpenedAt == null)
+                        process.RatingWindowOpenedAt = DateTime.UtcNow;
                     request.Status = "Completed";
 
                     _ctx.Update(process);
