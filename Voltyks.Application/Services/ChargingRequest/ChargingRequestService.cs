@@ -78,17 +78,33 @@ namespace Voltyks.Application.Services.ChargingRequest
                 var vehicleOwner = await _db.Set<AppUser>().FindAsync(userId);
                 if (vehicleOwner?.CurrentActivities?.Count > 0)
                 {
-                    // Smart validation: verify the IDs are actually still active
-                    var activeProcessIds = vehicleOwner.CurrentActivities.ToList();
-                    var hasActuallyActiveProcess = await _db.Set<Process>()
-                        .AnyAsync(p => activeProcessIds.Contains(p.Id)
-                            && p.Status != ProcessStatus.Completed
-                            && p.Status != ProcessStatus.Aborted);
+                    var activityIds = vehicleOwner.CurrentActivities.ToList();
 
-                    if (hasActuallyActiveProcess)
+                    // Fetch actual statuses for all referenced processes
+                    var processStatuses = await _db.Set<Process>()
+                        .Where(p => activityIds.Contains(p.Id))
+                        .Select(p => new { p.Id, p.Status })
+                        .ToListAsync();
+
+                    // Terminal statuses (matches TerminateProcessAsync definition)
+                    var terminalIds = processStatuses
+                        .Where(p => p.Status == ProcessStatus.Completed
+                                  || p.Status == ProcessStatus.Aborted
+                                  || p.Status == ProcessStatus.Disputed)
+                        .Select(p => p.Id)
+                        .ToHashSet();
+
+                    var existingIds = processStatuses.Select(p => p.Id).ToHashSet();
+
+                    // Keep only truly active (non-terminal, existing) processes
+                    var activeIds = activityIds
+                        .Where(id => !terminalIds.Contains(id) && existingIds.Contains(id))
+                        .ToList();
+
+                    if (activeIds.Count > 0)
                         return new ApiResponse<NotificationResultDto>(null, "You already have an active charging process", false);
 
-                    // Auto-cleanup: remove stale entries
+                    // Auto-cleanup: remove terminal + missing entries
                     vehicleOwner.CurrentActivities = new List<int>();
                     vehicleOwner.IsAvailable = true;
                     _db.Update(vehicleOwner);
@@ -98,16 +114,30 @@ namespace Voltyks.Application.Services.ChargingRequest
                 // Check if charger owner already has an active process
                 if (charger.User?.CurrentActivities?.Count > 0)
                 {
-                    var activeProcessIds = charger.User.CurrentActivities.ToList();
-                    var hasActuallyActiveProcess = await _db.Set<Process>()
-                        .AnyAsync(p => activeProcessIds.Contains(p.Id)
-                            && p.Status != ProcessStatus.Completed
-                            && p.Status != ProcessStatus.Aborted);
+                    var coActivityIds = charger.User.CurrentActivities.ToList();
 
-                    if (hasActuallyActiveProcess)
+                    var coProcessStatuses = await _db.Set<Process>()
+                        .Where(p => coActivityIds.Contains(p.Id))
+                        .Select(p => new { p.Id, p.Status })
+                        .ToListAsync();
+
+                    var coTerminalIds = coProcessStatuses
+                        .Where(p => p.Status == ProcessStatus.Completed
+                                  || p.Status == ProcessStatus.Aborted
+                                  || p.Status == ProcessStatus.Disputed)
+                        .Select(p => p.Id)
+                        .ToHashSet();
+
+                    var coExistingIds = coProcessStatuses.Select(p => p.Id).ToHashSet();
+
+                    var coActiveIds = coActivityIds
+                        .Where(id => !coTerminalIds.Contains(id) && coExistingIds.Contains(id))
+                        .ToList();
+
+                    if (coActiveIds.Count > 0)
                         return new ApiResponse<NotificationResultDto>(null, "Charger owner is currently busy", false);
 
-                    // Auto-cleanup: remove stale entries
+                    // Auto-cleanup: remove terminal + missing entries
                     charger.User.CurrentActivities = new List<int>();
                     charger.User.IsAvailable = true;
                     _db.Update(charger.User);
