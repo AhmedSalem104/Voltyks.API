@@ -756,34 +756,43 @@ namespace Voltyks.Core.DTOs.Processes
             // لو الاتنين قيّموا، أنهِ العملية
             if (process.VehicleOwnerRating.HasValue && process.ChargerOwnerRating.HasValue)
             {
-                process.Status = ProcessStatus.Completed;
-                process.SubStatus = null; // rating stage complete
-                process.DateCompleted = DateTimeHelper.GetEgyptTime();
-
-                // Update ChargingRequest status to Completed
-                var request = await _ctx.Set<ChargingRequestEntity>()
-                    .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
-                if (request != null)
+                // Race guard: skip if already finalized by RatingWindowService
+                if (process.SubStatus != null)
                 {
-                    request.Status = "Completed";
-                }
+                    // Check if this process has a pending report → Disputed instead of Completed
+                    var hasReport = await _ctx.Set<UserReport>()
+                        .AnyAsync(r => r.ProcessId == process.Id, ct);
 
-                // (اختياري) شيلها من CurrentActivities
-                foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
-                {
-                    var u = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
-                    if (u != null)
+                    var finalStatus = hasReport ? ProcessStatus.Disputed : ProcessStatus.Completed;
+                    var finalReqStatus = hasReport ? "Disputed" : "Completed";
+
+                    process.Status = finalStatus;
+                    process.SubStatus = null; // rating stage complete
+                    if (process.DateCompleted == null)
+                        process.DateCompleted = DateTimeHelper.GetEgyptTime();
+
+                    // Update ChargingRequest status (atomic with process)
+                    var request = await _ctx.Set<ChargingRequestEntity>()
+                        .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+                    if (request != null)
+                        request.Status = finalReqStatus;
+
+                    // شيلها من CurrentActivities
+                    foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
                     {
-                        var list = u.CurrentActivities.ToList();
-                        if (list.Contains(process.Id))
+                        var u = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+                        if (u != null)
                         {
-                            list.Remove(process.Id);
-                            u.CurrentActivities = list;
+                            var list = u.CurrentActivities.ToList();
+                            if (list.Contains(process.Id))
+                            {
+                                list.Remove(process.Id);
+                                u.CurrentActivities = list;
+                            }
+                            if (u.CurrentActivities.Count == 0)
+                                u.IsAvailable = true;
+                            _ctx.Update(u);
                         }
-                        // Make user available again if no more active processes
-                        if (u.CurrentActivities.Count == 0)
-                            u.IsAvailable = true;
-                        _ctx.Update(u);
                     }
                 }
             }
@@ -1108,7 +1117,7 @@ namespace Voltyks.Core.DTOs.Processes
             if (string.IsNullOrEmpty(me))
                 return new ApiResponse<PendingProcessDto>("Unauthorized", false);
 
-            var pendingStatuses = new[] { "pending", "accepted", "confirmed", "Started", "PendingCompleted" };
+            var pendingStatuses = new[] { "pending", "accepted", "confirmed", "Started", "PendingCompleted", "Completed" };
 
             var req = await _ctx.Set<ChargingRequestEntity>()
                 .AsNoTracking()
@@ -1129,15 +1138,31 @@ namespace Voltyks.Core.DTOs.Processes
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.ChargerRequestId == req.Id, ct);
 
+            // Skip fully completed requests (not in rating phase)
+            if (req.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                && (process == null || process.SubStatus != "awaiting_rating"))
+                return new ApiResponse<PendingProcessDto>(null, "No active process", true);
+
             var isVehicleOwner = req.UserId == me;
             var isChargerOwner = req.RecipientUserId == me;
 
             var (computedSubStatus, screenKey, notificationType, availableActions) =
                 DetermineStatusContext(req.Status, isVehicleOwner, isChargerOwner);
 
-            // Override notification type if process has been updated
-            if (process?.SubStatus == "process_updated")
-                notificationType = NotificationTypes.VehicleOwner_UpdateProcess;
+            // SubStatus drives notification type ONLY for started/pendingcompleted states.
+            // "confirmed" is PROTECTED — SubStatus must NEVER override it.
+            var reqStatusLower = req.Status.ToLower();
+            if (process?.SubStatus != null && reqStatusLower != "confirmed")
+            {
+                notificationType = process.SubStatus switch
+                {
+                    "process_updated" when reqStatusLower is "started" or "pendingcompleted"
+                        => NotificationTypes.VehicleOwner_UpdateProcess,
+                    "awaiting_rating"
+                        => NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                    _ => notificationType
+                };
+            }
 
             var subStatus = process?.SubStatus ?? computedSubStatus;
 
@@ -1286,6 +1311,18 @@ namespace Voltyks.Core.DTOs.Processes
                     "WAITING_FOR_COMPLETION",
                     NotificationTypes.VehicleOwner_CreateProcess,
                     new List<string> { "report" }
+                ),
+                "completed" when isChargerOwner => (
+                    "awaiting_rating",
+                    "RATING_SCREEN",
+                    NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                    new List<string> { "rate" }
+                ),
+                "completed" when isVehicleOwner => (
+                    "awaiting_rating",
+                    "RATING_SCREEN",
+                    NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                    new List<string> { "rate" }
                 ),
                 _ => (
                     "unknown",

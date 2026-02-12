@@ -354,6 +354,16 @@ namespace Voltyks.Application.Services.ChargingRequest
                 if (request.Charger?.User?.Id != userId)
                     return new ApiResponse<NotificationResultDto>(null, "Not your request", false);
 
+                // Clear stale SubStatus flag so it doesn't override notification type in GetPendingProcessesAsync
+                var existingProcess = await _db.Set<Process>()
+                    .FirstOrDefaultAsync(p => p.ChargerRequestId == request.Id);
+                if (existingProcess != null && existingProcess.SubStatus == "process_updated")
+                {
+                    existingProcess.SubStatus = null;
+                    _db.Update(existingProcess);
+                    await _db.SaveChangesAsync();
+                }
+
                 // إذا تم التحقق بنجاح، إرسال الإشعار إلى الـ Vehicle Owner
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
                 var title = "Charging Request Confirmed ✅";

@@ -72,14 +72,12 @@ namespace Voltyks.Application.Services.UserReport
             await _ctx.UserReports.AddAsync(report, ct);
             await _ctx.SaveChangesAsync(ct);
 
-            // ===== Terminate Process and Cleanup using unified method =====
-            // Use Disputed status (not Aborted) for report-initiated terminations
-            await _processesService.TerminateProcessAsync(
-                process.Id,
-                ProcessStatus.Disputed,
-                "report",
-                user.Id,
-                ct);
+            // ===== Move to rating phase instead of immediate termination =====
+            // Report is saved, but process stays active for rating.
+            // Final status (Disputed/Completed) determined after both parties rate.
+            process.SubStatus = "awaiting_rating";
+            process.RatingWindowOpenedAt = DateTime.UtcNow;
+            _ctx.Update(process);
             await _ctx.SaveChangesAsync(ct);
 
             // ===== Admin SignalR Notification (Real-time) =====

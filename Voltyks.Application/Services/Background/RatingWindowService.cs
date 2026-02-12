@@ -11,6 +11,7 @@ using Voltyks.Persistence.Entities.Main;
 using Voltyks.Core.Enums;
 using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
 using ProcessEntity = Voltyks.Persistence.Entities.Main.Process;
+using UserReportEntity = Voltyks.Persistence.Entities.Main.UserReport;
 
 namespace Voltyks.Application.Services.Background
 {
@@ -117,6 +118,14 @@ namespace Voltyks.Application.Services.Background
                     return;
                 }
 
+                // Race guard: skip if already finalized by SubmitRatingAsync
+                if ((process.Status == ProcessStatus.Completed || process.Status == ProcessStatus.Disputed)
+                    && process.SubStatus == null)
+                {
+                    await tx.RollbackAsync(ct);
+                    return;
+                }
+
                 // Apply default for missing VehicleOwnerRating (rating given by CO to VO)
                 if (!process.VehicleOwnerRating.HasValue)
                 {
@@ -169,19 +178,22 @@ namespace Voltyks.Application.Services.Background
                 process.DefaultRatingApplied = true;
                 process.SubStatus = null; // rating stage complete
 
-                // Ensure process is finalized
-                if (process.Status != ProcessStatus.Completed)
-                    process.Status = ProcessStatus.Completed;
+                // Check if reported → final status is Disputed
+                var hasReport = await ctx.Set<UserReportEntity>()
+                    .AnyAsync(r => r.ProcessId == process.Id, ct);
+
+                var finalStatus = hasReport ? ProcessStatus.Disputed : ProcessStatus.Completed;
+                var finalReqStatus = hasReport ? "Disputed" : "Completed";
+
+                process.Status = finalStatus;
                 if (process.DateCompleted == null)
                     process.DateCompleted = DateTimeHelper.GetEgyptTime();
 
-                // Update ChargingRequest status
+                // Update ChargingRequest status (atomic with process)
                 var request = await ctx.Set<ChargingRequestEntity>()
                     .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
-                if (request != null && request.Status != "Completed")
-                {
-                    request.Status = "Completed";
-                }
+                if (request != null)
+                    request.Status = finalReqStatus;
 
                 // Clean up CurrentActivities for both users
                 foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
