@@ -306,10 +306,15 @@ namespace Voltyks.Core.DTOs.Processes
                         {
                             var activities = user.CurrentActivities.ToList();
                             if (activities.Remove(process.Id))
+                            {
                                 user.CurrentActivities = activities;
+                                _ctx.Entry(user).Property(u => u.CurrentActivitiesJson).IsModified = true;
+                            }
                             if (user.CurrentActivities.Count == 0 && !user.IsAvailable)
+                            {
                                 user.IsAvailable = true;
-                            _ctx.Update(user);
+                                _ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
+                            }
                         }
                     }
                 }
@@ -502,10 +507,15 @@ namespace Voltyks.Core.DTOs.Processes
                         {
                             var activities = user.CurrentActivities.ToList();
                             if (activities.Remove(process.Id))
+                            {
                                 user.CurrentActivities = activities;
+                                _ctx.Entry(user).Property(u => u.CurrentActivitiesJson).IsModified = true;
+                            }
                             if (user.CurrentActivities.Count == 0 && !user.IsAvailable)
+                            {
                                 user.IsAvailable = true;
-                            _ctx.Update(user);
+                                _ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
+                            }
                         }
                     }
 

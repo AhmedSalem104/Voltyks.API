@@ -99,10 +99,15 @@ namespace Voltyks.Application.Services.UserReport
                 {
                     var activities = u.CurrentActivities.ToList();
                     if (activities.Remove(process.Id))
+                    {
                         u.CurrentActivities = activities;
+                        _ctx.Entry(u).Property(x => x.CurrentActivitiesJson).IsModified = true;
+                    }
                     if (u.CurrentActivities.Count == 0 && !u.IsAvailable)
+                    {
                         u.IsAvailable = true;
-                    _ctx.Update(u);
+                        _ctx.Entry(u).Property(x => x.IsAvailable).IsModified = true;
+                    }
                 }
             }
 
