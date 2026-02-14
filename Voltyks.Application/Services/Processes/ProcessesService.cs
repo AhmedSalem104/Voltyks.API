@@ -852,6 +852,24 @@ namespace Voltyks.Core.DTOs.Processes
                 }
             }
 
+            // Safety net: free the rater from this process
+            // (normally freed at completion, but guards against transaction rollback)
+            var rater = await _ctx.Set<AppUser>().FindAsync(new object?[] { me }, ct);
+            if (rater != null)
+            {
+                var raterList = rater.CurrentActivities.ToList();
+                if (raterList.Remove(process.Id))
+                {
+                    rater.CurrentActivities = raterList;
+                    _ctx.Entry(rater).Property(x => x.CurrentActivitiesJson).IsModified = true;
+                }
+                if (rater.CurrentActivities.Count == 0 && !rater.IsAvailable)
+                {
+                    rater.IsAvailable = true;
+                    _ctx.Entry(rater).Property(x => x.IsAvailable).IsModified = true;
+                }
+            }
+
             await _ctx.SaveChangesAsync(ct);
 
             // 📣 إرسال إشعار للطرف الآخر بالـ Rating الجديد
