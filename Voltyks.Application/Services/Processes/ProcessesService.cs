@@ -835,14 +835,16 @@ namespace Voltyks.Core.DTOs.Processes
                         if (u != null)
                         {
                             var list = u.CurrentActivities.ToList();
-                            if (list.Contains(process.Id))
+                            if (list.Remove(process.Id))
                             {
-                                list.Remove(process.Id);
                                 u.CurrentActivities = list;
+                                _ctx.Entry(u).Property(x => x.CurrentActivitiesJson).IsModified = true;
                             }
-                            if (u.CurrentActivities.Count == 0)
+                            if (u.CurrentActivities.Count == 0 && !u.IsAvailable)
+                            {
                                 u.IsAvailable = true;
-                            _ctx.Update(u);
+                                _ctx.Entry(u).Property(x => x.IsAvailable).IsModified = true;
+                            }
                         }
                     }
                 }
