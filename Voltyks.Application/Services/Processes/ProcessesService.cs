@@ -809,8 +809,8 @@ namespace Voltyks.Core.DTOs.Processes
             // لو الاتنين قيّموا، أنهِ العملية
             if (process.VehicleOwnerRating.HasValue && process.ChargerOwnerRating.HasValue)
             {
-                // Race guard: skip if already finalized by RatingWindowService
-                if (process.SubStatus != null)
+                // Race guard: skip only if RatingWindowService already finalized (applied defaults)
+                if (!process.DefaultRatingApplied)
                 {
                     // Check if this process has a pending report → Disputed instead of Completed
                     var hasReport = await _ctx.Set<UserReport>()
@@ -1215,6 +1215,39 @@ namespace Voltyks.Core.DTOs.Processes
             if (req.Status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
                 && (process == null || process.SubStatus != "awaiting_rating"))
                 return new ApiResponse<PendingProcessDto>(null, "No active process", true);
+
+            // Auto-heal: process has both ratings but was never finalized
+            if (process != null
+                && process.VehicleOwnerRating.HasValue
+                && process.ChargerOwnerRating.HasValue
+                && process.Status != ProcessStatus.Completed
+                && process.Status != ProcessStatus.Disputed)
+            {
+                var trackedProcess = await _ctx.Set<ProcessEntity>()
+                    .FirstOrDefaultAsync(p => p.Id == process.Id, ct);
+                if (trackedProcess != null)
+                {
+                    var hasReport = await _ctx.Set<UserReport>()
+                        .AnyAsync(r => r.ProcessId == process.Id, ct);
+
+                    trackedProcess.Status = hasReport ? ProcessStatus.Disputed : ProcessStatus.Completed;
+                    trackedProcess.SubStatus = null;
+                    if (trackedProcess.DateCompleted == null)
+                        trackedProcess.DateCompleted = DateTimeHelper.GetEgyptTime();
+
+                    var trackedReq = await _ctx.Set<ChargingRequestEntity>()
+                        .FirstOrDefaultAsync(r => r.Id == req.Id, ct);
+                    if (trackedReq != null)
+                        trackedReq.Status = hasReport ? "Disputed" : "Completed";
+
+                    await _ctx.SaveChangesAsync(ct);
+
+                    _logger.LogWarning(
+                        "Auto-healed stuck process {ProcessId}: both ratings exist, forced to {Status}",
+                        process.Id, trackedProcess.Status);
+                }
+                return new ApiResponse<PendingProcessDto>(null, "No active process", true);
+            }
 
             var isVehicleOwner = req.UserId == me;
             var isChargerOwner = req.RecipientUserId == me;
