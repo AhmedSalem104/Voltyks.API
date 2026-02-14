@@ -297,6 +297,21 @@ namespace Voltyks.Core.DTOs.Processes
                     process.RatingWindowOpenedAt = DateTime.UtcNow;
                     process.DateCompleted = DateTimeHelper.GetEgyptTime();
                     request.Status = "Completed";
+
+                    // Free both users immediately — rating is post-session, shouldn't lock them
+                    foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+                    {
+                        var user = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+                        if (user != null)
+                        {
+                            var activities = user.CurrentActivities.ToList();
+                            if (activities.Remove(process.Id))
+                                user.CurrentActivities = activities;
+                            if (user.CurrentActivities.Count == 0 && !user.IsAvailable)
+                                user.IsAvailable = true;
+                            _ctx.Update(user);
+                        }
+                    }
                 }
                 else if (decision == "started")
                 {
@@ -478,6 +493,21 @@ namespace Voltyks.Core.DTOs.Processes
                     if (process.RatingWindowOpenedAt == null)
                         process.RatingWindowOpenedAt = DateTime.UtcNow;
                     request.Status = "Completed";
+
+                    // Free both users immediately — rating is post-session, shouldn't lock them
+                    foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+                    {
+                        var user = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+                        if (user != null)
+                        {
+                            var activities = user.CurrentActivities.ToList();
+                            if (activities.Remove(process.Id))
+                                user.CurrentActivities = activities;
+                            if (user.CurrentActivities.Count == 0 && !user.IsAvailable)
+                                user.IsAvailable = true;
+                            _ctx.Update(user);
+                        }
+                    }
 
                     _ctx.Update(process);
                     _ctx.Update(request);

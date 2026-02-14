@@ -73,11 +73,39 @@ namespace Voltyks.Application.Services.UserReport
             await _ctx.SaveChangesAsync(ct);
 
             // ===== Move to rating phase instead of immediate termination =====
-            // Report is saved, but process stays active for rating.
+            // Report is saved, process moves to Completed + awaiting_rating.
             // Final status (Disputed/Completed) determined after both parties rate.
+            process.Status = ProcessStatus.Completed;
             process.SubStatus = "awaiting_rating";
             process.RatingWindowOpenedAt = DateTime.UtcNow;
+            if (process.DateCompleted == null)
+                process.DateCompleted = DateTimeHelper.GetEgyptTime();
             _ctx.Update(process);
+
+            // Update ChargingRequest status
+            var request = await _ctx.Set<ChargingRequestEntity>()
+                .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+            if (request != null)
+            {
+                request.Status = "Completed";
+                _ctx.Update(request);
+            }
+
+            // Free both users — report ends the active session, rating is post-session
+            foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+            {
+                var u = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+                if (u != null)
+                {
+                    var activities = u.CurrentActivities.ToList();
+                    if (activities.Remove(process.Id))
+                        u.CurrentActivities = activities;
+                    if (u.CurrentActivities.Count == 0 && !u.IsAvailable)
+                        u.IsAvailable = true;
+                    _ctx.Update(u);
+                }
+            }
+
             await _ctx.SaveChangesAsync(ct);
 
             // ===== Admin SignalR Notification (Real-time) =====
