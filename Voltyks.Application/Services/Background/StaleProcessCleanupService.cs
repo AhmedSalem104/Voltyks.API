@@ -102,7 +102,7 @@ namespace Voltyks.Application.Services.Background
             if (activityIds.Count == 0 && !user.IsAvailable)
             {
                 user.IsAvailable = true;
-                ctx.Update(user);
+                ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
                 _logger.LogInformation("Reset IsAvailable for user {UserId} with no activities", user.Id);
                 return;
             }
@@ -118,7 +118,7 @@ namespace Voltyks.Application.Services.Background
                     // Process doesn't exist - remove from activities
                     activityIds.Remove(processId);
                     user.CurrentActivities = activityIds;
-                    ctx.Update(user);
+                    ctx.Entry(user).Property(u => u.CurrentActivitiesJson).IsModified = true;
                     _logger.LogInformation("Removed non-existent process {ProcessId} from user {UserId}", processId, user.Id);
                     continue;
                 }
@@ -173,7 +173,7 @@ namespace Voltyks.Application.Services.Background
             if (updatedActivities.Count == 0 && !user.IsAvailable)
             {
                 user.IsAvailable = true;
-                ctx.Update(user);
+                ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
             }
         }
 

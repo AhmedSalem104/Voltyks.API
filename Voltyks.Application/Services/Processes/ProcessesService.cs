@@ -159,7 +159,8 @@ namespace Voltyks.Core.DTOs.Processes
                         vo.CurrentActivities = list;
                     }
                     vo.IsAvailable = false; // Hide from search during active process
-                    _ctx.Update(vo);
+                    _ctx.Entry(vo).Property(u => u.CurrentActivitiesJson).IsModified = true;
+                    _ctx.Entry(vo).Property(u => u.IsAvailable).IsModified = true;
                 }
 
                 if (co != null)
@@ -171,7 +172,8 @@ namespace Voltyks.Core.DTOs.Processes
                         co.CurrentActivities = list;
                     }
                     co.IsAvailable = false; // Hide from search during active process
-                    _ctx.Update(co);
+                    _ctx.Entry(co).Property(u => u.CurrentActivitiesJson).IsModified = true;
+                    _ctx.Entry(co).Property(u => u.IsAvailable).IsModified = true;
                 }
 
                 await _ctx.SaveChangesAsync(ct);

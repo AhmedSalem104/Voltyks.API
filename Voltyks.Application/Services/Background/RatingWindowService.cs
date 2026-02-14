@@ -204,14 +204,17 @@ namespace Voltyks.Application.Services.Background
                     if (user != null)
                     {
                         var activities = user.CurrentActivities.ToList();
-                        if (activities.Contains(processId))
+                        if (activities.Remove(processId))
                         {
-                            activities.Remove(processId);
                             user.CurrentActivities = activities;
+                            ctx.Entry(user).Property(u => u.CurrentActivitiesJson).IsModified = true;
                         }
 
                         if (user.CurrentActivities.Count == 0 && !user.IsAvailable)
+                        {
                             user.IsAvailable = true;
+                            ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
+                        }
                     }
                 }
 

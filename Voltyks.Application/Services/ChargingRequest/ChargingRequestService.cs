@@ -107,7 +107,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     // Auto-cleanup: remove terminal + missing entries
                     vehicleOwner.CurrentActivities = new List<int>();
                     vehicleOwner.IsAvailable = true;
-                    _db.Update(vehicleOwner);
+                    _db.Entry(vehicleOwner).Property(u => u.CurrentActivitiesJson).IsModified = true;
+                    _db.Entry(vehicleOwner).Property(u => u.IsAvailable).IsModified = true;
                     await _db.SaveChangesAsync();
                 }
 
@@ -140,7 +141,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     // Auto-cleanup: remove terminal + missing entries
                     charger.User.CurrentActivities = new List<int>();
                     charger.User.IsAvailable = true;
-                    _db.Update(charger.User);
+                    _db.Entry(charger.User).Property(u => u.CurrentActivitiesJson).IsModified = true;
+                    _db.Entry(charger.User).Property(u => u.IsAvailable).IsModified = true;
                     await _db.SaveChangesAsync();
                 }
 
