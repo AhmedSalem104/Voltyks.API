@@ -23,7 +23,7 @@ namespace Voltyks.Application.Services.Background
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<RatingWindowService> _logger;
-        private readonly TimeSpan _pollInterval = TimeSpan.FromSeconds(30);
+        private readonly TimeSpan _pollInterval = TimeSpan.FromSeconds(60);
         private readonly TimeSpan _windowDuration = TimeSpan.FromMinutes(5);
         private const double DefaultRating = 3.0;
 

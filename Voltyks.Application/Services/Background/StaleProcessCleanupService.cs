@@ -23,7 +23,7 @@ namespace Voltyks.Application.Services.Background
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<StaleProcessCleanupService> _logger;
-        private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);
+        private readonly TimeSpan _interval = TimeSpan.FromMinutes(2);
         private readonly TimeSpan _processTimeout = TimeSpan.FromMinutes(10);
 
         public StaleProcessCleanupService(

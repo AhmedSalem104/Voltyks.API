@@ -50,11 +50,14 @@ namespace Voltyks.Application.Services.Redis
             foreach (var endpoint in endpoints)
             {
                 var server = _redis.GetServer(endpoint);
-                var serverKeys = server.Keys(pattern: pattern);
-                keys.AddRange(serverKeys.Select(k => (string)k));
+                // Uses SCAN internally (cursor-based) — safe for production
+                await foreach (var key in server.KeysAsync(pattern: pattern, pageSize: 250))
+                {
+                    keys.Add(key!);
+                }
             }
 
-            return await Task.FromResult(keys);
+            return keys;
         }
     }
 

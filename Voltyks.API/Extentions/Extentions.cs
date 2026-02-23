@@ -130,40 +130,50 @@ namespace Voltyks.API.Extentions
                 });
             });
 
-            // Rate Limiting for security
+            // Rate Limiting for security (tuned for 10k concurrent users)
             services.AddRateLimiter(options =>
             {
                 options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-                // Global rate limit: 100 requests per minute per IP
-                options.AddFixedWindowLimiter("GlobalLimit", config =>
+                // Global rate limit: 1000 requests per minute per IP
+                options.AddSlidingWindowLimiter("GlobalLimit", config =>
                 {
-                    config.PermitLimit = 100;
+                    config.PermitLimit = 1000;
                     config.Window = TimeSpan.FromMinutes(1);
-                    config.QueueLimit = 0;
+                    config.SegmentsPerWindow = 4;
+                    config.QueueLimit = 10;
+                    config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
                 });
 
-                // Auth endpoints: 10 requests per minute per IP (prevent brute force)
-                options.AddFixedWindowLimiter("AuthLimit", config =>
+                // Auth endpoints: 20 requests per minute per IP (prevent brute force)
+                options.AddSlidingWindowLimiter("AuthLimit", config =>
                 {
-                    config.PermitLimit = 10;
+                    config.PermitLimit = 20;
                     config.Window = TimeSpan.FromMinutes(1);
-                    config.QueueLimit = 0;
+                    config.SegmentsPerWindow = 4;
+                    config.QueueLimit = 5;
+                    config.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
                 });
 
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-                    RateLimitPartition.GetFixedWindowLimiter(
+                    RateLimitPartition.GetSlidingWindowLimiter(
                         partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                        factory: _ => new FixedWindowRateLimiterOptions
+                        factory: _ => new SlidingWindowRateLimiterOptions
                         {
-                            PermitLimit = 100,
+                            PermitLimit = 1000,
                             Window = TimeSpan.FromMinutes(1),
-                            QueueLimit = 0
+                            SegmentsPerWindow = 4,
+                            QueueLimit = 10,
+                            QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst
                         }));
             });
 
-            // Add SignalR
-            services.AddSignalR();
+            // Add SignalR with Redis backplane for multi-instance scaling
+            services.AddSignalR()
+                .AddStackExchangeRedis(configuration.GetConnectionString("Redis")!, options =>
+                {
+                    options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("voltyks");
+                });
 
             services.AddResponseCaching();
             services.AddSwaggerServices();
@@ -177,7 +187,10 @@ namespace Voltyks.API.Extentions
             services.AddSingleton<SqlConnectionFactory>();
             services.AddAutoMapper(typeof(MappingProfile).Assembly);
             services.AddHttpClient();
-            services.AddHttpClient<PaymobService>();
+            services.AddHttpClient<PaymobService>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
             services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
             services.AddScoped<PaymobService>();
 
@@ -220,10 +233,17 @@ namespace Voltyks.API.Extentions
             // Add Interceptor
             services.AddScoped<ChargingRequestCleanupInterceptor>();
 
-            // Single DbContext registration with interceptor
+            // Single DbContext registration with interceptor + resilience
             services.AddDbContext<VoltyksDbContext>((sp, options) =>
             {
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
+                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"), sqlOptions =>
+                {
+                    sqlOptions.CommandTimeout(30);
+                    sqlOptions.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorNumbersToAdd: null);
+                });
                 options.AddInterceptors(sp.GetRequiredService<ChargingRequestCleanupInterceptor>());
             });
 
@@ -300,14 +320,16 @@ namespace Voltyks.API.Extentions
                 await next();
             });
 
-            // Configure the HTTP request pipeline.
-            // Enable Swagger in all environments
-            app.UseSwagger();
-            app.UseSwaggerUI(c =>
+            // Swagger - only in Development
+            if (app.Environment.IsDevelopment())
             {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
-                c.DefaultModelsExpandDepth(-1);
-            });
+                app.UseSwagger();
+                app.UseSwaggerUI(c =>
+                {
+                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
+                    c.DefaultModelsExpandDepth(-1);
+                });
+            }
 
             app.UseStaticFiles();
             app.UseHttpsRedirection();
@@ -476,7 +498,7 @@ namespace Voltyks.API.Extentions
                     ValidIssuer = jwtOptions.Issuer,
                     ValidAudience = jwtOptions.Audience,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecurityKey)),
-                    ClockSkew = TimeSpan.Zero // ⬅️ optional: to reduce token expiry delays
+                    ClockSkew = TimeSpan.FromMinutes(1) // Allow 1 min clock drift between servers
                 };
             });
 
