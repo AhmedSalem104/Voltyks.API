@@ -73,6 +73,52 @@ namespace Voltyks.API.Controllers.Admin
         }
 
         /// <summary>
+        /// POST /api/v1/admin/backup/cron?key={CronApiKey}
+        /// External cron endpoint — validates API key instead of JWT.
+        /// Give this URL to cron-job.org to trigger daily backups.
+        /// </summary>
+        [HttpPost("cron")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<object>>> CronBackup(
+            [FromQuery] string key, CancellationToken ct)
+        {
+            if (string.IsNullOrEmpty(_options.CronApiKey) ||
+                !string.Equals(key, _options.CronApiKey, StringComparison.Ordinal))
+            {
+                _logger.LogWarning("Cron backup attempt with invalid API key");
+                return Unauthorized(new ApiResponse<object>(
+                    message: "Invalid API key",
+                    status: false
+                ));
+            }
+
+            _logger.LogInformation("Cron backup triggered");
+
+            var connectionString = _configuration.GetConnectionString("DefaultConnection")!;
+            var executor = new BackupExecutor(connectionString, _options, _logger);
+            var result = await executor.ExecuteBackupAsync(ct);
+
+            var sizeMb = result.FileSizeBytes / (1024.0 * 1024.0);
+
+            return Ok(new ApiResponse<object>(
+                data: new
+                {
+                    fileName = Path.GetFileName(result.FilePath),
+                    sizeMb = Math.Round(sizeMb, 2),
+                    tablesExported = result.TablesExported,
+                    totalRows = result.TotalRowsExported,
+                    durationSeconds = Math.Round(result.Duration.TotalSeconds, 1),
+                    success = result.Success,
+                    errors = result.Errors
+                },
+                message: result.Success
+                    ? $"Backup OK: {result.TablesExported} tables, {result.TotalRowsExported} rows, {sizeMb:F2} MB"
+                    : $"Backup completed with {result.Errors.Count} error(s)",
+                status: result.Success
+            ));
+        }
+
+        /// <summary>
         /// GET /api/v1/admin/backup/list
         /// List all existing backup files
         /// </summary>

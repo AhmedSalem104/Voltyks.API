@@ -21,5 +21,10 @@ namespace Voltyks.Application.Services.Background.Backup
         public int BatchSize { get; set; } = 5000;
 
         public int CommandTimeoutSeconds { get; set; } = 300;
+
+        /// <summary>
+        /// API key for external cron services (e.g. cron-job.org) to trigger backups.
+        /// </summary>
+        public string? CronApiKey { get; set; }
     }
 }
