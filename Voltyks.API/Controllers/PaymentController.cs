@@ -203,6 +203,7 @@ namespace Voltyks.API.Controllers
         /// <param name="ct">Cancellation token</param>
         /// <returns>Payment result with transaction details</returns>
         [HttpPost("applepay/process")]
+        [HttpPost("/api/Paymob/applepay/process")]  // iOS route alias
         [ProducesResponseType(typeof(ApiResponse<ApplePayProcessResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<ApplePayProcessResponse>), StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<ApiResponse<ApplePayProcessResponse>>> ProcessApplePay(
@@ -239,6 +240,7 @@ namespace Voltyks.API.Controllers
         /// <param name="ct">Cancellation token</param>
         /// <returns>Current payment status</returns>
         [HttpPost("applepay/verify")]
+        [HttpPost("/api/Paymob/applepay/verify")]   // iOS route alias
         [ProducesResponseType(typeof(ApiResponse<ApplePayVerifyResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<ApplePayVerifyResponse>), StatusCodes.Status404NotFound)]
         public async Task<ActionResult<ApiResponse<ApplePayVerifyResponse>>> VerifyApplePay(
