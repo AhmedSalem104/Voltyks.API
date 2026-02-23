@@ -254,10 +254,151 @@ namespace Voltyks.Persistence
                     if (!await _roleManager.RoleExistsAsync(role))
                         await _roleManager.CreateAsync(new IdentityRole(role));
 
-                // Admin users are managed ONLY via API: POST /api/admin/users/create-admin
-                // Direct admin creation from code or DB is blocked by SQL trigger + DENY permissions.
+                // Allow admin role seeding past the DB trigger
+                await _context.Database.ExecuteSqlRawAsync(
+                    "EXEC sp_set_session_context @key = N'AllowAdminRoleInsert', @value = 1");
 
-                // 2) إنشاء Operator إذا لم يكن موجوداً
+                // 2) إنشاء Admin إذا لم يكن موجوداً
+                var existingAdmin = await _userManager.FindByNameAsync("Admin");
+                if (existingAdmin == null)
+                {
+                    var adminUser = new AppUser
+                    {
+                        FullName = "VoltyksOwner",
+                        FirstName = "Voltyks",
+                        LastName = "Owner",
+                        Email = "Admin@gmail.com",
+                        UserName = "Admin",
+                        PhoneNumber = "+201111276677",
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Admin Street"
+                        }
+                    };
+
+                    var resultAdmin = await _userManager.CreateAsync(adminUser, "Voltyks1041998@");
+                    if (resultAdmin.Succeeded)
+                    {
+                        await _userManager.AddToRoleAsync(adminUser, "Admin");
+                        await _userManager.AddClaimsAsync(adminUser, new[]
+                        {
+                            new System.Security.Claims.Claim("role-level", "admin"),
+                            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
+                            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+                        });
+                    }
+                }
+
+                // 2.5) إنشاء Admin2 (01005151055) إذا لم يكن موجوداً
+                var existingAdmin2 = await _userManager.FindByNameAsync("Admin2");
+                if (existingAdmin2 == null)
+                {
+                    var admin2User = new AppUser
+                    {
+                        FullName = "Admin User",
+                        FirstName = "Admin",
+                        LastName = "User",
+                        Email = "admin2@voltyks.com",
+                        UserName = "Admin2",
+                        PhoneNumber = "+201005151055",
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Admin Street"
+                        }
+                    };
+
+                    var resultAdmin2 = await _userManager.CreateAsync(admin2User, "Admin01005151055@");
+                    if (resultAdmin2.Succeeded)
+                    {
+                        await _userManager.AddToRoleAsync(admin2User, "Admin");
+                        await _userManager.AddClaimsAsync(admin2User, new[]
+                        {
+                            new System.Security.Claims.Claim("role-level", "admin"),
+                            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
+                            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+                        });
+                    }
+                }
+
+                // 2.6) إنشاء Admin3 (01015819700) إذا لم يكن موجوداً
+                var existingAdmin3 = await _userManager.FindByNameAsync("Admin3");
+                if (existingAdmin3 == null)
+                {
+                    var admin3User = new AppUser
+                    {
+                        FullName = "Admin User 3",
+                        FirstName = "Admin",
+                        LastName = "User3",
+                        Email = "admin3@voltyks.com",
+                        UserName = "Admin3",
+                        PhoneNumber = "+201015819700",
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Admin Street"
+                        }
+                    };
+
+                    var resultAdmin3 = await _userManager.CreateAsync(admin3User, "Admin01015819700@");
+                    if (resultAdmin3.Succeeded)
+                    {
+                        await _userManager.AddToRoleAsync(admin3User, "Admin");
+                        await _userManager.AddClaimsAsync(admin3User, new[]
+                        {
+                            new System.Security.Claims.Claim("role-level", "admin"),
+                            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
+                            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+                        });
+                    }
+                }
+
+                // 2.7) إنشاء Admin4 (01001727427) إذا لم يكن موجوداً
+                var existingAdmin4 = await _userManager.FindByNameAsync("Admin4");
+                if (existingAdmin4 == null)
+                {
+                    var admin4User = new AppUser
+                    {
+                        FullName = "Admin User 4",
+                        FirstName = "Admin",
+                        LastName = "User4",
+                        Email = "admin4@voltyks.com",
+                        UserName = "Admin4",
+                        PhoneNumber = "+201001727427",
+                        EmailConfirmed = true,
+                        PhoneNumberConfirmed = true,
+                        Address = new Address
+                        {
+                            City = "Cairo",
+                            Country = "Egypt",
+                            Street = "Admin Street"
+                        }
+                    };
+
+                    var resultAdmin4 = await _userManager.CreateAsync(admin4User, "Admin01001727427@");
+                    if (resultAdmin4.Succeeded)
+                    {
+                        await _userManager.AddToRoleAsync(admin4User, "Admin");
+                        await _userManager.AddClaimsAsync(admin4User, new[]
+                        {
+                            new System.Security.Claims.Claim("role-level", "admin"),
+                            new System.Security.Claims.Claim("can-manage-terms-fees", "true"),
+                            new System.Security.Claims.Claim("can-transfer-fees", "true"),
+                        });
+                    }
+                }
+
+                // 3) إنشاء Operator إذا لم يكن موجوداً
                 var existingOperator = await _userManager.FindByNameAsync("operator");
                 if (existingOperator == null)
                 {

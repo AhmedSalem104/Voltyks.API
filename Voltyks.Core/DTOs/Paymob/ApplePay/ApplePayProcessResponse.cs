@@ -15,7 +15,7 @@ namespace Voltyks.Core.DTOs.Paymob.ApplePay
         public string? TransactionId { get; set; }
         public long? PaymobOrderId { get; set; }
         public string? MerchantOrderId { get; set; }
-        public string Status { get; set; } = "Unknown";
+        public string Status { get; set; } = "unknown";
         public string? Message { get; set; }
         public long AmountCents { get; set; }
         public string Currency { get; set; } = "EGP";
