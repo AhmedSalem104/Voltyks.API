@@ -320,7 +320,7 @@ namespace Voltyks.API.Extentions
                 await next();
             });
 
-            // Swagger - only in Development
+            // Swagger: always in Development, config-gated in Production (behind route key)
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -328,6 +328,27 @@ namespace Voltyks.API.Extentions
                 {
                     c.SwaggerEndpoint("/swagger/v1/swagger.json", "Voltyks API v1");
                     c.DefaultModelsExpandDepth(-1);
+                });
+            }
+            else if (app.Configuration.GetValue<bool>("Swagger:Enabled"))
+            {
+                var swaggerKey = app.Configuration["Swagger:RouteKey"];
+                var hasKey = !string.IsNullOrWhiteSpace(swaggerKey);
+
+                app.UseSwagger(c =>
+                {
+                    if (hasKey)
+                        c.RouteTemplate = $"swagger/{{documentName}}/{swaggerKey}/swagger.json";
+                });
+                app.UseSwaggerUI(c =>
+                {
+                    var jsonPath = hasKey
+                        ? $"/swagger/v1/{swaggerKey}/swagger.json"
+                        : "/swagger/v1/swagger.json";
+                    c.SwaggerEndpoint(jsonPath, "Voltyks API v1");
+                    c.DefaultModelsExpandDepth(-1);
+                    if (hasKey)
+                        c.RoutePrefix = $"swagger/{swaggerKey}";
                 });
             }
 

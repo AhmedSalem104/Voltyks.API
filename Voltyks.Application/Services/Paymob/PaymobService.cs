@@ -2477,6 +2477,10 @@ namespace Voltyks.Application.Services.Paymob
                     if (intentionRoot.TryGetProperty("id", out var intentIdEl))
                         intentionId = intentIdEl.GetString();
 
+                    string? clientSecret = null;
+                    if (intentionRoot.TryGetProperty("client_secret", out var csEl))
+                        clientSecret = csEl.GetString(); // logged below for debugging
+
                     long intentionOrderId = 0;
                     if (intentionRoot.TryGetProperty("intention_order_id", out var iOrderEl))
                         intentionOrderId = iOrderEl.GetInt64();
@@ -2492,13 +2496,18 @@ namespace Voltyks.Application.Services.Paymob
                     }
 
                     response.PaymobOrderId = intentionOrderId;
-                    _log?.LogInformation("Apple Pay: Created intention {IntentionId}, order {OrderId}", intentionId, intentionOrderId);
+                    _log?.LogInformation(
+                        "Apple Pay: Created intention Id={IntentionId}, OrderId={OrderId}, ClientSecret={HasCS}, RawKeys=[{Keys}]",
+                        intentionId, intentionOrderId,
+                        !string.IsNullOrWhiteSpace(clientSecret),
+                        string.Join(", ", intentionRoot.EnumerateObject().Select(p => p.Name)));
 
                     // Record intention transaction
                     await AddTransactionAsync(merchantOrderId, intentionOrderId, request.AmountCents, currency, "ApplePay", "Pending", false);
 
                     // 6. Pay with Intention — POST /v1/intention/{intention_id}/pay
                     var payUrl = $"{_opt.Intention.Url!.TrimEnd('/')}/{intentionId}/pay";
+                    _log?.LogInformation("Apple Pay: Pay URL = {Url}", payUrl);
 
                     var payBody = new
                     {
@@ -2520,7 +2529,8 @@ namespace Voltyks.Application.Services.Paymob
                     var payJson = JsonSerializer.Serialize(payBody, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
                     payReq.Content = new StringContent(payJson, Encoding.UTF8, "application/json");
 
-                    _log?.LogInformation("Apple Pay: Sending pay request to {Url}", payUrl);
+                    _log?.LogInformation("Apple Pay: Sending pay request to {Url} with body keys: [{BodyKeys}]",
+                        payUrl, string.Join(", ", new[] { "payment_method", "billing_data", "apple_pay_token" }));
 
                     using var payRes = await http.SendAsync(payReq, ct);
                     var payRaw = await payRes.Content.ReadAsStringAsync(ct);
@@ -2531,8 +2541,9 @@ namespace Voltyks.Application.Services.Paymob
                     // 7. Parse payment response
                     if (!payRes.IsSuccessStatusCode)
                     {
-                        _log?.LogError("Apple Pay: Pay failed - Status: {Status}, Body: {Body}",
-                            payRes.StatusCode, payRaw);
+                        _log?.LogError(
+                            "Apple Pay: Pay failed - Status: {Status}, URL: {Url}, IntentionId: {IntentionId}, Body: {Body}",
+                            payRes.StatusCode, payUrl, intentionId, payRaw);
 
                         response.Success = false;
                         response.Status = "failed";
