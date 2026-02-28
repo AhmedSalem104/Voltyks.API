@@ -209,7 +209,7 @@ namespace Voltyks.Application.Services.SMSEgypt
         }
         public async Task<bool> SendOtpMessageAsync(string phoneNumber, string otp, string? customMessage = null)
         {
-            string message = customMessage ?? $"Voltyks: Your verification code is {otp}";
+            string message = customMessage ?? $"Your Voltyks verification code is {otp}";
             string fullUrl = $"{_smsSettings.Value.BaseUrl}?username={_smsSettings.Value.Username}&password={_smsSettings.Value.Password}&sendername={_smsSettings.Value.SenderName}&message={Uri.EscapeDataString(message)}&mobiles={phoneNumber}";
 
             var client = _httpClientFactory.CreateClient();
