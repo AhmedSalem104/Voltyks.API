@@ -786,6 +786,10 @@ namespace Voltyks.Core.DTOs.Processes
                 .AnyAsync(x => x.ProcessId == process.Id && x.RaterUserId == raterId, ct);
             if (already) return new ApiResponse<object>("You already rated this process", false);
 
+            // Reject rating if defaults already applied (window expired)
+            if (process.DefaultRatingApplied)
+                return new ApiResponse<object>("Rating window has expired — default ratings applied", false);
+
             // خزّن التقييم داخل الـ Process (المصدر المعتمد للعرض)
             if (me == process.VehicleOwnerId)
                 process.ChargerOwnerRating = dto.RatingForOther;   // VO يقيّم CO
