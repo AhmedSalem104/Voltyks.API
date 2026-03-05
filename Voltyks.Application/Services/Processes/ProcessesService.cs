@@ -980,7 +980,7 @@ namespace Voltyks.Core.DTOs.Processes
             }, "Ratings summary", true);
         }
 
-        private static readonly TimeSpan RatingWindowDuration = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan RatingWindowDuration = TimeSpan.FromMinutes(4);
 
         public async Task<ApiResponse<object>> OpenRatingWindowAsync(OpenRatingWindowDto dto, CancellationToken ct = default)
         {

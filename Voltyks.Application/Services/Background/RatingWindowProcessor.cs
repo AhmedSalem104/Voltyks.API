@@ -19,7 +19,7 @@ namespace Voltyks.Application.Services.Background
         private readonly VoltyksDbContext _ctx;
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly ILogger<RatingWindowProcessor> _logger;
-        private readonly TimeSpan _windowDuration = TimeSpan.FromMinutes(5);
+        private readonly TimeSpan _windowDuration = TimeSpan.FromMinutes(4);
         private const double DefaultRating = 3.0;
 
         public RatingWindowProcessor(
