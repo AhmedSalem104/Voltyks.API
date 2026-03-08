@@ -34,7 +34,7 @@ namespace Voltyks.Application.Services.Background
                 {
                     using var scope = _scopeFactory.CreateScope();
                     var processor = scope.ServiceProvider.GetRequiredService<IRatingWindowProcessor>();
-                    await processor.ProcessExpiredWindowsAsync(stoppingToken);
+                    _ = await processor.ProcessExpiredWindowsAsync(stoppingToken);
                 }
                 catch (Exception ex)
                 {

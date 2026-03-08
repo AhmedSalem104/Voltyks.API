@@ -1,7 +1,9 @@
 namespace Voltyks.Application.Interfaces.Processes
 {
+    public record RatingProcessingResult(int ExpiredProcessed, int StuckFinalized);
+
     public interface IRatingWindowProcessor
     {
-        Task ProcessExpiredWindowsAsync(CancellationToken ct);
+        Task<RatingProcessingResult> ProcessExpiredWindowsAsync(CancellationToken ct);
     }
 }

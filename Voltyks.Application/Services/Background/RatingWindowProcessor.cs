@@ -32,8 +32,12 @@ namespace Voltyks.Application.Services.Background
             _logger = logger;
         }
 
-        public async Task ProcessExpiredWindowsAsync(CancellationToken ct)
+        public async Task<RatingProcessingResult> ProcessExpiredWindowsAsync(CancellationToken ct)
         {
+            int expiredCount = 0;
+            int stuckCount = 0;
+
+            // ── Sweep 1: expired windows (at least one rating missing) ──
             var cutoff = DateTime.UtcNow.Subtract(_windowDuration);
 
             var expiredProcessIds = await _ctx.Set<ProcessEntity>()
@@ -46,22 +50,56 @@ namespace Voltyks.Application.Services.Background
                 .Select(p => p.Id)
                 .ToListAsync(ct);
 
-            if (expiredProcessIds.Count == 0)
-                return;
-
-            _logger.LogInformation("Found {Count} expired rating windows to process", expiredProcessIds.Count);
-
-            foreach (var processId in expiredProcessIds)
+            if (expiredProcessIds.Count > 0)
             {
-                try
+                _logger.LogInformation("Found {Count} expired rating windows to process", expiredProcessIds.Count);
+
+                foreach (var processId in expiredProcessIds)
                 {
-                    await ApplyDefaultRatingsAsync(processId, ct);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to apply default ratings for process {ProcessId}", processId);
+                    try
+                    {
+                        await ApplyDefaultRatingsAsync(processId, ct);
+                        expiredCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to apply default ratings for process {ProcessId}", processId);
+                    }
                 }
             }
+
+            // ── Sweep 2: stuck processes (both rated but never finalized) ──
+            // This happens when both users rate concurrently — each request only
+            // sees its own rating at check time, so neither finalizes the process.
+            var stuckProcessIds = await _ctx.Set<ProcessEntity>()
+                .AsNoTracking()
+                .Where(p =>
+                    p.SubStatus == "awaiting_rating" &&
+                    p.VehicleOwnerRating.HasValue &&
+                    p.ChargerOwnerRating.HasValue &&
+                    !p.DefaultRatingApplied)
+                .Select(p => p.Id)
+                .ToListAsync(ct);
+
+            if (stuckProcessIds.Count > 0)
+            {
+                _logger.LogInformation("Found {Count} stuck processes (both rated, not finalized)", stuckProcessIds.Count);
+
+                foreach (var processId in stuckProcessIds)
+                {
+                    try
+                    {
+                        await FinalizeStuckProcessAsync(processId, ct);
+                        stuckCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to finalize stuck process {ProcessId}", processId);
+                    }
+                }
+            }
+
+            return new RatingProcessingResult(expiredCount, stuckCount);
         }
 
         private async Task ApplyDefaultRatingsAsync(int processId, CancellationToken ct)
@@ -194,6 +232,67 @@ namespace Voltyks.Application.Services.Background
             }
 
             await SendDefaultRatingNotificationsAsync(notificationTargets, ct);
+        }
+
+        /// <summary>
+        /// Finalizes a process where both parties rated concurrently but neither
+        /// request finalized (race condition). Ratings are real — only status is updated.
+        /// </summary>
+        private async Task FinalizeStuckProcessAsync(int processId, CancellationToken ct)
+        {
+            using var tx = await _ctx.Database.BeginTransactionAsync(ct);
+            try
+            {
+                var process = await _ctx.Set<ProcessEntity>()
+                    .FromSqlRaw("SELECT * FROM [Process] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {0}", processId)
+                    .FirstOrDefaultAsync(ct);
+
+                if (process == null)
+                {
+                    await tx.RollbackAsync(ct);
+                    return;
+                }
+
+                // Re-verify stuck condition after acquiring lock
+                if (process.SubStatus != "awaiting_rating" ||
+                    !process.VehicleOwnerRating.HasValue ||
+                    !process.ChargerOwnerRating.HasValue ||
+                    process.DefaultRatingApplied)
+                {
+                    await tx.RollbackAsync(ct);
+                    return;
+                }
+
+                // Finalize — ratings are real (not defaults), so don't touch DefaultRatingApplied
+                var hasReport = await _ctx.Set<UserReportEntity>()
+                    .AnyAsync(r => r.ProcessId == process.Id, ct);
+
+                var finalStatus = hasReport ? ProcessStatus.Disputed : ProcessStatus.Completed;
+                var finalReqStatus = hasReport ? "Disputed" : "Completed";
+
+                process.Status = finalStatus;
+                process.SubStatus = null; // rating stage complete
+
+                if (process.DateCompleted == null)
+                    process.DateCompleted = DateTimeHelper.GetEgyptTime();
+
+                var request = await _ctx.Set<ChargingRequestEntity>()
+                    .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+                if (request != null)
+                    request.Status = finalReqStatus;
+
+                await _ctx.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+
+                _logger.LogInformation(
+                    "Finalized stuck process {ProcessId} (both ratings existed, SubStatus was awaiting_rating)",
+                    processId);
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
         }
 
         private async Task SendDefaultRatingNotificationsAsync(

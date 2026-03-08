@@ -43,10 +43,15 @@ namespace Voltyks.API.Controllers.Admin
 
             _logger.LogInformation("Cron process-ratings triggered");
 
-            await processor.ProcessExpiredWindowsAsync(ct);
+            var result = await processor.ProcessExpiredWindowsAsync(ct);
 
             return Ok(new ApiResponse<object>(
-                message: "Rating window processing completed",
+                data: new
+                {
+                    expiredProcessed = result.ExpiredProcessed,
+                    stuckFinalized = result.StuckFinalized
+                },
+                message: $"Done: {result.ExpiredProcessed} expired, {result.StuckFinalized} stuck finalized",
                 status: true
             ));
         }
