@@ -20,6 +20,10 @@ namespace Voltyks.Persistence.Data.Configurations
 
             builder.HasIndex(u => u.IsAvailable)
                    .HasDatabaseName("IX_AspNetUsers_IsAvailable");
+
+            builder.Property(u => u.CurrentActivitiesJson)
+                   .IsRequired()
+                   .HasDefaultValue("[]");
         }
     }
 }

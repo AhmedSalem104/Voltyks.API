@@ -32,7 +32,7 @@ namespace Voltyks.Persistence.Entities.Identity
         public double Wallet { get; set; } = 0;
 
 
-        public string? CurrentActivitiesJson { get; set; } = "[]";
+        public string CurrentActivitiesJson { get; set; } = "[]";
 
 
         [NotMapped]
