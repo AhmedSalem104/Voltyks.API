@@ -38,9 +38,15 @@ namespace Voltyks.Persistence.Entities.Identity
         [NotMapped]
         public ICollection<int> CurrentActivities
         {
-            get => string.IsNullOrWhiteSpace(CurrentActivitiesJson)
-                    ? new List<int>()
-                    : System.Text.Json.JsonSerializer.Deserialize<List<int>>(CurrentActivitiesJson) ?? new List<int>();
+            get
+            {
+                if (string.IsNullOrWhiteSpace(CurrentActivitiesJson))
+                {
+                    CurrentActivitiesJson = "[]";
+                    return new List<int>();
+                }
+                return System.Text.Json.JsonSerializer.Deserialize<List<int>>(CurrentActivitiesJson) ?? new List<int>();
+            }
             set => CurrentActivitiesJson = System.Text.Json.JsonSerializer.Serialize(value ?? new List<int>());
         }
 
