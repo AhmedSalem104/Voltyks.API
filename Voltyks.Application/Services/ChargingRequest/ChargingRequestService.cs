@@ -405,7 +405,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
                 var title = "Charging Request Confirmed ✅";
                 var body = $"The charger {request.Charger?.User?.FullName} confirmed the charging session for your vehicle.";
-                var notificationType = "Charger_ConfirmedProcessSuccessfully";
+                var notificationType = NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully;
 
                 // إرسال الإشعار
                 var result = await SendAndPersistNotificationAsync(

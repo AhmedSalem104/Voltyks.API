@@ -1,0 +1,504 @@
+﻿                                                                                                                                                                           Here is Claude's plan:
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ Frontend Notification Guide - Process Termination Flows
+
+ تأكيد هام
+
+ - لم يتغير شكل أي API Response
+ - لم تتغير DTOs
+ - التغيير فقط في القيم والحالات والـ Flow الداخلي
+
+ ---
+ Process Status Values (After Update)
+
+ ProcessStatus {
+     PendingCompleted = 0,  // Active - NOT terminal
+     Completed = 1,         // Terminal ✓
+     Aborted = 2,           // Terminal ✓
+     Disputed = 3           // Terminal ✓ (NEW - for reports)
+ }
+
+ قاعدة ذهبية: أي status غير PendingCompleted يعتبر Terminal.
+
+ ---
+ جدول Notification Types الكامل
+
+ 1. Notifications أثناء الـ Flow (Non-Terminal)
+ ┌─────────────────────────────┬───────────────────────┬───────────────────────────────────────────────────┬───────────┬──────────────────────────────────┐
+ │      Notification Type      │       متى تُرسل       │                  Process Status                   │ Terminal? │         Frontend Action          │
+ ├─────────────────────────────┼───────────────────────┼───────────────────────────────────────────────────┼───────────┼──────────────────────────────────┤
+ │ VehicleOwner_RequestCharger │ عند إرسال طلب شحن     │ لا يوجد process بعد                               │ ❌        │ عرض شاشة انتظار الرد             │
+ ├─────────────────────────────┼───────────────────────┼───────────────────────────────────────────────────┼───────────┼──────────────────────────────────┤
+ │ ChargerOwner_AcceptRequest  │ صاحب الشاحن قبل الطلب │ لا يوجد process بعد                               │ ❌        │ انتقال لشاشة التأكيد + بدء timer │
+ ├─────────────────────────────┼───────────────────────┼───────────────────────────────────────────────────┼───────────┼──────────────────────────────────┤
+ │ ChargerOwner_RejectRequest  │ صاحب الشاحن رفض الطلب │ لا يوجد process                                   │ ❌        │ إغلاق شاشة الانتظار + رسالة رفض  │
+ ├─────────────────────────────┼───────────────────────┼───────────────────────────────────────────────────┼───────────┼──────────────────────────────────┤
+ │ VehicleOwner_CreateProcess  │ تم إنشاء Process جديد │ PendingCompleted                                  │ ❌        │ انتقال لشاشة العملية النشطة      │
+ ├─────────────────────────────┼───────────────────────┼───────────────────────────────────────────────────┼───────────┼──────────────────────────────────┤
+ │ VehicleOwner_UpdateProcess  │ تحديث بيانات العملية  │ PendingCompleted                                  │ ❌        │ تحديث القيم على الشاشة           │
+ ├─────────────────────────────┼───────────────────────┼───────────────────────────────────────────────────┼───────────┼──────────────────────────────────┤
+ │ Process_Started             │ بدء الشحن             │ PendingCompleted + SubStatus=charging_in_progress │ ❌        │ عرض حالة "جاري الشحن"            │
+ └─────────────────────────────┴───────────────────────┴───────────────────────────────────────────────────┴───────────┴──────────────────────────────────┘
+ 2. Terminal Notifications (إنهاء العملية)
+ ┌────────────────────┬──────────────────────────┬────────────────┬───────────┬───────────────────┬─────────────────┐
+ │ Notification Type  │        متى تُرسل         │ Process Status │ Terminal? │ terminationReason │ Frontend Action │
+ ├────────────────────┼──────────────────────────┼────────────────┼───────────┼───────────────────┼─────────────────┤
+ │ Process_Terminated │ Abort من أي طرف          │ Aborted        │ ✅        │ "aborted"         │ إنهاء كامل      │
+ ├────────────────────┼──────────────────────────┼────────────────┼───────────┼───────────────────┼─────────────────┤
+ │ Process_Terminated │ Timeout (background job) │ Aborted        │ ✅        │ "timeout"         │ إنهاء كامل      │
+ ├────────────────────┼──────────────────────────┼────────────────┼───────────┼───────────────────┼─────────────────┤
+ │ Process_Terminated │ Report من أي طرف         │ Disputed       │ ✅        │ "report"          │ إنهاء كامل      │
+ ├────────────────────┼──────────────────────────┼────────────────┼───────────┼───────────────────┼─────────────────┤
+ │ Process_Terminated │ انتهاء الصلاحية          │ Aborted        │ ✅        │ "expired"         │ إنهاء كامل      │
+ ├────────────────────┼──────────────────────────┼────────────────┼───────────┼───────────────────┼─────────────────┤
+ │ Process_Terminated │ رفض بعد القبول           │ Aborted        │ ✅        │ "rejected"        │ إنهاء كامل      │
+ └────────────────────┴──────────────────────────┴────────────────┴───────────┴───────────────────┴─────────────────┘
+ 3. Report Notifications (للطرف المُبلَّغ عليه)
+ ┌───────────────────────────────────┬───────────────────┬────────────────┬───────────┬──────────────────────────┐
+ │         Notification Type         │     متى تُرسل     │ Process Status │ Terminal? │     Frontend Action      │
+ ├───────────────────────────────────┼───────────────────┼────────────────┼───────────┼──────────────────────────┤
+ │ Report_VehicleOwnerToChargerOwner │ صاحب العربية بلّغ │ Disputed       │ ✅        │ إنهاء + عرض رسالة البلاغ
+ ├───────────────────────────────────┼───────────────────┼────────────────┼───────────┼──────────────────────────┤
+ │ Report_ChargerOwnerToVehicleOwner │ صاحب الشاحن بلّغ  │ Disputed       │ ✅        │ إنهاء + عرض رسالة البلاغ
+ └───────────────────────────────────┴───────────────────┴────────────────┴───────────┴──────────────────────────┘
+ ---
+ Process_Terminated Payload Structure
+
+ {
+   "notification": {
+     "title": "تم إنهاء العملية",
+     "body": "تم إلغاء عملية الشحن"  // varies by reason
+   },
+   "data": {
+     "NotificationType": "Process_Terminated",
+     "processId": "123",
+     "requestId": "456",
+     "terminationReason": "aborted",  // or "report", "timeout", "expired", "rejected"
+     "terminatedAt": "2024-02-02T15:30:00.000Z"
+   }
+ }
+
+ terminationReason Values & Messages
+ ┌───────────────────┬────────────────────────────┐
+ │ terminationReason │       Arabic Message       │
+ ├───────────────────┼────────────────────────────┤
+ │ "aborted"         │ تم إلغاء عملية الشحن       │
+ ├───────────────────┼────────────────────────────┤
+ │ "report"          │ تم إنهاء العملية بسبب بلاغ │
+ ├───────────────────┼────────────────────────────┤
+ │ "timeout"         │ تم إنهاء العملية           │
+ ├───────────────────┼────────────────────────────┤
+ │ "expired"         │ انتهت صلاحية العملية       │
+ ├───────────────────┼────────────────────────────┤
+ │ "rejected"        │ تم رفض الطلب               │
+ └───────────────────┴────────────────────────────┘
+ ---
+ Frontend Terminal Notification Handler
+
+ عند استقبال أي Terminal Notification، يجب تنفيذ الخطوات التالية:
+
+ function handleTerminalNotification(notification: Notification) {
+     // 1. إغلاق شاشة العملية فوراً
+     closeProcessScreen();
+
+     // 2. مسح activeProcessId من الـ local state
+     clearActiveProcessId();
+
+     // 3. تحديث حالة المستخدم
+     setUserAvailable(true);
+
+     // 4. Refresh من الـ API للتأكد
+     await refreshUserState();
+
+     // 5. عرض رسالة مناسبة حسب الـ reason
+     showTerminationMessage(notification.data.terminationReason);
+
+     // 6. الانتقال للشاشة الرئيسية
+     navigateToHome();
+ }
+
+ ---
+ سيناريو Timeout من Background Job
+
+ الحالة:
+
+ - المستخدم على شاشة "Started" أو "Charging"
+ - العملية قديمة (أكثر من 24 ساعة)
+ - الـ Background Job يكتشفها ويقفلها
+
+ ما يحدث:
+
+ 1. الـ Job يستدعي TerminateProcessAsync(processId, Aborted, "timeout")
+ 2. يُرسل Process_Terminated للطرفين
+ 3. الـ Payload:
+ {
+   "data": {
+     "NotificationType": "Process_Terminated",
+     "processId": "123",
+     "requestId": "456",
+     "terminationReason": "timeout",
+     "terminatedAt": "2024-02-02T15:30:00.000Z"
+   }
+ }
+
+ Frontend Action:
+
+ if (notification.data.terminationReason === "timeout") {
+     // عرض رسالة خاصة
+     showAlert("انتهت صلاحية العملية", "تم إنهاء العملية تلقائياً بسبب عدم الاكتمال");
+
+     // تنفيذ الـ cleanup المعتاد
+     handleTerminalNotification(notification);
+ }
+
+ ---
+ Decision Tree للـ Frontend
+
+ استقبال Notification
+     │
+     ├─ NotificationType === "Process_Terminated"?
+     │   └─ YES → handleTerminalNotification() → END
+     │
+     ├─ NotificationType === "Report_*"?
+     │   └─ YES → handleTerminalNotification() + showReportDetails() → END
+     │
+     ├─ NotificationType === "ChargerOwner_RejectRequest"?
+     │   └─ YES → closeWaitingScreen() + showRejectionMessage() → END
+     │
+     └─ Otherwise → Update UI based on notification type → CONTINUE
+
+ ---
+ Mapping: Notification → Expected Action
+ ┌───────────────────────────────────┬─────────────┬──────────────┬───────────────┬───────────────┬──────────────┐
+ │           Notification            │ Is Terminal │ Close Screen │ Clear Process │ Refresh State │ Show Message │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ VehicleOwner_RequestCharger       │ ❌          │ ❌           │ ❌            │ ❌            │ ❌           │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ ChargerOwner_AcceptRequest        │ ❌          │ ❌           │ ❌            │ ❌            │ ✅           │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ ChargerOwner_RejectRequest        │ ❌          │ ✅           │ ❌            │ ❌            │ ✅           │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ VehicleOwner_CreateProcess        │ ❌          │ ❌           │ ❌            │ ❌            │ ❌           │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ VehicleOwner_UpdateProcess        │ ❌          │ ❌           │ ❌            │ ❌            │ ❌           │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ Process_Terminated                │ ✅          │ ✅           │ ✅            │ ✅            │ ✅           │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ Report_VehicleOwnerToChargerOwner │ ✅          │ ✅           │ ✅            │ ✅            │ ✅           │
+ ├───────────────────────────────────┼─────────────┼──────────────┼───────────────┼───────────────┼──────────────┤
+ │ Report_ChargerOwnerToVehicleOwner │ ✅          │ ✅           │ ✅            │ ✅            │ ✅           │
+ └───────────────────────────────────┴─────────────┴──────────────┴───────────────┴───────────────┴──────────────┘
+ ---
+ ملاحظات مهمة
+
+ 1. Idempotency: الـ Backend يضمن أن النداء المتكرر لـ TerminateProcessAsync لا يرسل notifications مكررة
+ 2. كل Terminal notification تُرسل للطرفين (VehicleOwner + ChargerOwner)
+ 3. الـ Report notifications: يتم إرسال Process_Terminated للطرفين + Report_* للطرف المُبلَّغ عليه فقط
+ 4. لا تعتمد على الـ Process Status من الـ notification - دائماً اعمل refresh من API بعد Terminal notification
+
+ ---
+ Testing Checklist للـ Frontend
+
+ - استقبال Process_Terminated مع reason=aborted → إغلاق صحيح
+ - استقبال Process_Terminated مع reason=timeout → إغلاق صحيح + رسالة timeout
+ - استقبال Process_Terminated مع reason=report → إغلاق صحيح
+ - استقبال Report_* → إغلاق + عرض تفاصيل البلاغ
+ - المستخدم على شاشة Started + استقبال timeout → الشاشة تُغلق بدون crash
+ - استقبال نفس الـ notification مرتين → لا يحدث خطأ
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+ Claude has written up a plan and is ready to execute. Would you like to proceed?
+
+ > 1. Yes, clear context and auto-accept edits (shift+tab)
+   2. Yes, auto-accept edits
+   3. Yes, manually approve edits
+   4. Type here to tell Claude what to change
+
+
+
+
+
+
+   # 📱 ملخص السيناريوهات للـ Frontend
+
+---
+
+## السيناريو ١: الـ Happy Path ✅ (كل حاجة تمام)
+
+**القصة:** صاحب عربية طلب شحن → صاحب الشاحن قبل → الشحن بدأ وخلص بنجاح → الطرفين قيّموا بعض.
+
+| الخطوة | الـ Notification اللي بتوصل | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| صاحب العربية طلب شحن | VehicleOwner_RequestCharger | صاحب الشاحن | اعرض شاشة "فيه طلب جديد" + زرار قبول ورفض |
+| صاحب الشاحن قبل | ChargerOwner_AcceptRequest | صاحب العربية | اقفل شاشة الانتظار + انقله لشاشة التأكيد + ابدأ Timer |
+| اتعمل Process | VehicleOwner_CreateProcess | الطرفين | احفظ data.processId في الـ State + انقل لشاشة العملية النشطة |
+| الشحن بدأ | Process_Started | الطرفين | غيّر الشاشة لحالة "جاري الشحن" |
+| تحديث أثناء الشحن | VehicleOwner_UpdateProcess | الطرفين | حدّث القيم على الشاشة (ممكن تيجي أكتر من مرة) |
+| طرف أكّد إنهاء الشحن | ChargerOwner_ConfirmProcess أو VehicleOwner_ConfirmProcess | الطرف التاني | اقفل شاشة الشحن + انقله لـ **شاشة التقييم** |
+| الطرفين قيّموا | — | — | امسح activeProcessId + API Refresh + انقل لـ Home |
+
+**⚠️ نقطة مهمة في الـ Confirm:**
+
+| الموضوع | التفصيل |
+|---|---|
+| مين بيأكّد؟ | أي طرف يقدر يأكّد منفرداً |
+| لو صاحب الشاحن أكّد | صاحب العربية بيستقبل ChargerOwner_ConfirmProcess |
+| لو صاحب العربية أكّد | صاحب الشاحن بيستقبل VehicleOwner_ConfirmProcess |
+| متمسحش الـ activeProcessId بعد الـ Confirm | ⚠️ العملية لسه مخلصتش — مستنية التقييم |
+| متخليش المستخدم "متاح" بعد الـ Confirm | ⚠️ الـ Backend مش هيحرره غير لما **الطرفين** يقيّموا |
+| الـ Cleanup الكامل بيحصل إمتى؟ | بس لما الطرفين يبعتوا التقييم |
+
+**الـ Confirm Payload:**
+
+| Field | القيمة |
+|---|---|
+| data.NotificationType | "ChargerOwner_ConfirmProcess" أو "VehicleOwner_ConfirmProcess" |
+| data.processId | ID العملية |
+| data.requestId | ID الطلب |
+| notification.title | "Process confirmed" |
+| notification.body | "Charger owner confirmed your session. Please submit your rating." |
+
+---
+
+---
+
+## السيناريو ٢: الرفض قبل ما يبدأ أي حاجة ❌
+
+**القصة:** صاحب عربية طلب شحن → صاحب الشاحن رفض → خلاص.
+
+| الخطوة | الـ Notification | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| صاحب العربية طلب شحن | VehicleOwner_RequestCharger | صاحب الشاحن | اعرض شاشة "فيه طلب جديد" |
+| صاحب الشاحن **رفض** | ChargerOwner_RejectRequest | صاحب العربية | اقفل شاشة الانتظار + اعرض رسالة "تم رفض الطلب" |
+
+**ملاحظة:** مفيش Process اتعمل أصلاً — مفيش cleanup مطلوب.
+
+---
+
+---
+
+## السيناريو ٣: إلغاء يدوي (Abort) 🔴
+
+**القصة:** العملية شغالة → حد من الطرفين ضغط "إلغاء".
+
+| الخطوة | الـ Notification | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| حد ضغط إلغاء | Process_Terminated | **الطرفين** | نفّذ الـ Terminal Handler (6 خطوات) |
+
+**الـ Payload:**
+
+| Field | القيمة |
+|---|---|
+| data.NotificationType | "Process_Terminated" |
+| data.terminationReason | **"aborted"** |
+| data.processId | ID العملية |
+| data.terminatedAt | وقت الإلغاء |
+
+**الرسالة اللي تعرضها:** تم إلغاء عملية الشحن
+
+**الـ Terminal Handler (6 خطوات) — نفسهم في كل سيناريوهات الإنهاء:**
+
+| الخطوة | الوصف |
+|---|---|
+| 1 | اقفل شاشة العملية فوراً |
+| 2 | امسح الـ activeProcessId من الـ State |
+| 3 | خلّي حالة المستخدم "متاح" |
+| 4 | اعمل Refresh من الـ API |
+| 5 | اعرض الرسالة المناسبة |
+| 6 | انقل المستخدم للـ Home |
+
+---
+
+---
+
+## السيناريو ٤: Timeout — النظام قفل العملية تلقائي ⏰
+
+**القصة:** العملية فضلت مفتوحة أكتر من 24 ساعة من غير ما تخلص → الـ Background Job قفلها.
+
+| الخطوة | الـ Notification | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| الـ Background Job قفل العملية | Process_Terminated | **الطرفين** | نفّذ الـ Terminal Handler (6 خطوات) |
+
+**الـ Payload:**
+
+| Field | القيمة |
+|---|---|
+| data.NotificationType | "Process_Terminated" |
+| data.terminationReason | **"timeout"** |
+| data.processId | ID العملية |
+| data.terminatedAt | وقت الإنهاء |
+
+**الرسالة اللي تعرضها:** تم إنهاء العملية تلقائياً بسبب عدم الاكتمال
+
+**⚠️ خلّي بالك:** المستخدم ممكن يكون على شاشة "جاري الشحن" لما الـ notification ده يوصل — لازم الشاشة تتقفل بدون crash.
+
+---
+
+---
+
+## السيناريو ٥: انتهاء الصلاحية (Expired) ⌛
+
+**القصة:** العملية ليها مدة محددة وخلصت قبل ما الشحن يبدأ أو يكتمل.
+
+| الخطوة | الـ Notification | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| الصلاحية انتهت | Process_Terminated | **الطرفين** | نفّذ الـ Terminal Handler (6 خطوات) |
+
+**الـ Payload:**
+
+| Field | القيمة |
+|---|---|
+| data.NotificationType | "Process_Terminated" |
+| data.terminationReason | **"expired"** |
+| data.processId | ID العملية |
+| data.terminatedAt | وقت الانتهاء |
+
+**الرسالة اللي تعرضها:** انتهت صلاحية العملية
+
+---
+
+---
+
+## السيناريو ٦: رفض بعد القبول (Rejected) 🔄
+
+**القصة:** صاحب الشاحن **كان قبل** الطلب وبعدين **غيّر رأيه ورفض** بعد ما الـ Process اتعمل.
+
+| الخطوة | الـ Notification | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| صاحب الشاحن رفض بعد القبول | Process_Terminated | **الطرفين** | نفّذ الـ Terminal Handler (6 خطوات) |
+
+**الـ Payload:**
+
+| Field | القيمة |
+|---|---|
+| data.NotificationType | "Process_Terminated" |
+| data.terminationReason | **"rejected"** |
+| data.processId | ID العملية |
+| data.terminatedAt | وقت الرفض |
+
+**الرسالة اللي تعرضها:** تم رفض الطلب
+
+**الفرق بين Reject و Rejected:**
+
+| | ChargerOwner_RejectRequest | Process_Terminated (rejected) |
+|---|---|---|
+| بيحصل إمتى | **قبل** ما يتعمل Process | **بعد** ما الـ Process اتعمل |
+| فيه Process؟ | لأ | أيوا |
+| محتاج Cleanup؟ | لأ — بس اقفل شاشة الانتظار | أيوا — الـ 6 خطوات كاملين |
+
+---
+
+---
+
+## السيناريو ٧: بلاغ من صاحب العربية 🚨
+
+**القصة:** العملية شغالة → صاحب العربية عمل بلاغ على صاحب الشاحن.
+
+| الخطوة | الـ Notification | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| البلاغ اتعمل | Process_Terminated (reason = "report") | **الطرفين** | نفّذ الـ Terminal Handler (6 خطوات) |
+| تفاصيل البلاغ | Report_VehicleOwnerToChargerOwner | **صاحب الشاحن بس** | اعرض رسالة/شاشة خاصة بالبلاغ |
+
+**الـ Payload بتاع Process_Terminated:**
+
+| Field | القيمة |
+|---|---|
+| data.NotificationType | "Process_Terminated" |
+| data.terminationReason | **"report"** |
+| data.processId | ID العملية |
+
+**الرسالة اللي تعرضها:** تم إنهاء العملية بسبب بلاغ
+
+**⚠️ صاحب الشاحن هيستقبل 2 notifications:** الأولى Process_Terminated (زي صاحب العربية) والتانية Report_VehicleOwnerToChargerOwner (ليه هو بس). لازم الكود يتحمّل ده من غير مشاكل.
+
+---
+
+---
+
+## السيناريو ٨: بلاغ من صاحب الشاحن 🚨
+
+**القصة:** العملية شغالة → صاحب الشاحن عمل بلاغ على صاحب العربية.
+
+| الخطوة | الـ Notification | بتوصل لمين | إنت بتعمل إيه |
+|---|---|---|---|
+| البلاغ اتعمل | Process_Terminated (reason = "report") | **الطرفين** | نفّذ الـ Terminal Handler (6 خطوات) |
+| تفاصيل البلاغ | Report_ChargerOwnerToVehicleOwner | **صاحب العربية بس** | اعرض رسالة/شاشة خاصة بالبلاغ |
+
+**نفس الكلام:** صاحب العربية هيستقبل 2 notifications — الـ Terminal + الـ Report.
+
+---
+
+---
+
+## 📊 جدول ملخص — كل السيناريوهات في نظرة واحدة
+
+| # | السيناريو | الـ Notification الأساسية | الرسالة | وين بيروح المستخدم |
+|---|---|---|---|---|
+| ١ | نجاح ✅ | ChargerOwner_ConfirmProcess / VehicleOwner_ConfirmProcess | "تم تأكيد العملية — قيّم تجربتك" | شاشة التقييم |
+| ٢ | رفض قبل البدء ❌ | ChargerOwner_RejectRequest | "تم رفض الطلب" | يقدر يدوّر على شاحن تاني |
+| ٣ | إلغاء يدوي 🔴 | Process_Terminated (aborted) | "تم إلغاء عملية الشحن" | Home |
+| ٤ | Timeout ⏰ | Process_Terminated (timeout) | "تم إنهاء العملية تلقائياً بسبب عدم الاكتمال" | Home |
+| ٥ | انتهاء صلاحية ⌛ | Process_Terminated (expired) | "انتهت صلاحية العملية" | Home |
+| ٦ | رفض بعد القبول 🔄 | Process_Terminated (rejected) | "تم رفض الطلب" | Home |
+| ٧ | بلاغ من صاحب العربية 🚨 | Process_Terminated (report) + Report_VehicleOwnerToChargerOwner | "تم إنهاء العملية بسبب بلاغ" | Home |
+| ٨ | بلاغ من صاحب الشاحن 🚨 | Process_Terminated (report) + Report_ChargerOwnerToVehicleOwner | "تم إنهاء العملية بسبب بلاغ" | Home |
+
+---
+
+## 📊 جدول الـ Actions — كل Notification محتاجة إيه بالظبط
+
+| Notification | اقفل الشاشة | امسح الـ Process | خلّي المستخدم متاح | API Refresh | اعرض رسالة | الوجهة |
+|---|---|---|---|---|---|---|
+| VehicleOwner_RequestCharger | ❌ | ❌ | ❌ | ❌ | ❌ | شاشة الطلب الجديد |
+| ChargerOwner_AcceptRequest | ❌ | ❌ | ❌ | ❌ | ✅ "تم القبول" | شاشة التأكيد + Timer |
+| ChargerOwner_RejectRequest | ✅ الانتظار | ❌ | ❌ | ❌ | ✅ "تم الرفض" | يدوّر على شاحن تاني |
+| VehicleOwner_CreateProcess | ❌ | ❌ | ❌ | ❌ | ❌ | شاشة العملية النشطة |
+| VehicleOwner_UpdateProcess | ❌ | ❌ | ❌ | ❌ | ❌ | نفس الشاشة (تحديث قيم) |
+| Process_Started | ❌ | ❌ | ❌ | ❌ | ❌ | حالة "جاري الشحن" |
+| ChargerOwner_ConfirmProcess | ✅ الشحن | ❌ ⚠️ | ❌ ⚠️ | ✅ | ✅ "تم التأكيد" | شاشة التقييم |
+| VehicleOwner_ConfirmProcess | ✅ الشحن | ❌ ⚠️ | ❌ ⚠️ | ✅ | ✅ "تم التأكيد" | شاشة التقييم |
+| Process_Terminated | ✅ | ✅ | ✅ | ✅ | ✅ حسب السبب | Home |
+| Report_VehicleOwnerToChargerOwner | ✅ | ✅ | ✅ | ✅ | ✅ + تفاصيل البلاغ | Home |
+| Report_ChargerOwnerToVehicleOwner | ✅ | ✅ | ✅ | ✅ | ✅ + تفاصيل البلاغ | Home |
+
+> ⚠️ الـ Confirm مش بيمسح الـ Process ومش بيخلي المستخدم متاح — ده بيحصل بس لما **الطرفين يقيّموا**.
+
+---
+
+## ⚠️ Edge Cases — حالات لازم تشتغل صح
+
+| الحالة | إيه اللي بيحصل | الحل |
+|---|---|---|
+| المستخدم على شاشة "جاري الشحن" + جاله timeout | الشاشة لازم تتقفل بدون crash | شيك لو الشاشة مفتوحة قبل ما تقفلها |
+| نفس الـ Notification وصل مرتين | ممكن يحصل بسبب الشبكة | شيك لو فيه عملية نشطة — لو مفيش، متعملش حاجة |
+| البلاغ بيبعت 2 Notifications | الطرف المُبلَّغ عليه بيستقبل Process_Terminated + Report_* | الأولى بتتنفذ، التانية بتلاقي مفيش عملية فمبتعملش حاجة |
+| المستخدم على شاشة التقييم + جاله Terminal | حالة نادرة بس ممكنة | الـ Terminal دايماً ليه الأولوية — اقفل التقييم ونفّذ Terminal Handler |
+| طرف واحد بس قيّم | التاني لسه مقيّمش | ارجع Home عادي — الـ Backend هيحرر المستخدم تلقائياً |
+
+---
+
+## 📌 قاعدة ذهبية
+
+> **الـ Notification مجرد تنبيه — مش مصدر بيانات.**
+> دايماً اعمل API Call بعد أي notification واجيب البيانات الصح من الـ Server.
+
+---
+
+## ✅ Checklist
+
+### Happy Path
+- [ ] Confirm وصل → شاشة التقييم ظهرت
+- [ ] الطرفين قيّموا → Cleanup كامل + Home
+- [ ] طرف واحد قيّم → مفيش crash
+
+### Termination
+- [ ] aborted → شاشة اتقفلت + رسالة صح + Home
+- [ ] timeout → شاشة اتقفلت + رسالة timeout + Home
+- [ ] expired → شاشة اتقفلت + رسالة expired + Home
+- [ ] rejected → شاشة اتقفلت + رسالة rejected + Home
+- [ ] report → شاشة اتقفلت + رسالة report + Home
+- [ ] Report_* → تفاصيل البلاغ ظهرت
+
+### Edge Cases
+- [ ] Notification وصل مرتين → مفيش خطأ
+- [ ] شاشة شحن + timeout → مفيش crash
+- [ ] شاشة تقييم + Terminal → Home صح

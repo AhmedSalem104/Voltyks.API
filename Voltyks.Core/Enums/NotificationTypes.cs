@@ -11,11 +11,10 @@ namespace Voltyks.Core.Enums
         public const string VehicleOwner_RequestCharger = "VehicleOwner_RequestCharger";
         public const string ChargerOwner_AcceptRequest = "ChargerOwner_AcceptRequest";
         public const string ChargerOwner_RejectRequest = "ChargerOwner_RejectRequest";
-        public const string VehicleOwner_CompleteProcessSuccessfully = "VehicleOwner_CompleteProcessSuccessfully";
+        public const string ChargerOwner_ConfirmedProcessSuccessfully = "ChargerOwner_ConfirmedProcessSuccessfully";
         public const string VehicleOwner_ProcessAbortedAfterPaymentSuccessfully = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
         public const string VehicleOwner_CreateProcess = "VehicleOwner_CreateProcess";
         public const string VehicleOwner_UpdateProcess = "VehicleOwner_UpdateProcess";
-        public const string Charger_ConfirmedProcessSuccessfully = "Charger_ConfirmedProcessSuccessfully";
         public const string Report_ChargerOwnerToVehicleOwner = "Report_ChargerOwnerToVehicleOwner";
         public const string Report_VehicleOwnerToChargerOwner = "Report_VehicleOwnerToChargerOwner";
 

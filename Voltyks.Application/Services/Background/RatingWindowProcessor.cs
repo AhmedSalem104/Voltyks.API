@@ -134,6 +134,15 @@ namespace Voltyks.Application.Services.Background
                     return;
                 }
 
+                if (process.Status == ProcessStatus.Aborted)
+                {
+                    _logger.LogInformation("Skipping aborted process {ProcessId}", processId);
+                    await tx.RollbackAsync(ct);
+                    return;
+                }
+
+                // VehicleOwnerRating = rating given by CO to VO.
+                // If null → CO didn't rate VO → RaterUserId = CO (the missing rater)
                 if (!process.VehicleOwnerRating.HasValue)
                 {
                     process.VehicleOwnerRating = DefaultRating;
@@ -141,7 +150,7 @@ namespace Voltyks.Application.Services.Background
                     await _ctx.AddAsync(new RatingsHistory
                     {
                         ProcessId = process.Id,
-                        RaterUserId = "system",
+                        RaterUserId = process.ChargerOwnerId,
                         RateeUserId = process.VehicleOwnerId,
                         Stars = DefaultRating
                     }, ct);
@@ -156,6 +165,8 @@ namespace Voltyks.Application.Services.Background
                     notificationTargets.Add((process.VehicleOwnerId, process.Id, process.ChargerRequestId));
                 }
 
+                // ChargerOwnerRating = rating given by VO to CO.
+                // If null → VO didn't rate CO → RaterUserId = VO (the missing rater)
                 if (!process.ChargerOwnerRating.HasValue)
                 {
                     process.ChargerOwnerRating = DefaultRating;
@@ -163,7 +174,7 @@ namespace Voltyks.Application.Services.Background
                     await _ctx.AddAsync(new RatingsHistory
                     {
                         ProcessId = process.Id,
-                        RaterUserId = "system",
+                        RaterUserId = process.VehicleOwnerId,
                         RateeUserId = process.ChargerOwnerId,
                         Stars = DefaultRating
                     }, ct);

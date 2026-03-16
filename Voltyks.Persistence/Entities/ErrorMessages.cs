@@ -65,7 +65,7 @@ namespace Voltyks.Persistence.Entities
         public const string InvalidBrand = "Brand does not exist.";
         public const string InvalidModel = "Model does not exist.";
         public const string ModelBrandMismatch = "Model does not belong to the specified brand.";
-        public const string VehicleNotFound = "Vehicle not found.";
+        public const string VehicleNotFound = "Vehicle not found."; 
   
 
 

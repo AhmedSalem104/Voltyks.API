@@ -360,7 +360,7 @@ namespace Voltyks.Core.DTOs.Processes
 
                 var updateNotifType = decision switch
                 {
-                    "completed" => NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                    "completed" => NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully,
                     "aborted" or "ended-by-report" => NotificationTypes.Process_Terminated,
                     _ => NotificationTypes.VehicleOwner_UpdateProcess
                 };
@@ -1037,6 +1037,40 @@ namespace Voltyks.Core.DTOs.Processes
 
             // Open the rating window
             process.RatingWindowOpenedAt = DateTime.UtcNow;
+
+            // Self-healing fallback: if process is still PendingCompleted,
+            // complete it properly so the rating window and sweeps work correctly.
+            if (process.Status == ProcessStatus.PendingCompleted)
+            {
+                process.Status = ProcessStatus.Completed;
+                process.SubStatus = "awaiting_rating";
+                process.DateCompleted ??= DateTimeHelper.GetEgyptTime();
+
+                var request = await _ctx.Set<ChargingRequestEntity>()
+                    .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
+                if (request != null)
+                    request.Status = "Completed";
+
+                foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
+                {
+                    var user = await _ctx.Set<AppUser>().FindAsync(new object?[] { uid }, ct);
+                    if (user != null)
+                    {
+                        var activities = user.CurrentActivities.ToList();
+                        if (activities.Remove(process.Id))
+                        {
+                            user.CurrentActivities = activities;
+                            _ctx.Entry(user).Property(u => u.CurrentActivitiesJson).IsModified = true;
+                        }
+                        if (user.CurrentActivities.Count == 0 && !user.IsAvailable)
+                        {
+                            user.IsAvailable = true;
+                            _ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
+                        }
+                    }
+                }
+            }
+
             _ctx.Update(process);
             await _ctx.SaveChangesAsync(ct);
 
@@ -1269,7 +1303,7 @@ namespace Voltyks.Core.DTOs.Processes
                     "process_updated" when reqStatusLower is "started" or "pendingcompleted"
                         => NotificationTypes.VehicleOwner_UpdateProcess,
                     "awaiting_rating"
-                        => NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                        => NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully,
                     _ => notificationType
                 };
             }
@@ -1327,7 +1361,7 @@ namespace Voltyks.Core.DTOs.Processes
             };
 
             // Timer fields - only for accepted (mirrors ChargerOwner_AcceptRequest FCM payload)
-            // and confirmed (mirrors Charger_ConfirmedProcessSuccessfully SignalR payload)
+            // and confirmed (mirrors ChargerOwner_ConfirmedProcessSuccessfully SignalR payload)
             if (statusLower == "accepted")
             {
                 if (req.RespondedAt.HasValue)
@@ -1389,13 +1423,13 @@ namespace Voltyks.Core.DTOs.Processes
                 "confirmed" when isChargerOwner => (
                     "charging_confirmed",
                     "START_CHARGING",
-                    NotificationTypes.Charger_ConfirmedProcessSuccessfully,
+                    NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully,
                     new List<string> { "start", "abort" }
                 ),
                 "confirmed" when isVehicleOwner => (
                     "charging_confirmed",
                     "WAITING_FOR_START",
-                    NotificationTypes.Charger_ConfirmedProcessSuccessfully,
+                    NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully,
                     new List<string> { "abort" }
                 ),
                 "started" when isVehicleOwner => (
@@ -1425,13 +1459,13 @@ namespace Voltyks.Core.DTOs.Processes
                 "completed" when isChargerOwner => (
                     "awaiting_rating",
                     "RATING_SCREEN",
-                    NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                    NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully,
                     new List<string> { "rate" }
                 ),
                 "completed" when isVehicleOwner => (
                     "awaiting_rating",
                     "RATING_SCREEN",
-                    NotificationTypes.VehicleOwner_CompleteProcessSuccessfully,
+                    NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully,
                     new List<string> { "rate" }
                 ),
                 _ => (
