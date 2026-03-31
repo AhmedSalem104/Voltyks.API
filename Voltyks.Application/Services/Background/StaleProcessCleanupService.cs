@@ -208,18 +208,19 @@ namespace Voltyks.Application.Services.Background
                 var previousStatus = req.Status;
                 req.Status = "Expired";
 
-                var extraData = new Dictionary<string, string>
-                {
-                    ["requestId"] = req.Id.ToString(),
-                    ["NotificationType"] = NotificationTypes.Process_Terminated,
-                    ["terminationReason"] = "expired",
-                    ["terminatedAt"] = DateTime.UtcNow.ToString("o")
-                };
-
                 // Send notification to both users
                 foreach (var userId in new[] { req.UserId, req.RecipientUserId })
                 {
                     if (string.IsNullOrWhiteSpace(userId)) continue;
+
+                    var extraData = new Dictionary<string, string>
+                    {
+                        ["requestId"] = req.Id.ToString(),
+                        ["NotificationType"] = NotificationTypes.Process_Terminated,
+                        ["terminationReason"] = "expired",
+                        ["terminatedAt"] = DateTime.UtcNow.ToString("o"),
+                        ["userRole"] = userId == req.UserId ? "vehicle_owner" : "charger_owner"
+                    };
 
                     var user = await ctx.Set<AppUser>()
                         .Include(u => u.DeviceTokens)

@@ -364,3 +364,6 @@ FodyWeavers.xsd
 
 # Project sensitive info (credentials)
 PROJECT_INFO.md
+
+# Firebase service account key (sensitive)
+**/Firebase/service-account-key.json

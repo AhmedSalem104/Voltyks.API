@@ -192,7 +192,8 @@ namespace Voltyks.Core.DTOs.Processes
                     ["processId"] = process.Id.ToString(),
                     ["estimatedPrice"] = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
                     ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                    ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                    ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    ["userRole"] = "charger_owner"
                 };
 
                 var notifDto = await SendAndPersistNotificationAsync(
@@ -355,7 +356,8 @@ namespace Voltyks.Core.DTOs.Processes
                     ["processId"] = process.Id.ToString(),
                     ["estimatedPrice"] = (process.EstimatedPrice ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
                     ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
-                    ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                    ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                    ["userRole"] = "charger_owner"
                 };
 
                 var updateNotifType = decision switch
@@ -534,7 +536,8 @@ namespace Voltyks.Core.DTOs.Processes
                             "Charger owner confirmed your session. Please submit your rating.",
                             request.Id,
                             "ChargerOwner_ConfirmProcess",
-                            ct
+                            ct,
+                            new Dictionary<string, string> { ["userRole"] = "vehicle_owner" }
                         );
                         // SignalR Real-time
                         await _signalRService.SendPaymentCompletedAsync(process.Id, process.VehicleOwnerId, new
@@ -552,7 +555,8 @@ namespace Voltyks.Core.DTOs.Processes
                             "Vehicle owner confirmed the session completion.",
                             request.Id,
                             "VehicleOwner_ConfirmProcess",
-                            ct
+                            ct,
+                            new Dictionary<string, string> { ["userRole"] = "charger_owner" }
                         );
                         // SignalR Real-time
                         await _signalRService.SendPaymentCompletedAsync(process.Id, process.ChargerOwnerId, new
@@ -582,7 +586,8 @@ namespace Voltyks.Core.DTOs.Processes
                         $"{whoStarted} started the process.",
                         request.Id,
                         "Process_Started",
-                        ct
+                        ct,
+                        new Dictionary<string, string> { ["userRole"] = isChargerOwner ? "vehicle_owner" : "charger_owner" }
                     );
                     // SignalR Real-time
                     await _signalRService.SendProcessStartedAsync(process.Id, receiverId, new
@@ -889,6 +894,11 @@ namespace Voltyks.Core.DTOs.Processes
 
             var relatedRequestId = process.ChargerRequestId;
 
+            var ratingExtraData = new Dictionary<string, string>
+            {
+                ["userRole"] = receiverIsChargerOwner ? "charger_owner" : "vehicle_owner"
+            };
+
             var ratingNotifDto = await SendAndPersistNotificationAsync(
                 receiverUserId: receiverUserId,
                 requestId: relatedRequestId,
@@ -897,7 +907,8 @@ namespace Voltyks.Core.DTOs.Processes
                 body: body,
                 notificationType: notificationType,
                 userTypeId: userTypeId,
-                ct: ct
+                ct: ct,
+                extraData: ratingExtraData
             );
 
             // ⬇ ارجع التقييمين من جدول Process نفسه
@@ -1125,7 +1136,7 @@ namespace Voltyks.Core.DTOs.Processes
             return new ApiResponse<object>(pagedResult, "My activities fetched", true);
         }
 
-        private async Task SendToUserAsync(string userId, string title, string body, int relatedRequestId, string notificationType, CancellationToken ct)
+        private async Task SendToUserAsync(string userId, string title, string body, int relatedRequestId, string notificationType, CancellationToken ct, Dictionary<string, string>? extraData = null)
         {
             var tokens = await _ctx.Set<DeviceToken>()
                                    .AsNoTracking()
@@ -1135,7 +1146,7 @@ namespace Voltyks.Core.DTOs.Processes
 
             foreach (var tk in tokens)
             {
-                try { await _firebase.SendNotificationAsync(tk, title, body, relatedRequestId, notificationType); }
+                try { await _firebase.SendNotificationAsync(tk, title, body, relatedRequestId, notificationType, extraData); }
                 catch (Exception ex) { _logger.LogError(ex, "Failed to send notification to token {Token}", tk); }
             }
         }
@@ -1609,7 +1620,8 @@ namespace Voltyks.Core.DTOs.Processes
                             ["processId"] = processId.ToString(),
                             ["requestId"] = process.ChargerRequestId.ToString(),
                             ["terminationReason"] = terminationReason,
-                            ["terminatedAt"] = DateTime.UtcNow.ToString("o")
+                            ["terminatedAt"] = DateTime.UtcNow.ToString("o"),
+                            ["userRole"] = uid == process.VehicleOwnerId ? "vehicle_owner" : "charger_owner"
                         };
 
                         foreach (var token in user.DeviceTokens)

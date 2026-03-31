@@ -163,7 +163,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     title: title,
                     body: body,
                     notificationType: notificationType,
-                    userTypeId: userTypeId
+                    userTypeId: userTypeId,
+                    extraData: new Dictionary<string, string> { ["userRole"] = "charger_owner" }
                 );
 
                 // 4) SignalR Real-time notification
@@ -214,7 +215,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                 var timerData = new Dictionary<string, string>
                 {
                     ["timerStartedAt"] = request.RespondedAt?.ToString("o") ?? "",
-                    ["timerDurationMinutes"] = "10"
+                    ["timerDurationMinutes"] = "10",
+                    ["userRole"] = "vehicle_owner"
                 };
 
                 var result = await SendAndPersistNotificationAsync(
@@ -305,7 +307,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                         title: title,
                         body: body,
                         notificationType: notificationType,
-                        userTypeId: 2 // VehicleOwner
+                        userTypeId: 2, // VehicleOwner
+                        extraData: new Dictionary<string, string> { ["userRole"] = "vehicle_owner" }
                     );
 
                     // SignalR Real-time notification
@@ -414,7 +417,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     title: title,
                     body: body,
                     notificationType: notificationType,
-                    userTypeId: 2 // VehicleOwner
+                    userTypeId: 2, // VehicleOwner
+                    extraData: new Dictionary<string, string> { ["userRole"] = "vehicle_owner" }
                 );
 
                 // SignalR Real-time notification
@@ -497,7 +501,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     title: title,
                     body: body,
                     notificationType: notificationType,
-                    userTypeId: recipientUserTypeId
+                    userTypeId: recipientUserTypeId,
+                    extraData: new Dictionary<string, string> { ["userRole"] = isChargerOwner ? "vehicle_owner" : "charger_owner" }
                 );
 
                 // SignalR Real-time notification

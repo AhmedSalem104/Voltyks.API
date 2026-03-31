@@ -144,6 +144,29 @@ namespace Voltyks.Persistence
                 }
 
 
+                //// Seeding For ComplaintCategories From Json File
+                if (!_context.ComplaintCategories.Any())
+                {
+                    try
+                    {
+                        var seedPath = Path.Combine(seedingBasePath, "complaintCategories_seed.json");
+                        var data = await File.ReadAllTextAsync(seedPath);
+                        var categories = JsonSerializer.Deserialize<List<ComplaintCategory>>(data, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                        if (categories is not null && categories.Any())
+                        {
+                            foreach (var cat in categories)
+                                cat.CreatedAt = DateTime.UtcNow;
+
+                            await _context.ComplaintCategories.AddRangeAsync(categories);
+                            await _context.SaveChangesAsync();
+                        }
+                    }
+                    catch { /* Skip seeding if file not found */ }
+                }
+
                 //// Seeding For TermsDocuments From Json File
                 if (!_context.termsDocuments.Any())
                 {
@@ -309,6 +332,44 @@ namespace Voltyks.Persistence
                 if (items is not null && items.Any() && !await _context.Capacities.AnyAsync())
                 {
                     await _context.Capacities.AddRangeAsync(items);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch { }
+
+            // Force Seed ComplaintCategories
+            try
+            {
+                var seedPath = Path.Combine(seedingBasePath, "complaintCategories_seed.json");
+                var data = await File.ReadAllTextAsync(seedPath);
+                var items = JsonSerializer.Deserialize<List<ComplaintCategory>>(data, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                if (items is not null && items.Any())
+                {
+                    var existingNames = await _context.ComplaintCategories.Select(c => c.Name).ToListAsync();
+                    var newItems = items.Where(c => !existingNames.Contains(c.Name)).ToList();
+                    if (newItems.Any())
+                    {
+                        foreach (var cat in newItems)
+                            cat.CreatedAt = DateTime.UtcNow;
+
+                        await _context.ComplaintCategories.AddRangeAsync(newItems);
+                        await _context.SaveChangesAsync();
+                    }
+
+                    // Update descriptions for existing categories that have empty descriptions
+                    foreach (var item in items)
+                    {
+                        var existing = await _context.ComplaintCategories
+                            .FirstOrDefaultAsync(c => c.Name == item.Name && string.IsNullOrWhiteSpace(c.Description));
+                        if (existing != null)
+                        {
+                            existing.Description = item.Description;
+                            existing.UpdatedAt = DateTime.UtcNow;
+                        }
+                    }
                     await _context.SaveChangesAsync();
                 }
             }

@@ -166,7 +166,8 @@ namespace Voltyks.Application.Services.UserReport
             {
                 ["reportId"] = report.Id.ToString(),
                 ["reporterId"] = user.Id,
-                ["reporterName"] = reporterName
+                ["reporterName"] = reporterName,
+                ["userRole"] = isReporterVehicleOwner ? "charger_owner" : "vehicle_owner"
             };
 
             var notifDto = await SendAndPersistNotificationAsync(

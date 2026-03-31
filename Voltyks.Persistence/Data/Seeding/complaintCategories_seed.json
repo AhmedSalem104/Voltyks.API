@@ -1,0 +1,22 @@
+[
+  {
+    "Name": "Need to understand something",
+    "Description": "User needs help understanding app features, pricing, how charging works, or general FAQ-type questions."
+  },
+  {
+    "Name": "Problem with my wallet",
+    "Description": "Issues related to wallet balance, deposits, withdrawals, incorrect charges, or payment transaction failures."
+  },
+  {
+    "Name": "Need to report a problem",
+    "Description": "User wants to report a bug, app crash, technical issue, or unexpected behavior in the application."
+  },
+  {
+    "Name": "Problem with my last activity",
+    "Description": "Issues with a recent charging session such as incorrect billing, incomplete process, wrong rating, or dispute with the other party."
+  },
+  {
+    "Name": "Problem with something else",
+    "Description": "Any issue that does not fit into the other categories, including account problems, suggestions, or general feedback."
+  }
+]

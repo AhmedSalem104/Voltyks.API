@@ -104,7 +104,7 @@ namespace Voltyks.Application.Services.Background
 
         private async Task ApplyDefaultRatingsAsync(int processId, CancellationToken ct)
         {
-            var notificationTargets = new List<(string UserId, int ProcessId, int RequestId)>();
+            var notificationTargets = new List<(string UserId, int ProcessId, int RequestId, string UserRole)>();
 
             using var tx = await _ctx.Database.BeginTransactionAsync(ct);
             try
@@ -162,7 +162,7 @@ namespace Voltyks.Application.Services.Background
                         vo.RatingCount += 1;
                     }
 
-                    notificationTargets.Add((process.VehicleOwnerId, process.Id, process.ChargerRequestId));
+                    notificationTargets.Add((process.VehicleOwnerId, process.Id, process.ChargerRequestId, "vehicle_owner"));
                 }
 
                 // ChargerOwnerRating = rating given by VO to CO.
@@ -186,7 +186,7 @@ namespace Voltyks.Application.Services.Background
                         co.RatingCount += 1;
                     }
 
-                    notificationTargets.Add((process.ChargerOwnerId, process.Id, process.ChargerRequestId));
+                    notificationTargets.Add((process.ChargerOwnerId, process.Id, process.ChargerRequestId, "charger_owner"));
                 }
 
                 process.DefaultRatingApplied = true;
@@ -307,7 +307,7 @@ namespace Voltyks.Application.Services.Background
         }
 
         private async Task SendDefaultRatingNotificationsAsync(
-            List<(string UserId, int ProcessId, int RequestId)> targets,
+            List<(string UserId, int ProcessId, int RequestId, string UserRole)> targets,
             CancellationToken ct)
         {
             if (targets.Count == 0)
@@ -325,7 +325,7 @@ namespace Voltyks.Application.Services.Background
                 return;
             }
 
-            foreach (var (userId, processId, requestId) in targets)
+            foreach (var (userId, processId, requestId, userRole) in targets)
             {
                 try
                 {
@@ -343,7 +343,8 @@ namespace Voltyks.Application.Services.Background
                         ["processId"] = processId.ToString(),
                         ["requestId"] = requestId.ToString(),
                         ["NotificationType"] = "DefaultRating_Applied",
-                        ["defaultRating"] = DefaultRating.ToString("0.#")
+                        ["defaultRating"] = DefaultRating.ToString("0.#"),
+                        ["userRole"] = userRole
                     };
 
                     foreach (var token in tokens)
