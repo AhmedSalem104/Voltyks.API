@@ -79,6 +79,46 @@ namespace Voltyks.Application.Services.AppSettings
             return new ApiResponse<bool>(true, message, true);
         }
 
+        public async Task<bool> IsAdminsModeActivatedAsync(CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+            return settings.AdminsModeActivated;
+        }
+
+        public async Task<ApiResponse<object>> GetAdminsModeStatusAsync(CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+
+            var data = new
+            {
+                adminsModeActivated = settings.AdminsModeActivated,
+                registrationEnabled = !settings.AdminsModeActivated,
+                message = settings.AdminsModeActivated
+                    ? "System is in admin-only mode. New registrations are disabled."
+                    : "Registration is open for new users."
+            };
+
+            return new ApiResponse<object>(data, "Success", true);
+        }
+
+        public async Task<ApiResponse<bool>> SetAdminsModeAsync(bool activated, string adminId, CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+
+            settings.AdminsModeActivated = activated;
+            settings.UpdatedBy = adminId;
+            settings.UpdatedAt = DateTime.UtcNow;
+
+            _context.AppSettings.Update(settings);
+            await _context.SaveChangesAsync(ct);
+
+            var message = activated
+                ? "Admins mode activated — new registrations are now disabled"
+                : "Admins mode deactivated — registration is now open";
+
+            return new ApiResponse<bool>(true, message, true);
+        }
+
         public async Task<ApiResponse<int>> ActivateAllInactiveChargersAsync(CancellationToken ct = default)
         {
             var inactiveChargers = await _context.Chargers

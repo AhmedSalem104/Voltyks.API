@@ -33,6 +33,7 @@ using Newtonsoft.Json.Linq;
 using System.Net.Http.Headers;
 using static System.Net.WebRequestMethods;
 using Voltyks.Application.Interfaces.SignalR;
+using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Core.Enums;
 using Voltyks.Application.Utilities;
 
@@ -48,6 +49,7 @@ namespace Voltyks.Application.Services.Auth
         , VoltyksDbContext context
         , IVehicleService _vehicleService
         , ISignalRService signalRService
+        , IAppSettingsService appSettingsService
 
         ) : IAuthService
     {
@@ -217,6 +219,19 @@ namespace Voltyks.Application.Services.Auth
         }
         public async Task<ApiResponse<UserRegisterationResultDto>> RegisterAsync(RegisterDTO model)
         {
+            // Check if registration is disabled (admins-only mode)
+            var adminsModeActivated = await appSettingsService.IsAdminsModeActivatedAsync();
+            if (adminsModeActivated)
+            {
+                return new ApiResponse<UserRegisterationResultDto>
+                {
+                    Status = false,
+                    Message = "Registration is currently disabled. The system is in admin-only mode.",
+                    Data = null,
+                    Errors = new List<string> { "ADMINS_MODE_ACTIVE" }
+                };
+            }
+
             var validationContext = new ValidationContext(model);
             var validationResults = new List<ValidationResult>();
             bool isValid = Validator.TryValidateObject(model, validationContext, validationResults, true);

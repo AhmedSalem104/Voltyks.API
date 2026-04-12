@@ -70,7 +70,7 @@ namespace Voltyks.Application.ServicesManager
     ILogger<SmsEgyptService> smsLogger) : IServiceManager
     {
 
-        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService);
+        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService, appSettingsService);
         public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager, smsLogger);
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);

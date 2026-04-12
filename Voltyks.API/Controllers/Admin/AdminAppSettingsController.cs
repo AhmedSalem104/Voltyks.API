@@ -39,5 +39,20 @@ namespace Voltyks.API.Controllers.Admin
             var result = await _appSettingsService.ActivateAllInactiveChargersAsync(ct);
             return Ok(result);
         }
+
+        [HttpGet("admins-mode")]
+        public async Task<IActionResult> GetAdminsMode(CancellationToken ct)
+        {
+            var result = await _appSettingsService.GetAdminsModeStatusAsync(ct);
+            return Ok(result);
+        }
+
+        [HttpPatch("admins-mode")]
+        public async Task<IActionResult> SetAdminsMode([FromBody] SetAdminsModeDto dto, CancellationToken ct)
+        {
+            var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var result = await _appSettingsService.SetAdminsModeAsync(dto.Activated, adminId, ct);
+            return Ok(result);
+        }
     }
 }

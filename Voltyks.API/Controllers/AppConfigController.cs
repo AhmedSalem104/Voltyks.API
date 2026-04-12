@@ -64,5 +64,16 @@ namespace Voltyks.API.Controllers
             var result = await _appSettingsService.GetChargingModeStatusAsync(ct);
             return Ok(result);
         }
+
+        /// <summary>
+        /// GET /api/v1/app-config/registration-status
+        /// Public endpoint — frontend uses this to show/hide the registration link
+        /// </summary>
+        [HttpGet("registration-status")]
+        public async Task<IActionResult> GetRegistrationStatus(CancellationToken ct = default)
+        {
+            var result = await _appSettingsService.GetAdminsModeStatusAsync(ct);
+            return Ok(result);
+        }
     }
 }
