@@ -61,6 +61,9 @@ namespace Voltyks.Persistence.Data
         public DbSet<ComplaintCategory> ComplaintCategories { get; set; }
         public DbSet<UserGeneralComplaint> UserGeneralComplaints { get; set; }
 
+        // Vehicle Addition Requests
+        public DbSet<VehicleAdditionRequest> VehicleAdditionRequests { get; set; }
+
         // Wallet Transactions
         public DbSet<WalletTransaction> WalletTransactions { get; set; }
 

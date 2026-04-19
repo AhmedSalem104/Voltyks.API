@@ -51,6 +51,8 @@ using Voltyks.Application.Services.ImageUpload;
 using Voltyks.API.Services;
 using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Services.AppSettings;
+using Voltyks.Application.Interfaces.VehicleAdditionRequest;
+using Voltyks.Application.Services.VehicleAdditionRequest;
 using Voltyks.Application.Services.Background;
 using Voltyks.Application.Services.Background.Backup;
 using Voltyks.Application.Interfaces.Processes;
@@ -427,6 +429,9 @@ namespace Voltyks.API.Extentions
 
             // App Settings Service
             services.AddScoped<IAppSettingsService, AppSettingsService>();
+
+            // Vehicle Addition Requests (user-facing)
+            services.AddScoped<IVehicleAdditionRequestService, VehicleAdditionRequestService>();
 
             services.AddHttpClient("paymob"); // تقدر تضيف BaseAddress لو تحب
             services.AddSingleton<IPaymobAuthTokenProvider, PaymobAuthTokenProviderRedis>();

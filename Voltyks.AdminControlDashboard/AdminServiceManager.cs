@@ -8,6 +8,7 @@ using Voltyks.AdminControlDashboard.Services;
 using Voltyks.AdminControlDashboard.Services.Complaints;
 using Voltyks.AdminControlDashboard.Services.Notifications;
 using Voltyks.Application.Interfaces.Redis;
+using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Infrastructure.UnitOfWork;
@@ -26,7 +27,8 @@ namespace Voltyks.AdminControlDashboard
             IServiceManager serviceManager,
             UserManager<AppUser> userManager,
             ISmsEgyptService smsEgyptService,
-            IRedisService redisService)
+            IRedisService redisService,
+            ISignalRService signalRService)
         {
             AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor, userManager, smsEgyptService, redisService);
             AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context, httpContextAccessor);
@@ -42,6 +44,7 @@ namespace Voltyks.AdminControlDashboard
             AdminCapacityService = new AdminCapacityService(context);
             AdminNotificationsService = new AdminNotificationsService(context);
             AdminStoreService = new AdminStoreService(context);
+            AdminVehicleAdditionRequestsService = new AdminVehicleAdditionRequestsService(context, signalRService);
         }
 
         public IAdminUsersService AdminUsersService { get; }
@@ -58,5 +61,6 @@ namespace Voltyks.AdminControlDashboard
         public IAdminCapacityService AdminCapacityService { get; }
         public IAdminNotificationsService AdminNotificationsService { get; }
         public IAdminStoreService AdminStoreService { get; }
+        public IAdminVehicleAdditionRequestsService AdminVehicleAdditionRequestsService { get; }
     }
 }

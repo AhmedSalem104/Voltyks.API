@@ -25,5 +25,9 @@ namespace Voltyks.Core.Enums
         public const string Admin_Report_Created = "Admin_Report_Created";
         public const string Admin_Complaint_Created = "Admin_Complaint_Created";
         public const string Admin_Reservation_Created = "Admin_Reservation_Created";
+
+        // Vehicle Addition Requests
+        public const string VehicleAdditionRequest_Accepted = "VehicleAdditionRequest_Accepted";
+        public const string VehicleAdditionRequest_Declined = "VehicleAdditionRequest_Declined";
     }
 }
