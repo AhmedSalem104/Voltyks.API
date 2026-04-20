@@ -45,18 +45,16 @@ namespace Voltyks.Application.Services.VehicleAdditionRequest
                         "This vehicle already exists in our system. Please check the vehicles list again.",
                         status: false);
 
-                // Prevent duplicate pending request from same user
-                var duplicatePending = await _context.VehicleAdditionRequests
+                // Prevent user from having more than one pending request at a time
+                var hasPending = await _context.VehicleAdditionRequests
                     .AnyAsync(r =>
                         r.UserId == userId &&
-                        r.Status == VehicleAdditionRequestStatuses.Pending &&
-                        r.BrandName.ToLower() == brandName.ToLower() &&
-                        r.ModelName.ToLower() == modelName.ToLower(),
+                        r.Status == VehicleAdditionRequestStatuses.Pending,
                         ct);
 
-                if (duplicatePending)
+                if (hasPending)
                     return new ApiResponse<UserVehicleAdditionRequestDto>(
-                        "You already have a pending request for this vehicle.",
+                        "You already have a pending vehicle addition request. Please wait for admin review before submitting another one.",
                         status: false);
 
                 var request = new VehicleAdditionRequestEntity
