@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -14,7 +15,7 @@ namespace Voltyks.Persistence.Entities.Main
 
         [Column(TypeName = "nvarchar(50)")]
         public string Plate { get; set; }
-        public DateTime CreationDate { get; set; } = DateTime.Now;
+        public DateTime CreationDate { get; set; } = DateTimeHelper.GetEgyptTime();
         public int Year { get; set; }
         public bool IsDeleted { get; set; } = false; 
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Paymob
 {
@@ -17,7 +18,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public int? HttpStatus { get; set; }
         public string? HeadersJson { get; set; }
         public string RawPayload { get; set; } = default!;
-        public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
+        public DateTime ReceivedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public bool IsValid { get; set; }                              
         public long? MerchantId { get; set; }
 

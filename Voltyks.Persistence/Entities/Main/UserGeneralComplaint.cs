@@ -1,4 +1,5 @@
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -7,7 +8,7 @@ namespace Voltyks.Persistence.Entities.Main
         public string UserId { get; set; } = default!;
         public int CategoryId { get; set; }
         public string Content { get; set; } = default!;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public bool IsResolved { get; set; } = false;
 
         // Navigation

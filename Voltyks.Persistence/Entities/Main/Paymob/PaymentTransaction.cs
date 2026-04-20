@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Paymob
 {
@@ -22,7 +23,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public string? GatewayResponseMessage { get; set; }
         public string? PaymentMethodMasked { get; set; }                  // لا تخزن PAN/CVV
         public string? CardBrand { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public DateTime? UpdatedAt { get; set; }
         public bool HmacVerified { get; set; }                           // تحقق من صحة HMAC
         public PaymentOrder Order { get; set; } = default!;

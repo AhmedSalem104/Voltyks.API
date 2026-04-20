@@ -1,5 +1,6 @@
 using System;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Store
 {
@@ -27,8 +28,8 @@ namespace Voltyks.Persistence.Entities.Main.Store
         // Admin
         public string? AdminNotes { get; set; }
         public DateTime? ContactedAt { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
+        public DateTime UpdatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
 
         // Navigation
         public AppUser? User { get; set; }

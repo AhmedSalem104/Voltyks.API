@@ -1,3 +1,5 @@
+using Voltyks.Persistence.Utilities;
+
 namespace Voltyks.Persistence.Entities.Main.Paymob
 {
     public class CardTokenWebhookLog : BaseEntity<int>
@@ -60,7 +62,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         /// <summary>
         /// When webhook was received
         /// </summary>
-        public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
+        public DateTime ReceivedAt { get; set; } = DateTimeHelper.GetEgyptTime();
 
         /// <summary>
         /// When processing completed

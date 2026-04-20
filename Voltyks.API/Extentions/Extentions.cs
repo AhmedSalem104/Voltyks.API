@@ -261,6 +261,11 @@ namespace Voltyks.API.Extentions
                 {
                     // Enable proper Unicode/Arabic character encoding in JSON responses
                     options.JsonSerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+
+                    // Serialize DateTime values with the Egypt UTC offset so clients
+                    // never misinterpret server-stored (Egypt-local) timestamps as UTC.
+                    options.JsonSerializerOptions.Converters.Add(new Voltyks.API.Converters.EgyptDateTimeJsonConverter());
+                    options.JsonSerializerOptions.Converters.Add(new Voltyks.API.Converters.EgyptNullableDateTimeJsonConverter());
                 });
             return services;
         }

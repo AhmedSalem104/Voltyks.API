@@ -11,6 +11,7 @@ using Voltyks.Core.Enums;
 using Voltyks.Core.Localization;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Main;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.AdminControlDashboard.Services
 {
@@ -376,7 +377,7 @@ namespace Voltyks.AdminControlDashboard.Services
 
                 // Update request status
                 request.Status = VehicleAdditionRequestStatuses.Accepted;
-                request.UpdatedAt = DateTime.UtcNow;
+                request.UpdatedAt = DateTimeHelper.GetEgyptTime();
                 request.ProcessedBy = adminId;
                 await _context.SaveChangesAsync(ct);
 
@@ -423,7 +424,7 @@ namespace Voltyks.AdminControlDashboard.Services
                         $"Request is already {request.Status}, cannot decline it.", status: false);
 
                 request.Status = VehicleAdditionRequestStatuses.Declined;
-                request.UpdatedAt = DateTime.UtcNow;
+                request.UpdatedAt = DateTimeHelper.GetEgyptTime();
                 request.ProcessedBy = adminId;
                 await _context.SaveChangesAsync(ct);
 
@@ -466,7 +467,7 @@ namespace Voltyks.AdminControlDashboard.Services
                 UserTypeId = 2, // VehicleOwner
                 IsAdminNotification = false,
                 IsRead = false,
-                SentAt = DateTime.UtcNow,
+                SentAt = DateTimeHelper.GetEgyptTime(),
                 RelatedRequestId = null
             };
 

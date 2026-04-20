@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Paymob
 {
@@ -14,7 +15,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public long AmountCents { get; set; }
         public string Currency { get; set; } = "EGP";
         public string Status { get; set; } = "Pending";
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public DateTime? UpdatedAt { get; set; }
 
         public string? LastPaymentKey { get; set; }

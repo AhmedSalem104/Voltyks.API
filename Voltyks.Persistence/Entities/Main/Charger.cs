@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -25,7 +26,7 @@ namespace Voltyks.Persistence.Entities.Main
         public bool? Adaptor { get; set; }
         public double AverageRating { get; set; }
         public int RatingCount { get; set; }
-        public DateTime DateAdded { get; set; } = DateTime.UtcNow;
+        public DateTime DateAdded { get; set; } = DateTimeHelper.GetEgyptTime();
 
 
         public ICollection<ChargingRequest> ChargingRequests { get; set; }

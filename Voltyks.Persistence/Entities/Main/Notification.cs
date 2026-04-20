@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -15,7 +16,7 @@ namespace Voltyks.Persistence.Entities.Main
         public string Title { get; set; }
         public string Body { get; set; }
         public bool IsRead { get; set; } = false;
-        public DateTime SentAt { get; set; } = DateTime.UtcNow;
+        public DateTime SentAt { get; set; } = DateTimeHelper.GetEgyptTime();
 
         public int? UserTypeId { get; set; }
         public UserType? UserType { get; set; }

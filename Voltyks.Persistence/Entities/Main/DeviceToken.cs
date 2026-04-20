@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -14,7 +15,7 @@ namespace Voltyks.Persistence.Entities.Main
         public AppUser User { get; set; }
         public string RoleContext { get; set; } = null!; // <-- New Field
         public string Token { get; set; }
-        public DateTime RegisteredAt { get; set; } = DateTime.UtcNow;
+        public DateTime RegisteredAt { get; set; } = DateTimeHelper.GetEgyptTime();
     }
 
 }

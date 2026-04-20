@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -13,7 +14,7 @@ namespace Voltyks.Persistence.Entities.Main
         public string RaterUserId { get; set; } = default!;
         public string RateeUserId { get; set; } = default!;
         public double Stars { get; set; } // 1..5
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
     }
 
 }

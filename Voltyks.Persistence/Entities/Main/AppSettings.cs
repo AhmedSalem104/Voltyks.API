@@ -1,3 +1,5 @@
+using Voltyks.Persistence.Utilities;
+
 namespace Voltyks.Persistence.Entities.Main
 {
     public class AppSettings : BaseEntity<int>
@@ -6,6 +8,6 @@ namespace Voltyks.Persistence.Entities.Main
         public DateTime? ChargingModeEnabledAt { get; set; }
         public bool AdminsModeActivated { get; set; } = false;
         public string? UpdatedBy { get; set; }
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Paymob
 {
@@ -15,7 +16,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public string Status { get; set; } = "Requested";
         public string? GatewayResponseCode { get; set; }
         public string? GatewayResponseMessage { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public DateTime? UpdatedAt { get; set; }
     }
 }

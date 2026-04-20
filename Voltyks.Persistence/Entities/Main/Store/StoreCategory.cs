@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Store
 {
@@ -11,8 +12,8 @@ namespace Voltyks.Persistence.Entities.Main.Store
         public int SortOrder { get; set; } = 0;
         public string? Icon { get; set; }
         public string? PlaceholderMessage { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
+        public DateTime UpdatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public bool IsDeleted { get; set; } = false;
         public DateTime? DeletedAt { get; set; }
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -21,7 +22,7 @@ namespace Voltyks.Persistence.Entities.Main
         public Charger Charger { get; set; }
 
         public string Status { get; set; } // pending / accepted / rejected / confirmed / expired
-        public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
+        public DateTime RequestedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public DateTime? RespondedAt { get; set; }
         public DateTime? ConfirmedAt { get; set; }
 

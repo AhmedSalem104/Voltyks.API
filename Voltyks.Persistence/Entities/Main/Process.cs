@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main
 {
@@ -40,7 +41,7 @@ namespace Voltyks.Persistence.Entities.Main
         /// </summary>
         public bool DefaultRatingApplied { get; set; }
 
-        public DateTime DateCreated { get; set; } = DateTime.UtcNow;
+        public DateTime DateCreated { get; set; } = DateTimeHelper.GetEgyptTime();
         public DateTime? DateCompleted { get; set; }
 
         // navs (اختياري)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Store
 {
@@ -15,8 +16,8 @@ namespace Voltyks.Persistence.Entities.Main.Store
         public string? SpecificationsJson { get; set; } // JSON object
         public string Status { get; set; } = "active"; // active, out_of_stock, hidden
         public bool IsReservable { get; set; } = true;
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
+        public DateTime UpdatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public bool IsDeleted { get; set; } = false;
         public DateTime? DeletedAt { get; set; }
 

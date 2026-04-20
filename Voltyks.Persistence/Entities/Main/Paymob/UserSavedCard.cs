@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Persistence.Entities.Main.Paymob
 {
@@ -16,7 +17,7 @@ namespace Voltyks.Persistence.Entities.Main.Paymob
         public int? ExpiryYear { get; set; }
         public string? PaymobTokenId { get; set; }
         public bool IsDefault { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
         public long? MerchantId { get; set; }
 
     }
