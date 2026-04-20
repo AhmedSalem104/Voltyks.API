@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.AdminControlDashboard;
+using Voltyks.AdminControlDashboard.Dtos.VehicleAdditionRequests;
 using Voltyks.Core.DTOs.Common;
 
 namespace Voltyks.API.Controllers.Admin
@@ -47,15 +48,33 @@ namespace Voltyks.API.Controllers.Admin
         }
 
         /// <summary>
+        /// GET /api/admin/vehicle-addition-requests/{id}/accept-preview
+        /// Returns smart suggestions (similar brands/models + parsed capacity)
+        /// so the admin can verify and clean the data before accepting.
+        /// </summary>
+        [HttpGet("{id}/accept-preview")]
+        public async Task<IActionResult> GetAcceptPreview(int id, CancellationToken ct = default)
+        {
+            var result = await _adminServiceManager.AdminVehicleAdditionRequestsService
+                .GetAcceptPreviewAsync(id, ct);
+            return Ok(result);
+        }
+
+        /// <summary>
         /// POST /api/admin/vehicle-addition-requests/{id}/accept
         /// Accept request: adds Brand (if new) + Model, notifies user.
+        /// Body is optional; if provided the admin can override brand/model/capacity
+        /// or link to an existing brand via UseExistingBrandId.
         /// </summary>
         [HttpPost("{id}/accept")]
-        public async Task<IActionResult> Accept(int id, CancellationToken ct = default)
+        public async Task<IActionResult> Accept(
+            int id,
+            [FromBody] AcceptVehicleAdditionRequestDto? body = null,
+            CancellationToken ct = default)
         {
             var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown";
             var result = await _adminServiceManager.AdminVehicleAdditionRequestsService
-                .AcceptAsync(id, adminId, ct);
+                .AcceptAsync(id, adminId, body, ct);
             return Ok(result);
         }
 

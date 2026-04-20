@@ -11,7 +11,9 @@ namespace Voltyks.AdminControlDashboard.Interfaces
 
         Task<ApiResponse<AdminVehicleAdditionRequestDto>> GetByIdAsync(int id, CancellationToken ct = default);
 
-        Task<ApiResponse<object>> AcceptAsync(int id, string adminId, CancellationToken ct = default);
+        Task<ApiResponse<AcceptPreviewDto>> GetAcceptPreviewAsync(int id, CancellationToken ct = default);
+
+        Task<ApiResponse<object>> AcceptAsync(int id, string adminId, AcceptVehicleAdditionRequestDto? overrides, CancellationToken ct = default);
 
         Task<ApiResponse<object>> DeclineAsync(int id, string adminId, CancellationToken ct = default);
     }

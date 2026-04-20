@@ -121,7 +121,172 @@ namespace Voltyks.AdminControlDashboard.Services
             }
         }
 
-        public async Task<ApiResponse<object>> AcceptAsync(int id, string adminId, CancellationToken ct = default)
+        public async Task<ApiResponse<AcceptPreviewDto>> GetAcceptPreviewAsync(int id, CancellationToken ct = default)
+        {
+            try
+            {
+                var request = await _context.VehicleAdditionRequests
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(r => r.Id == id, ct);
+
+                if (request is null)
+                    return new ApiResponse<AcceptPreviewDto>("Request not found", status: false);
+
+                var dto = new AcceptPreviewDto
+                {
+                    Original = new OriginalSubmissionDto
+                    {
+                        BrandName = request.BrandName,
+                        ModelName = request.ModelName,
+                        Capacity = request.Capacity
+                    }
+                };
+
+                var warnings = new List<string>();
+
+                // Parse capacity
+                var match = Regex.Match(request.Capacity ?? "", @"[\d]+(\.[\d]+)?");
+                if (match.Success && double.TryParse(match.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedCapacity))
+                {
+                    dto.ParsedCapacity = parsedCapacity;
+                    dto.CapacityParseSuccess = true;
+                }
+                else
+                {
+                    dto.CapacityParseSuccess = false;
+                    warnings.Add($"Could not parse a numeric capacity from '{request.Capacity}'. Admin must provide a numeric value when accepting.");
+                }
+
+                // Load brands + their model counts (small table, safe in-memory)
+                var brands = await _context.Brands
+                    .AsNoTracking()
+                    .Select(b => new { b.Id, b.Name })
+                    .ToListAsync(ct);
+
+                var modelCounts = await _context.Models
+                    .AsNoTracking()
+                    .GroupBy(m => m.BrandId)
+                    .Select(g => new { BrandId = g.Key, Count = g.Count() })
+                    .ToListAsync(ct);
+
+                var countMap = modelCounts.ToDictionary(x => x.BrandId, x => x.Count);
+
+                var requestedBrand = (request.BrandName ?? "").Trim();
+
+                // Exact brand match (case-insensitive)
+                var exact = brands.FirstOrDefault(b =>
+                    string.Equals(b.Name, requestedBrand, StringComparison.OrdinalIgnoreCase));
+
+                if (exact != null)
+                {
+                    dto.ExactBrandMatch = new BrandSuggestionDto
+                    {
+                        Id = exact.Id,
+                        Name = exact.Name,
+                        Similarity = 1.0,
+                        ModelsCount = countMap.TryGetValue(exact.Id, out var c) ? c : 0
+                    };
+                }
+                else
+                {
+                    // Fuzzy suggestions (similarity >= 0.6), top 5
+                    dto.SimilarBrands = brands
+                        .Select(b => new
+                        {
+                            b.Id,
+                            b.Name,
+                            Sim = CalculateSimilarity(b.Name, requestedBrand)
+                        })
+                        .Where(x => x.Sim >= 0.6)
+                        .OrderByDescending(x => x.Sim)
+                        .Take(5)
+                        .Select(x => new BrandSuggestionDto
+                        {
+                            Id = x.Id,
+                            Name = x.Name,
+                            Similarity = Math.Round(x.Sim, 2),
+                            ModelsCount = countMap.TryGetValue(x.Id, out var c) ? c : 0
+                        })
+                        .ToList();
+
+                    if (dto.SimilarBrands.Any())
+                        warnings.Add($"Found {dto.SimilarBrands.Count} similar brand(s). User may have made a typo.");
+                }
+
+                // Model similarity — search within the matched brand (exact or top similar)
+                var brandIdsToSearch = new List<int>();
+                if (dto.ExactBrandMatch != null) brandIdsToSearch.Add(dto.ExactBrandMatch.Id);
+                brandIdsToSearch.AddRange(dto.SimilarBrands.Select(b => b.Id));
+
+                if (brandIdsToSearch.Any())
+                {
+                    var requestedModel = (request.ModelName ?? "").Trim();
+                    var candidateModels = await _context.Models
+                        .AsNoTracking()
+                        .Where(m => brandIdsToSearch.Contains(m.BrandId))
+                        .Select(m => new
+                        {
+                            m.Id,
+                            m.Name,
+                            m.BrandId,
+                            BrandName = m.Brand!.Name
+                        })
+                        .ToListAsync(ct);
+
+                    var exactModel = candidateModels.FirstOrDefault(m =>
+                        string.Equals(m.Name, requestedModel, StringComparison.OrdinalIgnoreCase));
+
+                    if (exactModel != null)
+                    {
+                        dto.ExactModelMatch = new ModelSuggestionDto
+                        {
+                            ModelId = exactModel.Id,
+                            ModelName = exactModel.Name,
+                            BrandId = exactModel.BrandId,
+                            BrandName = exactModel.BrandName,
+                            Similarity = 1.0
+                        };
+                        warnings.Add($"A model named '{exactModel.Name}' already exists under '{exactModel.BrandName}'. Accepting would create a duplicate.");
+                    }
+                    else
+                    {
+                        dto.SimilarModels = candidateModels
+                            .Select(m => new
+                            {
+                                m.Id,
+                                m.Name,
+                                m.BrandId,
+                                m.BrandName,
+                                Sim = CalculateSimilarity(m.Name, requestedModel)
+                            })
+                            .Where(x => x.Sim >= 0.6)
+                            .OrderByDescending(x => x.Sim)
+                            .Take(5)
+                            .Select(x => new ModelSuggestionDto
+                            {
+                                ModelId = x.Id,
+                                ModelName = x.Name,
+                                BrandId = x.BrandId,
+                                BrandName = x.BrandName,
+                                Similarity = Math.Round(x.Sim, 2)
+                            })
+                            .ToList();
+                    }
+                }
+
+                dto.Warnings = warnings;
+                return new ApiResponse<AcceptPreviewDto>(dto, "Preview generated", true);
+            }
+            catch (Exception ex)
+            {
+                return new ApiResponse<AcceptPreviewDto>(
+                    message: "Failed to generate preview",
+                    status: false,
+                    errors: new List<string> { ex.Message });
+            }
+        }
+
+        public async Task<ApiResponse<object>> AcceptAsync(int id, string adminId, AcceptVehicleAdditionRequestDto? overrides, CancellationToken ct = default)
         {
             using var tx = await _context.Database.BeginTransactionAsync(ct);
             try
@@ -136,41 +301,72 @@ namespace Voltyks.AdminControlDashboard.Services
                     return new ApiResponse<object>(
                         $"Request is already {request.Status}, cannot accept it.", status: false);
 
-                // Re-check Brand+Model doesn't exist (race condition guard)
-                var brandLower = request.BrandName.Trim().ToLower();
-                var modelLower = request.ModelName.Trim().ToLower();
+                // Resolve final values (admin overrides > original submission)
+                var finalBrandName = !string.IsNullOrWhiteSpace(overrides?.BrandName)
+                    ? overrides.BrandName.Trim()
+                    : request.BrandName.Trim();
 
+                var finalModelName = !string.IsNullOrWhiteSpace(overrides?.ModelName)
+                    ? overrides.ModelName.Trim()
+                    : request.ModelName.Trim();
+
+                // Resolve the Brand: existing ID wins, then override name, then original
+                Brand? brand = null;
+                if (overrides?.UseExistingBrandId.HasValue == true)
+                {
+                    brand = await _context.Brands
+                        .FirstOrDefaultAsync(b => b.Id == overrides.UseExistingBrandId.Value, ct);
+
+                    if (brand is null)
+                        return new ApiResponse<object>(
+                            $"Brand with id {overrides.UseExistingBrandId} not found.", status: false);
+                }
+                else
+                {
+                    var brandLower = finalBrandName.ToLower();
+                    brand = await _context.Brands
+                        .FirstOrDefaultAsync(b => b.Name.ToLower() == brandLower, ct);
+
+                    if (brand is null)
+                    {
+                        brand = new Brand { Name = finalBrandName };
+                        _context.Brands.Add(brand);
+                        await _context.SaveChangesAsync(ct);
+                    }
+                }
+
+                // Check model dedup against the resolved brand
+                var modelLower = finalModelName.ToLower();
                 var modelExists = await _context.Models
-                    .AnyAsync(m =>
-                        m.Name.ToLower() == modelLower &&
-                        m.Brand != null &&
-                        m.Brand.Name.ToLower() == brandLower, ct);
+                    .AnyAsync(m => m.BrandId == brand.Id && m.Name.ToLower() == modelLower, ct);
 
                 if (modelExists)
                     return new ApiResponse<object>(
-                        "Brand+Model already exists. Please decline this request.", status: false);
+                        $"Model '{finalModelName}' already exists under brand '{brand.Name}'. Please decline this request.",
+                        status: false);
 
-                // Parse capacity string -> double
-                var match = Regex.Match(request.Capacity, @"[\d]+(\.[\d]+)?");
-                if (!match.Success || !double.TryParse(match.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var capacityValue))
-                    return new ApiResponse<object>(
-                        $"Invalid capacity format: '{request.Capacity}'. Expected numeric value.", status: false);
-
-                // Find or create Brand (case-insensitive)
-                var brand = await _context.Brands
-                    .FirstOrDefaultAsync(b => b.Name.ToLower() == brandLower, ct);
-
-                if (brand is null)
+                // Resolve capacity: admin override takes precedence, otherwise parse
+                double capacityValue;
+                if (overrides?.Capacity.HasValue == true)
                 {
-                    brand = new Brand { Name = request.BrandName.Trim() };
-                    _context.Brands.Add(brand);
-                    await _context.SaveChangesAsync(ct);
+                    if (overrides.Capacity.Value <= 0)
+                        return new ApiResponse<object>(
+                            "Capacity must be greater than zero.", status: false);
+                    capacityValue = overrides.Capacity.Value;
+                }
+                else
+                {
+                    var match = Regex.Match(request.Capacity ?? "", @"[\d]+(\.[\d]+)?");
+                    if (!match.Success || !double.TryParse(match.Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out capacityValue))
+                        return new ApiResponse<object>(
+                            $"Invalid capacity format: '{request.Capacity}'. Please provide a numeric capacity in the accept payload.",
+                            status: false);
                 }
 
                 // Create Model
                 var model = new Model
                 {
-                    Name = request.ModelName.Trim(),
+                    Name = finalModelName,
                     BrandId = brand.Id,
                     Capacity = capacityValue
                 };
@@ -315,6 +511,38 @@ namespace Voltyks.AdminControlDashboard.Services
             {
                 // SignalR failure shouldn't block the accept/decline flow
             }
+        }
+
+        private static double CalculateSimilarity(string a, string b)
+        {
+            a = (a ?? "").Trim().ToLowerInvariant();
+            b = (b ?? "").Trim().ToLowerInvariant();
+            if (a.Length == 0 && b.Length == 0) return 1.0;
+            if (a == b) return 1.0;
+            int maxLen = Math.Max(a.Length, b.Length);
+            if (maxLen == 0) return 1.0;
+            int distance = LevenshteinDistance(a, b);
+            return 1.0 - (double)distance / maxLen;
+        }
+
+        private static int LevenshteinDistance(string a, string b)
+        {
+            if (a.Length == 0) return b.Length;
+            if (b.Length == 0) return a.Length;
+
+            var d = new int[a.Length + 1, b.Length + 1];
+            for (int i = 0; i <= a.Length; i++) d[i, 0] = i;
+            for (int j = 0; j <= b.Length; j++) d[0, j] = j;
+
+            for (int i = 1; i <= a.Length; i++)
+                for (int j = 1; j <= b.Length; j++)
+                {
+                    int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                    d[i, j] = Math.Min(
+                        Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
+                        d[i - 1, j - 1] + cost);
+                }
+            return d[a.Length, b.Length];
         }
     }
 }
