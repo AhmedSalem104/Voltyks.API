@@ -4,11 +4,16 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Voltyks.Core.DTOs.Common;
 
 namespace Voltyks.Core.DTOs.ChargerRequest
 {
-    public class SendChargingRequestDto
+    public class SendChargingRequestDto : ILocalizedRequest
     {
+        /// <summary>Optional language for the notification ("en"/"ar"). Defaults to "en".</summary>
+        public string? Lang { get; set; }
+
+
         [Required(ErrorMessage = "Charger ID is required")]
         [Range(1, int.MaxValue, ErrorMessage = "ChargerId must be a positive integer")]
         public int ChargerId { get; set; }

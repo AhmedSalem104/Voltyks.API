@@ -22,6 +22,7 @@
   - **FCM Push** — بيوصل حتى لو التطبيق مقفول (push على شاشة القفل)
   - **SignalR** — real-time لو المستخدم فاتح التطبيق
   - **DB Notifications** — المستخدم يشوفها في قسم Notifications في التطبيق (history)
+- **Localization:** كل الـ notifications بتدعم `en` و `ar`. شوف `Docs/NotificationsLocalizationAPI.md` للتفاصيل.
 
 ---
 

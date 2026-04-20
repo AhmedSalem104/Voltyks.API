@@ -81,13 +81,17 @@ namespace Voltyks.API.Controllers.Admin
         /// <summary>
         /// POST /api/admin/vehicle-addition-requests/{id}/decline
         /// Decline request and notify user (reason: vehicle already exists).
+        /// Body is optional; carries `lang` for the notification.
         /// </summary>
         [HttpPost("{id}/decline")]
-        public async Task<IActionResult> Decline(int id, CancellationToken ct = default)
+        public async Task<IActionResult> Decline(
+            int id,
+            [FromBody] DeclineVehicleAdditionRequestDto? body = null,
+            CancellationToken ct = default)
         {
             var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown";
             var result = await _adminServiceManager.AdminVehicleAdditionRequestsService
-                .DeclineAsync(id, adminId, ct);
+                .DeclineAsync(id, adminId, body, ct);
             return Ok(result);
         }
     }

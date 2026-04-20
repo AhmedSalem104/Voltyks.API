@@ -5,7 +5,9 @@ using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Utilities;
+using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
+using Voltyks.Core.Localization;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
@@ -228,14 +230,15 @@ namespace Voltyks.Application.Services.Background
 
                     if (user?.DeviceTokens?.Any() != true) continue;
 
+                    var (expTitle, expBody) = NotificationMessages.ProcessExpired(Languages.Default);
                     foreach (var token in user.DeviceTokens)
                     {
                         try
                         {
                             await firebaseService.SendNotificationAsync(
                                 token.Token,
-                                "Process Terminated",
-                                "The request has expired",
+                                expTitle,
+                                expBody,
                                 req.Id,
                                 NotificationTypes.Process_Terminated,
                                 extraData);

@@ -16,7 +16,9 @@ using Voltyks.Application.Utilities;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Process;
+using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
+using Voltyks.Core.Localization;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
@@ -183,8 +185,8 @@ namespace Voltyks.Core.DTOs.Processes
                 await _redisService.RemoveAsync($"complaint_last:{process.VehicleOwnerId}");
                 await _redisService.RemoveAsync($"complaint_last:{process.ChargerOwnerId}");
 
-                var title = "Process confirmation pending";
-                var body = $"Amount Charged: {process.AmountCharged:0.##} | Amount Paid: {process.AmountPaid:0.##}";
+                var lang = Languages.Normalize(dto.Lang);
+                var (title, body) = NotificationMessages.ProcessConfirmationPending(lang, process.AmountCharged, process.AmountPaid);
 
                 // extraData للـ FCM فقط
                 var extraData = new Dictionary<string, string>
@@ -332,23 +334,23 @@ namespace Voltyks.Core.DTOs.Processes
                     var reason = decision == "ended-by-report" ? "report" : "aborted";
                     var status = reason == "report" ? ProcessStatus.Disputed : ProcessStatus.Aborted;
 
-                    await TerminateProcessAsync(process.Id, status, reason, me, ct);
+                    await TerminateProcessAsync(process.Id, status, reason, me, ct, dto.Lang);
                 }
 
                 _ctx.Update(process);
                 _ctx.Update(request);
                 await _ctx.SaveChangesAsync(ct);
 
-                var title = "Process updated";
-                var body = "The vehicle owner updated process details.";
-
+                var lang = Languages.Normalize(dto.Lang);
                 var changes = new List<string>();
                 if (dto.Status != null) changes.Add($"status: {dto.Status}");
                 if (dto.EstimatedPrice != null) changes.Add($"estimated: {dto.EstimatedPrice:0.##}");
                 if (dto.AmountCharged != null) changes.Add($"charged: {dto.AmountCharged:0.##}");
                 if (dto.AmountPaid != null) changes.Add($"paid: {dto.AmountPaid:0.##}");
-                if (changes.Any())
-                    body = "Updated fields → " + string.Join(", ", changes);
+
+                var (title, body) = changes.Any()
+                    ? NotificationMessages.VehicleOwnerUpdateProcessWithFields(lang, string.Join(", ", changes))
+                    : NotificationMessages.VehicleOwnerUpdateProcess(lang);
 
                 // extraData للـ FCM فقط
                 var extraData = new Dictionary<string, string>
@@ -528,12 +530,14 @@ namespace Voltyks.Core.DTOs.Processes
                     await _ctx.SaveChangesAsync(ct);
 
                     // إشعار للطرف التاني حسب مين اتخذ القرار
+                    var langDecision = Languages.Normalize(dto.Lang);
                     if (isChargerOwner)
                     {
+                        var (cTitle, cBody) = NotificationMessages.ProcessConfirmedByCharger(langDecision);
                         await SendToUserAsync(
                             process.VehicleOwnerId,
-                            "Process confirmed",
-                            "Charger owner confirmed your session. Please submit your rating.",
+                            cTitle,
+                            cBody,
                             request.Id,
                             "ChargerOwner_ConfirmProcess",
                             ct,
@@ -549,10 +553,11 @@ namespace Voltyks.Core.DTOs.Processes
                     }
                     else // Vehicle Owner
                     {
+                        var (vTitle, vBody) = NotificationMessages.ProcessConfirmedByVehicle(langDecision);
                         await SendToUserAsync(
                             process.ChargerOwnerId,
-                            "Process confirmed",
-                            "Vehicle owner confirmed the session completion.",
+                            vTitle,
+                            vBody,
                             request.Id,
                             "VehicleOwner_ConfirmProcess",
                             ct,
@@ -579,11 +584,15 @@ namespace Voltyks.Core.DTOs.Processes
 
                     // إشعار للطرف الآخر ببدء العملية
                     var receiverId = isChargerOwner ? process.VehicleOwnerId : process.ChargerOwnerId;
-                    var whoStarted = isChargerOwner ? "Charger owner" : "Vehicle owner";
+                    var langStarted = Languages.Normalize(dto.Lang);
+                    var whoStarted = isChargerOwner
+                        ? (langStarted == Languages.Ar ? "صاحب الشاحن" : "Charger owner")
+                        : (langStarted == Languages.Ar ? "صاحب السيارة" : "Vehicle owner");
+                    var (startedTitle, startedBody) = NotificationMessages.ProcessStarted(langStarted, whoStarted);
                     await SendToUserAsync(
                         receiverId,
-                        "Process started",
-                        $"{whoStarted} started the process.",
+                        startedTitle,
+                        startedBody,
                         request.Id,
                         "Process_Started",
                         ct,
@@ -603,7 +612,7 @@ namespace Voltyks.Core.DTOs.Processes
                     var reason = decision.ToLower().Contains("report") ? "report" : "aborted";
                     var status = reason == "report" ? ProcessStatus.Disputed : ProcessStatus.Aborted;
 
-                    await TerminateProcessAsync(process.Id, status, reason, me, ct);
+                    await TerminateProcessAsync(process.Id, status, reason, me, ct, dto.Lang);
                     await _ctx.SaveChangesAsync(ct);
 
                     // SignalR Real-time to counterparty
@@ -886,8 +895,8 @@ namespace Voltyks.Core.DTOs.Processes
             bool receiverIsChargerOwner = receiverUserId == process.ChargerOwnerId;
             int userTypeId = receiverIsChargerOwner ? 1 : 2; // 1 = ChargerOwner, 2 = VehicleOwner
 
-            var title = "New rating received ⭐";
-            var body = $"You received a {dto.RatingForOther:0.#}★ rating for process #{process.Id}.";
+            var ratingLang = Languages.Normalize(dto.Lang);
+            var (title, body) = NotificationMessages.SubmitRating(ratingLang, dto.RatingForOther, process.Id);
             var notificationType = receiverIsChargerOwner
                 ? "VehicleOwner_SubmitRating"   // VO قيّم CO
                 : "ChargerOwner_SubmitRating";  // CO قيّم VO
@@ -1545,8 +1554,11 @@ namespace Voltyks.Core.DTOs.Processes
             ProcessStatus targetStatus,
             string terminationReason,
             string? actorUserId = null,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            string? lang = null)
         {
+            var resolvedLang = Languages.Normalize(lang);
+            var (terminatedTitle, terminatedBody) = NotificationMessages.ProcessTerminated(resolvedLang);
             var process = await _ctx.Set<ProcessEntity>()
                 .FirstOrDefaultAsync(p => p.Id == processId, ct);
 
@@ -1630,8 +1642,8 @@ namespace Voltyks.Core.DTOs.Processes
                             {
                                 await _firebase.SendNotificationAsync(
                                     token.Token,
-                                    "Process terminated",
-                                    GetTerminationMessage(terminationReason),
+                                    terminatedTitle,
+                                    terminatedBody,
                                     process.ChargerRequestId,
                                     NotificationTypes.Process_Terminated,
                                     extraData);

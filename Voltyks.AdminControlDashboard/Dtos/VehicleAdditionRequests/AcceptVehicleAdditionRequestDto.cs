@@ -1,11 +1,17 @@
+using Voltyks.Core.DTOs.Common;
+
 namespace Voltyks.AdminControlDashboard.Dtos.VehicleAdditionRequests
 {
     /// <summary>
     /// Optional payload for accepting a request. When null/omitted, the service
     /// uses the original submitted values. When provided, fields override them.
     /// </summary>
-    public class AcceptVehicleAdditionRequestDto
+    public class AcceptVehicleAdditionRequestDto : ILocalizedRequest
     {
+        /// <summary>Optional language for the user notification ("en"/"ar"). Defaults to "en".</summary>
+        public string? Lang { get; set; }
+
+
         /// <summary>
         /// If set, link the new model to this existing brand ID (no new brand created).
         /// Takes precedence over <see cref="BrandName"/>.

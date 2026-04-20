@@ -18,8 +18,10 @@ using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using Voltyks.Core.DTOs.Charger;
+using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
 using Voltyks.Core.DTOs.ChargerRequest;
+using Voltyks.Core.Localization;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Utilities;
@@ -158,8 +160,8 @@ namespace Voltyks.Application.Services.UserReport
                 ? NotificationTypes.Report_VehicleOwnerToChargerOwner
                 : NotificationTypes.Report_ChargerOwnerToVehicleOwner;
 
-            var title = $"{reporterName} filed a report against you";
-            var body = "Open the process to review the report details.";
+            var reportLang = Languages.Normalize(dto.Lang);
+            var (title, body) = NotificationMessages.ReportFiled(reportLang, reporterName);
 
             // data الإضافية داخل الـ push
             var extraData = new Dictionary<string, string>

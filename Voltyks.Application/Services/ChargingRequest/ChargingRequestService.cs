@@ -12,9 +12,11 @@ using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Utilities;
+using Voltyks.Core.Constants;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.Enums;
+using Voltyks.Core.Localization;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
@@ -151,8 +153,8 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 // 2) جهّز بيانات الإشعار
                 var recipientUserId = charger.UserId; // صاحب المحطة
-                var title = "New Charging Request 🚗";
-                var body = $"Driver requested to charge at your station.";
+                var lang = Languages.Normalize(dto.Lang);
+                var (title, body) = NotificationMessages.VehicleOwnerRequestCharger(lang);
                 var notificationType = NotificationTypes.VehicleOwner_RequestCharger; // ثوابت
                 var userTypeId = (int)NotificationUserType.ChargerOwner;              // 1
 
@@ -207,8 +209,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                     return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
-                var title = "Charging Request Accepted";
-                var body = $"Your request to charge at {request.Charger?.User?.FullName}'s station has been accepted.";
+                var lang = Languages.Normalize(dto.Lang);
+                var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
+                var (title, body) = NotificationMessages.ChargerOwnerAccepted(lang, stationOwnerName);
                 var notificationType = "ChargerOwner_AcceptRequest";
 
                 // Timer data للـ FCM notification
@@ -296,9 +299,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                     if (string.IsNullOrWhiteSpace(recipientUserId))
                         continue;
 
-                    var title = "Charging Request Rejected ❌";
+                    var lang = Languages.Normalize(dto.Lang);
                     var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
-                    var body = $"Your request to charge at {stationOwnerName}'s station was rejected.";
+                    var (title, body) = NotificationMessages.ChargerOwnerRejected(lang, stationOwnerName);
                     var notificationType = "ChargerOwner_RejectRequest";
 
                     var sent = await SendAndPersistNotificationAsync(
@@ -406,8 +409,9 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 // إذا تم التحقق بنجاح، إرسال الإشعار إلى الـ Vehicle Owner
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
-                var title = "Charging Request Confirmed ✅";
-                var body = $"The charger {request.Charger?.User?.FullName} confirmed the charging session for your vehicle.";
+                var lang = Languages.Normalize(dto.Lang);
+                var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
+                var (title, body) = NotificationMessages.ChargerOwnerConfirmed(lang, stationOwnerName);
                 var notificationType = NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully;
 
                 // إرسال الإشعار
@@ -466,6 +470,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 string body;
                 string notificationType;
                 int recipientUserTypeId; // 1 = ChargerOwner, 2 = VehicleOwner (المستلم)
+                var lang = Languages.Normalize(dto.Lang);
 
                 if (isChargerOwner)
                 {
@@ -475,8 +480,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     // هنا تحط منطق خصم الرسوم من صاحب الشاحن (محفظة/رصيد/الخ...)
                     await ApplyAbortFeesForChargerOwnerAsync(request, userId);
 
-                    title = "Charging session aborted";
-                    body = "The station owner aborted your charging request.";
+                    (title, body) = NotificationMessages.ChargerOwnerAborted(lang);
                     notificationType = "ChargerOwner_ProcessAborted";
                     recipientUserTypeId = 2; // VehicleOwner
                 }
@@ -485,8 +489,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     // 🔹 صاحب العربية هو اللي عمل abort → تبلغ صاحب الشاحن فقط
                     recipientUserId = chargerOwnerId;
 
-                    title = "Request Aborted ❌";
-                    body = $"The driver {request.CarOwner?.FullName} aborted the charging session at your station after payment.";
+                    var driverName = request.CarOwner?.FullName ?? "the driver";
+                    (title, body) = NotificationMessages.VehicleOwnerAbortedAfterPayment(lang, driverName);
                     notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
                     recipientUserTypeId = 1; // ChargerOwner
                 }
@@ -523,7 +527,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                         process.Id,
                         ProcessStatus.Aborted,
                         "aborted",
-                        userId);
+                        userId,
+                        lang: dto.Lang);
                     await _db.SaveChangesAsync();
                 }
 

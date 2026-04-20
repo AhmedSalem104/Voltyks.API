@@ -8,6 +8,7 @@ using Voltyks.Core.Constants;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.Enums;
+using Voltyks.Core.Localization;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Main;
 
@@ -381,12 +382,14 @@ namespace Voltyks.AdminControlDashboard.Services
 
                 await tx.CommitAsync(ct);
 
-                // Notify user (DB + SignalR, no FCM)
+                // Notify user (DB + FCM + SignalR)
+                var lang = Languages.Normalize(overrides?.Lang);
+                var (title, body) = NotificationMessages.VehicleAdditionAccepted(lang);
                 await NotifyUserAsync(
                     userId: request.UserId,
                     requestId: request.Id,
-                    title: "Request Accepted",
-                    body: "Your vehicle is now available! You can add your vehicle now with us",
+                    title: title,
+                    body: body,
                     type: NotificationTypes.VehicleAdditionRequest_Accepted,
                     ct: ct);
 
@@ -405,7 +408,7 @@ namespace Voltyks.AdminControlDashboard.Services
             }
         }
 
-        public async Task<ApiResponse<object>> DeclineAsync(int id, string adminId, CancellationToken ct = default)
+        public async Task<ApiResponse<object>> DeclineAsync(int id, string adminId, DeclineVehicleAdditionRequestDto? body, CancellationToken ct = default)
         {
             try
             {
@@ -424,12 +427,14 @@ namespace Voltyks.AdminControlDashboard.Services
                 request.ProcessedBy = adminId;
                 await _context.SaveChangesAsync(ct);
 
-                // Notify user (DB + SignalR, no FCM)
+                // Notify user (DB + FCM + SignalR)
+                var lang = Languages.Normalize(body?.Lang);
+                var (title, msgBody) = NotificationMessages.VehicleAdditionDeclined(lang);
                 await NotifyUserAsync(
                     userId: request.UserId,
                     requestId: request.Id,
-                    title: "Request Declined",
-                    body: "The vehicle you requested already exists. Please check again",
+                    title: title,
+                    body: msgBody,
                     type: NotificationTypes.VehicleAdditionRequest_Declined,
                     ct: ct);
 

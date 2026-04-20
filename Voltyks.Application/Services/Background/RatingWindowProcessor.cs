@@ -7,7 +7,9 @@ using Voltyks.Application.Utilities;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
+using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
+using Voltyks.Core.Localization;
 using ChargingRequestEntity = Voltyks.Persistence.Entities.Main.ChargingRequest;
 using ProcessEntity = Voltyks.Persistence.Entities.Main.Process;
 using UserReportEntity = Voltyks.Persistence.Entities.Main.UserReport;
@@ -347,14 +349,15 @@ namespace Voltyks.Application.Services.Background
                         ["userRole"] = userRole
                     };
 
+                    var (defaultTitle, defaultBody) = NotificationMessages.DefaultRatingApplied(Languages.Default, DefaultRating, processId);
                     foreach (var token in tokens)
                     {
                         try
                         {
                             await firebase.SendNotificationAsync(
                                 token,
-                                "Default rating applied",
-                                $"A default {DefaultRating:0.#}★ rating was applied for process #{processId}.",
+                                defaultTitle,
+                                defaultBody,
                                 requestId,
                                 "DefaultRating_Applied",
                                 extraData);
