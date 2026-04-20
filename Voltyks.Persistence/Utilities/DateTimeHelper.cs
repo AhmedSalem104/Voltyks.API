@@ -3,10 +3,13 @@ using System;
 namespace Voltyks.Persistence.Utilities
 {
     /// <summary>
-    /// Egypt timezone helper using pure arithmetic — no dependency on
-    /// TimeZoneInfo or system tzdata (which is broken on Monster ASP hosting).
-    /// Egypt uses UTC+2 in winter and UTC+3 during DST.
-    /// DST rule: last Friday of April (00:00 local) → last Thursday of October (24:00 local).
+    /// Timestamp helper — stored values are UTC across the app. The JSON
+    /// converter in the API layer handles the UTC → Egypt conversion at
+    /// serialization time, so clients still see Egypt wall-clock time with
+    /// the matching offset (+02:00 / +03:00 during DST).
+    ///
+    /// All fields we persist to the database must be UTC, otherwise any
+    /// internal comparison (<c>DateTime.UtcNow - stored</c>) breaks.
     /// </summary>
     public static class DateTimeHelper
     {
@@ -14,17 +17,18 @@ namespace Voltyks.Persistence.Utilities
         private static readonly TimeSpan DaylightOffset = TimeSpan.FromHours(3);
 
         /// <summary>
-        /// Returns the current Egypt wall-clock time.
-        /// The returned DateTime has <see cref="DateTimeKind.Unspecified"/>.
+        /// Returns <c>DateTime.UtcNow</c>. Kept under this name for
+        /// backwards compatibility — callers can continue to use
+        /// <c>DateTimeHelper.GetEgyptTime()</c> everywhere and end up
+        /// with consistent UTC-stored values. The JSON converter on the
+        /// way out is the single place that converts to Egypt time.
         /// </summary>
-        public static DateTime GetEgyptTime()
-        {
-            var utc = DateTime.UtcNow;
-            var offset = GetOffsetForUtc(utc);
-            return DateTime.SpecifyKind(utc.Add(offset), DateTimeKind.Unspecified);
-        }
+        public static DateTime GetEgyptTime() => DateTime.UtcNow;
 
-        /// <summary>Convert a UTC DateTime to Egypt wall-clock time.</summary>
+        /// <summary>
+        /// Converts a UTC DateTime to Egypt wall-clock time
+        /// (used by the JSON converter, not for persistence).
+        /// </summary>
         public static DateTime ToEgyptTime(DateTime utc)
         {
             var utcValue = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
@@ -45,8 +49,7 @@ namespace Voltyks.Persistence.Utilities
         }
 
         /// <summary>
-        /// DST starts at 00:00 Egypt (last Friday of April) = previous day 22:00 UTC.
-        /// DST ends at 24:00 Egypt DST (last Thursday of October) = same day 21:00 UTC.
+        /// Egypt DST window: last Friday of April 00:00 local → last Thursday of October 24:00 local.
         /// </summary>
         private static bool IsEgyptDstActive(DateTime utc)
         {

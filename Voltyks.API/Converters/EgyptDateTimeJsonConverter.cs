@@ -37,10 +37,18 @@ namespace Voltyks.API.Converters
 
         public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
         {
-            var offset = DateTimeHelper.GetEgyptUtcOffset(DateTime.UtcNow);
-            // The stored value already represents Egypt local time (Unspecified kind).
-            // Emit with the Egypt offset so clients treat it correctly.
-            var dto = new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Unspecified), offset);
+            // Treat stored values as UTC (that's how most of the app writes them:
+            // DateTime.UtcNow, DateTimeHelper already returns UTC-based values, and
+            // EF Core reads datetime2 columns back as Unspecified Kind).
+            // Convert to Egypt wall-clock time and emit with the matching offset
+            // so clients always receive a fully-qualified, unambiguous timestamp.
+            var utc = value.Kind == DateTimeKind.Utc
+                ? value
+                : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+
+            var egyptTime = DateTimeHelper.ToEgyptTime(utc);
+            var offset = DateTimeHelper.GetEgyptUtcOffset(utc);
+            var dto = new DateTimeOffset(DateTime.SpecifyKind(egyptTime, DateTimeKind.Unspecified), offset);
             writer.WriteStringValue(dto.ToString(Format, CultureInfo.InvariantCulture));
         }
     }
