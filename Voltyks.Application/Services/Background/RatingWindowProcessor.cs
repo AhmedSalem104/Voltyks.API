@@ -349,7 +349,13 @@ namespace Voltyks.Application.Services.Background
                         ["userRole"] = userRole
                     };
 
-                    var (defaultTitle, defaultBody) = NotificationMessages.DefaultRatingApplied(Languages.Default, DefaultRating, processId);
+                    // Use the receiver's stored preferred language
+                    var receiverLang = Languages.Normalize(
+                        await _ctx.Users.AsNoTracking()
+                            .Where(u => u.Id == userId)
+                            .Select(u => u.PreferredLanguage)
+                            .FirstOrDefaultAsync(ct));
+                    var (defaultTitle, defaultBody) = NotificationMessages.DefaultRatingApplied(receiverLang, DefaultRating, processId);
                     foreach (var token in tokens)
                     {
                         try

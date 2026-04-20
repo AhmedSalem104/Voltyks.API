@@ -383,8 +383,8 @@ namespace Voltyks.AdminControlDashboard.Services
 
                 await tx.CommitAsync(ct);
 
-                // Notify user (DB + FCM + SignalR)
-                var lang = Languages.Normalize(overrides?.Lang);
+                // Notify user (DB + FCM + SignalR) using the receiver's stored language
+                var lang = await GetUserLanguageAsync(request.UserId, ct);
                 var (title, body) = NotificationMessages.VehicleAdditionAccepted(lang);
                 await NotifyUserAsync(
                     userId: request.UserId,
@@ -428,8 +428,8 @@ namespace Voltyks.AdminControlDashboard.Services
                 request.ProcessedBy = adminId;
                 await _context.SaveChangesAsync(ct);
 
-                // Notify user (DB + FCM + SignalR)
-                var lang = Languages.Normalize(body?.Lang);
+                // Notify user (DB + FCM + SignalR) using the receiver's stored language
+                var lang = await GetUserLanguageAsync(request.UserId, ct);
                 var (title, msgBody) = NotificationMessages.VehicleAdditionDeclined(lang);
                 await NotifyUserAsync(
                     userId: request.UserId,
@@ -517,6 +517,16 @@ namespace Voltyks.AdminControlDashboard.Services
             {
                 // SignalR failure shouldn't block the accept/decline flow
             }
+        }
+
+        private async Task<string> GetUserLanguageAsync(string userId, CancellationToken ct)
+        {
+            var stored = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.PreferredLanguage)
+                .FirstOrDefaultAsync(ct);
+            return Languages.Normalize(stored);
         }
 
         private static double CalculateSimilarity(string a, string b)

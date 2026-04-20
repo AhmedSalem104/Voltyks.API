@@ -4,14 +4,11 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Voltyks.Core.DTOs.Common;
 
 namespace Voltyks.Core.DTOs.ChargerRequest
 {
-    public class SendChargingRequestDto : ILocalizedRequest
+    public class SendChargingRequestDto
     {
-        /// <summary>Optional language for the notification ("en"/"ar"). Defaults to "en".</summary>
-        public string? Lang { get; set; }
 
 
         [Required(ErrorMessage = "Charger ID is required")]

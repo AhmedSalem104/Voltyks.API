@@ -153,7 +153,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 // 2) جهّز بيانات الإشعار
                 var recipientUserId = charger.UserId; // صاحب المحطة
-                var lang = Languages.Normalize(dto.Lang);
+                var lang = await GetUserLanguageAsync(recipientUserId);
                 var (title, body) = NotificationMessages.VehicleOwnerRequestCharger(lang);
                 var notificationType = NotificationTypes.VehicleOwner_RequestCharger; // ثوابت
                 var userTypeId = (int)NotificationUserType.ChargerOwner;              // 1
@@ -209,7 +209,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     return new ApiResponse<NotificationResultDto>(null, "Charging request not found", false);
 
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
-                var lang = Languages.Normalize(dto.Lang);
+                var lang = await GetUserLanguageAsync(recipientUserId);
                 var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
                 var (title, body) = NotificationMessages.ChargerOwnerAccepted(lang, stationOwnerName);
                 var notificationType = "ChargerOwner_AcceptRequest";
@@ -299,7 +299,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     if (string.IsNullOrWhiteSpace(recipientUserId))
                         continue;
 
-                    var lang = Languages.Normalize(dto.Lang);
+                    var lang = await GetUserLanguageAsync(recipientUserId);
                     var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
                     var (title, body) = NotificationMessages.ChargerOwnerRejected(lang, stationOwnerName);
                     var notificationType = "ChargerOwner_RejectRequest";
@@ -409,7 +409,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                 // إذا تم التحقق بنجاح، إرسال الإشعار إلى الـ Vehicle Owner
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
-                var lang = Languages.Normalize(dto.Lang);
+                var lang = await GetUserLanguageAsync(recipientUserId);
                 var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
                 var (title, body) = NotificationMessages.ChargerOwnerConfirmed(lang, stationOwnerName);
                 var notificationType = NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully;
@@ -470,7 +470,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 string body;
                 string notificationType;
                 int recipientUserTypeId; // 1 = ChargerOwner, 2 = VehicleOwner (المستلم)
-                var lang = Languages.Normalize(dto.Lang);
 
                 if (isChargerOwner)
                 {
@@ -480,6 +479,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     // هنا تحط منطق خصم الرسوم من صاحب الشاحن (محفظة/رصيد/الخ...)
                     await ApplyAbortFeesForChargerOwnerAsync(request, userId);
 
+                    var lang = await GetUserLanguageAsync(recipientUserId);
                     (title, body) = NotificationMessages.ChargerOwnerAborted(lang);
                     notificationType = "ChargerOwner_ProcessAborted";
                     recipientUserTypeId = 2; // VehicleOwner
@@ -490,6 +490,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     recipientUserId = chargerOwnerId;
 
                     var driverName = request.CarOwner?.FullName ?? "the driver";
+                    var lang = await GetUserLanguageAsync(recipientUserId);
                     (title, body) = NotificationMessages.VehicleOwnerAbortedAfterPayment(lang, driverName);
                     notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
                     recipientUserTypeId = 1; // ChargerOwner
@@ -527,8 +528,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                         process.Id,
                         ProcessStatus.Aborted,
                         "aborted",
-                        userId,
-                        lang: dto.Lang);
+                        userId);
                     await _db.SaveChangesAsync();
                 }
 
@@ -1013,6 +1013,17 @@ namespace Voltyks.Application.Services.ChargingRequest
             var tokens = await _unitOfWork.GetRepository<DeviceToken, int>()
                 .GetAllAsync(t => t.UserId == userId);
             return tokens.Select(t => t.Token).ToList();
+        }
+
+        private async Task<string> GetUserLanguageAsync(string? userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId)) return Languages.Default;
+            var stored = await _db.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.PreferredLanguage)
+                .FirstOrDefaultAsync();
+            return Languages.Normalize(stored);
         }
         // RegisterDeviceTokenAsync ===> Helper Private Mehtods
         private string? GetCurrentUserId()

@@ -160,7 +160,11 @@ namespace Voltyks.Application.Services.UserReport
                 ? NotificationTypes.Report_VehicleOwnerToChargerOwner
                 : NotificationTypes.Report_ChargerOwnerToVehicleOwner;
 
-            var reportLang = Languages.Normalize(dto.Lang);
+            var reportLang = Languages.Normalize(
+                await _ctx.Users.AsNoTracking()
+                    .Where(u => u.Id == receiverUserId)
+                    .Select(u => u.PreferredLanguage)
+                    .FirstOrDefaultAsync(ct));
             var (title, body) = NotificationMessages.ReportFiled(reportLang, reporterName);
 
             // data الإضافية داخل الـ push

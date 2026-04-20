@@ -16,8 +16,9 @@ namespace Voltyks.Core.DTOs.AuthDTOs
         public string PhoneNumber { get; set; }
         public bool IsAvailable { get; set; }
         public bool IsBanned { get; set; }
-        public double Rating { get; set; } 
-        public int RatingCount { get; set; } 
+        public double Rating { get; set; }
+        public int RatingCount { get; set; }
+        public string PreferredLanguage { get; set; } = "en";
 
         public List<VehicleDto> Vehicles { get; set; }
         public List<ChargerDto> Chargers { get; set; }

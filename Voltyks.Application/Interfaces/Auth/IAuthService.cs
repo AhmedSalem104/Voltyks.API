@@ -38,6 +38,9 @@ namespace Voltyks.Application.Interfaces.Auth
 
         Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default);
 
+        Task<ApiResponse<string>> GetMyLanguageAsync(CancellationToken ct = default);
+        Task<ApiResponse<string>> UpdateMyLanguageAsync(UpdateUserLanguageDto dto, CancellationToken ct = default);
+
         Task<ApiResponse<object>> CreateGeneralComplaintAsync(CreateGeneralComplaintDto dto, CancellationToken ct = default);
         Task<ApiResponse<CanSubmitComplaintDto>> CanSubmitComplaintAsync(CancellationToken ct = default);
 

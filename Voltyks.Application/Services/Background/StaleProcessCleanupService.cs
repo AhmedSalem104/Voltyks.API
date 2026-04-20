@@ -230,7 +230,8 @@ namespace Voltyks.Application.Services.Background
 
                     if (user?.DeviceTokens?.Any() != true) continue;
 
-                    var (expTitle, expBody) = NotificationMessages.ProcessExpired(Languages.Default);
+                    // Use the receiver's stored preferred language
+                    var (expTitle, expBody) = NotificationMessages.ProcessExpired(Languages.Normalize(user.PreferredLanguage));
                     foreach (var token in user.DeviceTokens)
                     {
                         try

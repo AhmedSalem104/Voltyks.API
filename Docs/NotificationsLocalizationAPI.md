@@ -1,118 +1,158 @@
-# Notifications Localization (EN / AR)
+# Notifications Language Preference (EN / AR)
 ## Documentation for Mobile & Dashboard Teams
 
 ---
 
 ## Overview
 
-كل الـ notifications في التطبيق (FCM push + SignalR real-time + DB history) بتدعم **لغتين**:
-- **English** (`en`) — default
-- **Arabic** (`ar`)
+كل مستخدم عنده **preference محفوظة في حسابه** لغة الإشعارات (زي الـ Wallet):
+- **Default**: `"en"` لأي user جديد
+- **القيم المقبولة**: `"en"` أو `"ar"` (case-insensitive، أي قيمة تانية → `"en"`)
 
-الـ frontend بيتحكم في لغة الـ notification عن طريق field اسمه `lang` يتبعت **اختياري** في الـ body لأي endpoint بيعمل trigger لـ notification.
-
----
-
-## القواعد
-
-1. **`lang` اختياري** — لو مش مبعوت، default English.
-2. **القيم المقبولة**: `"en"` أو `"ar"` (case-insensitive). أي قيمة تانية → fallback إلى English.
-3. **لغة الـ notification = لغة الـ sender** (الـ user اللي بيعمل الـ API call). لو User A بعت request بـ `lang=ar` والإشعار رايح لـ User B، User B هيستقبل الإشعار بالعربي.
-4. **Background notifications** (زي timeout من rating window، expiry من stale cleanup) → **دايمًا English**. مفيش طريقة يتبعت معاها lang.
+الـ backend بيستخدم القيمة المخزنة على الـ **receiver** لاختيار لغة الإشعار اللي هيوصله (FCM + SignalR + DB notification).
 
 ---
 
-## Endpoints اللي بتقبل `lang`
+## الـ Flow المطلوب من الـ Frontend
 
-| Endpoint | Notification Type |
-|----------|-------------------|
-| `POST /api/ChargingRequest/sendChargingRequest` | VehicleOwner_RequestCharger |
-| `POST /api/ChargingRequest/AcceptRequest` | ChargerOwner_AcceptRequest |
-| `POST /api/ChargingRequest/RejectRequest` | ChargerOwner_RejectRequest |
-| `POST /api/ChargingRequest/ConfirmRequest` | ChargerOwner_ConfirmedProcessSuccessfully |
-| `POST /api/ChargingRequest/abortRequest` | ChargerOwner_ProcessAborted / VehicleOwner_ProcessAbortedAfterPaymentSuccessfully |
-| Processes — ConfirmByVehicleOwner | VehicleOwner_CreateProcess |
-| Processes — Update | VehicleOwner_UpdateProcess |
-| Processes — OwnerDecision | ChargerOwner_ConfirmProcess / VehicleOwner_ConfirmProcess / Process_Started / Process_Terminated |
-| Processes — SubmitRating | VehicleOwner_SubmitRating / ChargerOwner_SubmitRating |
-| `POST /api/UserReport/create` | Report_VehicleOwnerToChargerOwner / Report_ChargerOwnerToVehicleOwner |
-| `POST /api/admin/vehicle-addition-requests/{id}/accept` | VehicleAdditionRequest_Accepted |
-| `POST /api/admin/vehicle-addition-requests/{id}/decline` | VehicleAdditionRequest_Declined |
+1. **أول فتح للتطبيق لمستخدم مسجل** → ابعت الـ locale الحالية في الـ PUT endpoint.
+2. **كل ما المستخدم يغير اللغة من settings** → ابعت تاني لنفس الـ endpoint.
+3. **كل الإشعارات بعد كده** هتوصل تلقائيًا باللغة اللي اتحفظت.
+
+الـ endpoint **idempotent** — لو بعت نفس القيمة المخزنة، مفيش DB write، بس بيرجع success.
 
 ---
 
-## كيفية الاستخدام
+## Endpoints
 
-### مثال: إرسال طلب شحن بالعربي
+### 1. GET /api/auth/language
+جلب اللغة الحالية المحفوظة للمستخدم.
 
-```http
-POST /api/ChargingRequest/sendChargingRequest
-Content-Type: application/json
-Authorization: Bearer {token}
+**Headers:** `Authorization: Bearer {token}`
 
+**Response (200):**
+```json
 {
-  "chargerId": 123,
-  "kwNeeded": 30,
-  "currentBatteryPercentage": 45,
-  "latitude": 30.01,
-  "longitude": 31.2,
-  "lang": "ar"
+  "status": true,
+  "message": "Language fetched successfully",
+  "data": "en"
 }
 ```
 
-صاحب الشاحن هيستقبل:
-- **Title:** `طلب شحن جديد 🚗`
-- **Body:** `طلب سائق الشحن في محطتك.`
+---
 
-نفس الـ request بدون `"lang": "ar"` أو بـ `"lang": "en"`:
-- **Title:** `New Charging Request 🚗`
-- **Body:** `Driver requested to charge at your station.`
+### 2. PUT /api/auth/language
+تحديث اللغة المفضلة للمستخدم.
+
+**Headers:** `Authorization: Bearer {token}` + `Content-Type: application/json`
+
+**Body:**
+```json
+{
+  "language": "ar"
+}
+```
+
+**Success Response (200) — قيمة جديدة:**
+```json
+{
+  "status": true,
+  "message": "Language updated to ar",
+  "data": "ar"
+}
+```
+
+**Success Response (200) — نفس القيمة المخزنة:**
+```json
+{
+  "status": true,
+  "message": "Language already set to ar",
+  "data": "ar"
+}
+```
 
 ---
 
-## نصوص كل الـ notifications (EN / AR)
+### 3. GET /api/auth/GetProfileDetails — بقى يرجع `preferredLanguage`
 
-### Vehicle Addition Requests
-| Type | EN Title / Body | AR Title / Body |
-|------|----------------|------------------|
-| Accepted | `Request Accepted` / `Your vehicle is now available! You can add your vehicle now with us` | `تم قبول الطلب` / `سيارتك متاحة الآن! يمكنك إضافة سيارتك معنا` |
-| Declined | `Request Declined` / `The vehicle you requested already exists. Please check again` | `تم رفض الطلب` / `السيارة المطلوبة موجودة بالفعل. يرجى البحث مرة أخرى` |
-
-### Charging Request Lifecycle
-| Type | EN | AR |
-|------|----|----|
-| VehicleOwner_RequestCharger | `New Charging Request 🚗` / `Driver requested to charge at your station.` | `طلب شحن جديد 🚗` / `طلب سائق الشحن في محطتك.` |
-| ChargerOwner_AcceptRequest | `Charging Request Accepted` / `Your request to charge at {ownerName}'s station has been accepted.` | `تم قبول طلب الشحن` / `تم قبول طلبك للشحن في محطة {ownerName}.` |
-| ChargerOwner_RejectRequest | `Charging Request Rejected ❌` / `Your request to charge at {ownerName}'s station was rejected.` | `تم رفض طلب الشحن ❌` / `تم رفض طلبك للشحن في محطة {ownerName}.` |
-| ChargerOwner_ConfirmedProcessSuccessfully | `Charging Request Confirmed ✅` / `The charger {ownerName} confirmed the charging session for your vehicle.` | `تم تأكيد طلب الشحن ✅` / `أكد صاحب الشاحن {ownerName} جلسة الشحن لسيارتك.` |
-| ChargerOwner_ProcessAborted | `Charging session aborted` / `The station owner aborted your charging request.` | `تم إلغاء جلسة الشحن` / `قام صاحب المحطة بإلغاء طلب الشحن الخاص بك.` |
-| VehicleOwner_ProcessAbortedAfterPaymentSuccessfully | `Request Aborted ❌` / `The driver {driverName} aborted the charging session at your station after payment.` | `تم إلغاء الطلب ❌` / `قام السائق {driverName} بإلغاء جلسة الشحن في محطتك بعد الدفع.` |
-
-### Process Lifecycle
-| Type | EN | AR |
-|------|----|----|
-| VehicleOwner_CreateProcess | `Process confirmation pending` / `Amount Charged: X | Amount Paid: Y` | `في انتظار تأكيد العملية` / `المبلغ المحصل: X | المبلغ المدفوع: Y` |
-| VehicleOwner_UpdateProcess | `Process updated` / `The vehicle owner updated process details.` أو `Updated fields → ...` | `تم تحديث العملية` / `قام صاحب السيارة بتحديث تفاصيل العملية.` أو `الحقول المحدثة → ...` |
-| ChargerOwner_ConfirmProcess | `Process confirmed` / `Charger owner confirmed your session. Please submit your rating.` | `تم تأكيد العملية` / `أكد صاحب الشاحن جلستك. يرجى إرسال التقييم.` |
-| VehicleOwner_ConfirmProcess | `Process confirmed` / `Vehicle owner confirmed the session completion.` | `تم تأكيد العملية` / `أكد صاحب السيارة اكتمال الجلسة.` |
-| Process_Started | `Process started` / `{whoStarted} started the process.` | `بدأت العملية` / `{whoStarted} بدأ العملية.` |
-| Process_Terminated | `Process Terminated` / `The process has been terminated.` | `تم إنهاء العملية` / `تم إنهاء العملية.` |
-| Process_Terminated (expiry, background) | `Process Terminated` / `The request has expired.` | (English only — background) |
-| SubmitRating | `New rating received ⭐` / `You received a {rating}★ rating for process #{id}.` | `تم استلام تقييم جديد ⭐` / `حصلت على تقييم {rating}★ للعملية رقم #{id}.` |
-| DefaultRating_Applied (background) | `Default rating applied` / `A default {rating}★ rating was applied for process #{id}.` | (English only — background) |
-
-### Reports
-| Type | EN | AR |
-|------|----|----|
-| Report_* | `{reporterName} filed a report against you` / `Open the process to review the report details.` | `قام {reporterName} بالإبلاغ عنك` / `افتح العملية لمراجعة تفاصيل البلاغ.` |
+```json
+{
+  "status": true,
+  "data": {
+    "id": "...",
+    "firstName": "...",
+    ...
+    "preferredLanguage": "ar"
+  }
+}
+```
 
 ---
 
-## Response
+## إزاي الإشعارات بتتبعت
 
-الـ response من كل endpoint (JSON body اللي بيرجع) لسه **English دايمًا** — الـ localization تطبق على الـ **notification text فقط** (title/body اللي بيوصل للمستخدم).
+- الـ receiver (المستقبل) بيحصل على الإشعار **بلغته المحفوظة في الـ DB**.
+- ده ينطبق على الـ FCM push + SignalR real-time + DB history.
+- مفيش داعي لبعت أي `lang` في body أي endpoint — الـ `lang` field اللي كان في الـ body قديمًا **اتحذف تمامًا**.
+
+## نصوص الـ Notifications المتاحة (EN / AR)
+
+نفس القائمة اللي كانت قبل كده — بس اختيار اللغة بقى تلقائي حسب preference الـ receiver:
+
+### 🚗 Charging Request Lifecycle
+| Event | EN | AR |
+|-------|----|----|
+| Request sent | `New Charging Request 🚗` / `Driver requested...` | `طلب شحن جديد 🚗` / `طلب سائق الشحن في محطتك.` |
+| Accepted | `Charging Request Accepted` / ... | `تم قبول طلب الشحن` / ... |
+| Rejected | `Charging Request Rejected ❌` / ... | `تم رفض طلب الشحن ❌` / ... |
+| Confirmed | `Charging Request Confirmed ✅` / ... | `تم تأكيد طلب الشحن ✅` / ... |
+| Aborted (by charger) | `Charging session aborted` / ... | `تم إلغاء جلسة الشحن` / ... |
+| Aborted (by vehicle) | `Request Aborted ❌` / ... | `تم إلغاء الطلب ❌` / ... |
+
+### ⚡ Process Lifecycle
+| Event | EN | AR |
+|-------|----|----|
+| Create process | `Process confirmation pending` / `Amount Charged... \| Amount Paid...` | `في انتظار تأكيد العملية` / ... |
+| Update process | `Process updated` / ... | `تم تحديث العملية` / ... |
+| Confirmed (by charger) | `Process confirmed` / ... | `تم تأكيد العملية` / ... |
+| Confirmed (by vehicle) | `Process confirmed` / ... | `تم تأكيد العملية` / ... |
+| Started | `Process started` / `{who} started the process.` | `بدأت العملية` / `{who} بدأ العملية.` |
+| Terminated | `Process Terminated` / ... | `تم إنهاء العملية` / ... |
+| Rating received | `New rating received ⭐` / `You received a {rating}★...` | `تم استلام تقييم جديد ⭐` / ... |
+
+### 📋 Reports
+| Event | EN | AR |
+|-------|----|----|
+| Report filed | `{name} filed a report against you` / ... | `قام {name} بالإبلاغ عنك` / ... |
+
+### 🚙 Vehicle Addition
+| Event | EN | AR |
+|-------|----|----|
+| Accepted | `Request Accepted` / `Your vehicle is now available!...` | `تم قبول الطلب` / `سيارتك متاحة الآن!...` |
+| Declined | `Request Declined` / `The vehicle you requested already exists...` | `تم رفض الطلب` / `السيارة المطلوبة موجودة بالفعل...` |
 
 ---
 
-**Version:** 1.0 — Notifications Localization
+## Suggested implementation for Frontend
+
+```
+on app launch (if user is authenticated):
+  lang = currentAppLocale()  // "en" or "ar"
+  PUT /api/auth/language  body: { "language": lang }
+
+on user changes language in settings:
+  newLang = "ar"  // or "en"
+  PUT /api/auth/language  body: { "language": newLang }
+  // (also update app UI locale)
+```
+
+---
+
+## Migration Note
+- كل المستخدمين القدامى default = `"en"`
+- مفيش breaking change على الـ bodies — `lang` field القديم في DTOs اتشال، لكن لو الـ client لسه بعته، JSON deserializer بيتجاهله تلقائيًا (بدون errors).
+
+---
+
+**Version:** 2.0 — Per-User Stored Preference
 **Last Updated:** 2026-04-20

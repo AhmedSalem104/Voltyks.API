@@ -31,6 +31,8 @@ namespace Voltyks.Persistence.Entities.Identity
 
         public double Wallet { get; set; } = 0;
 
+        public string PreferredLanguage { get; set; } = "en";
+
 
         public string CurrentActivitiesJson { get; set; } = "[]";
 

@@ -185,7 +185,7 @@ namespace Voltyks.Core.DTOs.Processes
                 await _redisService.RemoveAsync($"complaint_last:{process.VehicleOwnerId}");
                 await _redisService.RemoveAsync($"complaint_last:{process.ChargerOwnerId}");
 
-                var lang = Languages.Normalize(dto.Lang);
+                var lang = await GetUserLanguageAsync(process.ChargerOwnerId, ct);
                 var (title, body) = NotificationMessages.ProcessConfirmationPending(lang, process.AmountCharged, process.AmountPaid);
 
                 // extraData للـ FCM فقط
@@ -334,14 +334,14 @@ namespace Voltyks.Core.DTOs.Processes
                     var reason = decision == "ended-by-report" ? "report" : "aborted";
                     var status = reason == "report" ? ProcessStatus.Disputed : ProcessStatus.Aborted;
 
-                    await TerminateProcessAsync(process.Id, status, reason, me, ct, dto.Lang);
+                    await TerminateProcessAsync(process.Id, status, reason, me, ct);
                 }
 
                 _ctx.Update(process);
                 _ctx.Update(request);
                 await _ctx.SaveChangesAsync(ct);
 
-                var lang = Languages.Normalize(dto.Lang);
+                var lang = await GetUserLanguageAsync(process.ChargerOwnerId, ct);
                 var changes = new List<string>();
                 if (dto.Status != null) changes.Add($"status: {dto.Status}");
                 if (dto.EstimatedPrice != null) changes.Add($"estimated: {dto.EstimatedPrice:0.##}");
@@ -530,10 +530,10 @@ namespace Voltyks.Core.DTOs.Processes
                     await _ctx.SaveChangesAsync(ct);
 
                     // إشعار للطرف التاني حسب مين اتخذ القرار
-                    var langDecision = Languages.Normalize(dto.Lang);
                     if (isChargerOwner)
                     {
-                        var (cTitle, cBody) = NotificationMessages.ProcessConfirmedByCharger(langDecision);
+                        var vehicleOwnerLang = await GetUserLanguageAsync(process.VehicleOwnerId, ct);
+                        var (cTitle, cBody) = NotificationMessages.ProcessConfirmedByCharger(vehicleOwnerLang);
                         await SendToUserAsync(
                             process.VehicleOwnerId,
                             cTitle,
@@ -553,7 +553,8 @@ namespace Voltyks.Core.DTOs.Processes
                     }
                     else // Vehicle Owner
                     {
-                        var (vTitle, vBody) = NotificationMessages.ProcessConfirmedByVehicle(langDecision);
+                        var chargerOwnerLang = await GetUserLanguageAsync(process.ChargerOwnerId, ct);
+                        var (vTitle, vBody) = NotificationMessages.ProcessConfirmedByVehicle(chargerOwnerLang);
                         await SendToUserAsync(
                             process.ChargerOwnerId,
                             vTitle,
@@ -584,7 +585,7 @@ namespace Voltyks.Core.DTOs.Processes
 
                     // إشعار للطرف الآخر ببدء العملية
                     var receiverId = isChargerOwner ? process.VehicleOwnerId : process.ChargerOwnerId;
-                    var langStarted = Languages.Normalize(dto.Lang);
+                    var langStarted = await GetUserLanguageAsync(receiverId, ct);
                     var whoStarted = isChargerOwner
                         ? (langStarted == Languages.Ar ? "صاحب الشاحن" : "Charger owner")
                         : (langStarted == Languages.Ar ? "صاحب السيارة" : "Vehicle owner");
@@ -612,7 +613,7 @@ namespace Voltyks.Core.DTOs.Processes
                     var reason = decision.ToLower().Contains("report") ? "report" : "aborted";
                     var status = reason == "report" ? ProcessStatus.Disputed : ProcessStatus.Aborted;
 
-                    await TerminateProcessAsync(process.Id, status, reason, me, ct, dto.Lang);
+                    await TerminateProcessAsync(process.Id, status, reason, me, ct);
                     await _ctx.SaveChangesAsync(ct);
 
                     // SignalR Real-time to counterparty
@@ -895,7 +896,7 @@ namespace Voltyks.Core.DTOs.Processes
             bool receiverIsChargerOwner = receiverUserId == process.ChargerOwnerId;
             int userTypeId = receiverIsChargerOwner ? 1 : 2; // 1 = ChargerOwner, 2 = VehicleOwner
 
-            var ratingLang = Languages.Normalize(dto.Lang);
+            var ratingLang = await GetUserLanguageAsync(receiverUserId, ct);
             var (title, body) = NotificationMessages.SubmitRating(ratingLang, dto.RatingForOther, process.Id);
             var notificationType = receiverIsChargerOwner
                 ? "VehicleOwner_SubmitRating"   // VO قيّم CO
@@ -1161,6 +1162,17 @@ namespace Voltyks.Core.DTOs.Processes
         }
         private string CurrentUserId()
            => _http.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+        private async Task<string> GetUserLanguageAsync(string? userId, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(userId)) return Languages.Default;
+            var stored = await _ctx.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => u.PreferredLanguage)
+                .FirstOrDefaultAsync(ct);
+            return Languages.Normalize(stored);
+        }
 
         private async Task<Notification> AddNotificationAsync(
     string receiverUserId,
@@ -1554,11 +1566,8 @@ namespace Voltyks.Core.DTOs.Processes
             ProcessStatus targetStatus,
             string terminationReason,
             string? actorUserId = null,
-            CancellationToken ct = default,
-            string? lang = null)
+            CancellationToken ct = default)
         {
-            var resolvedLang = Languages.Normalize(lang);
-            var (terminatedTitle, terminatedBody) = NotificationMessages.ProcessTerminated(resolvedLang);
             var process = await _ctx.Set<ProcessEntity>()
                 .FirstOrDefaultAsync(p => p.Id == processId, ct);
 
@@ -1635,6 +1644,10 @@ namespace Voltyks.Core.DTOs.Processes
                             ["terminatedAt"] = DateTime.UtcNow.ToString("o"),
                             ["userRole"] = uid == process.VehicleOwnerId ? "vehicle_owner" : "charger_owner"
                         };
+
+                        // Each receiver gets the notification in THEIR stored preferred language
+                        var userLang = Languages.Normalize(user.PreferredLanguage);
+                        var (terminatedTitle, terminatedBody) = NotificationMessages.ProcessTerminated(userLang);
 
                         foreach (var token in user.DeviceTokens)
                         {

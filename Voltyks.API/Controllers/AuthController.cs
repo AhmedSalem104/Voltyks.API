@@ -224,6 +224,21 @@ namespace Voltyks.Presentation
         public async Task<IActionResult> DeductFeesFromWallet([FromBody] DeductFeesDto dto, CancellationToken ct)
             => Ok(await serviceManager.AuthService.DeductFeesFromWalletAsync(dto.RequestId, ct));
 
+        /// <summary>GET /api/auth/language — current user's notification language ("en"/"ar")</summary>
+        [HttpGet("language"), Authorize]
+        public async Task<IActionResult> GetMyLanguage(CancellationToken ct)
+            => Ok(await serviceManager.AuthService.GetMyLanguageAsync(ct));
+
+        /// <summary>
+        /// PUT /api/auth/language — set the current user's notification language.
+        /// Call once on app open with the frontend locale, and again whenever
+        /// the user changes language. Values: "en" / "ar" (anything else → "en").
+        /// Idempotent: calling with the same value as stored is a no-op.
+        /// </summary>
+        [HttpPut("language"), Authorize]
+        public async Task<IActionResult> UpdateMyLanguage([FromBody] UpdateUserLanguageDto dto, CancellationToken ct)
+            => Ok(await serviceManager.AuthService.UpdateMyLanguageAsync(dto, ct));
+
         /// <summary>
         /// POST /api/auth/general-complaints - Submit a general complaint
         /// </summary>

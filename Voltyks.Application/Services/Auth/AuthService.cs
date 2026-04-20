@@ -34,6 +34,7 @@ using System.Net.Http.Headers;
 using static System.Net.WebRequestMethods;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Interfaces.AppSettings;
+using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
 using Voltyks.Application.Utilities;
 
@@ -808,6 +809,71 @@ namespace Voltyks.Application.Services.Auth
             );
         }
 
+        public async Task<ApiResponse<string>> GetMyLanguageAsync(CancellationToken ct = default)
+        {
+            var userId =
+                httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<string>(message: "Unauthorized", status: false, errors: new() { "No current user context." });
+
+            var lang = await userManager.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.PreferredLanguage)
+                .FirstOrDefaultAsync(ct);
+
+            if (lang is null && !await userManager.Users.AnyAsync(u => u.Id == userId, ct))
+                return new ApiResponse<string>(message: "User not found", status: false);
+
+            return new ApiResponse<string>(
+                data: Languages.Normalize(lang),
+                message: "Language fetched successfully",
+                status: true
+            );
+        }
+
+        public async Task<ApiResponse<string>> UpdateMyLanguageAsync(UpdateUserLanguageDto dto, CancellationToken ct = default)
+        {
+            var userId =
+                httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return new ApiResponse<string>(message: "Unauthorized", status: false, errors: new() { "No current user context." });
+
+            var normalized = Languages.Normalize(dto?.Language);
+
+            var user = await userManager.FindByIdAsync(userId);
+            if (user is null)
+                return new ApiResponse<string>(message: "User not found", status: false);
+
+            // Idempotent: skip DB write when nothing changes
+            if (string.Equals(user.PreferredLanguage, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                return new ApiResponse<string>(
+                    data: normalized,
+                    message: "Language already set to " + normalized,
+                    status: true
+                );
+            }
+
+            user.PreferredLanguage = normalized;
+            var result = await userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                var errs = result.Errors.Select(e => e.Description).ToList();
+                return new ApiResponse<string>(message: "Failed to update language", status: false, errors: errs);
+            }
+
+            return new ApiResponse<string>(
+                data: normalized,
+                message: "Language updated to " + normalized,
+                status: true
+            );
+        }
+
         public async Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default)
         {
             // 1. Get the charging request
@@ -1522,6 +1588,7 @@ namespace Voltyks.Application.Services.Auth
 
             result.Vehicles = _mapper.Map<List<VehicleDto>>(vehicles);
             result.Chargers = _mapper.Map<List<ChargerDto>>(chargers);
+            result.PreferredLanguage = Languages.Normalize(user.PreferredLanguage);
 
             return result;
         }

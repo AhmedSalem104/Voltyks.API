@@ -34,7 +34,6 @@ namespace Voltyks.Application.Interfaces.Processes
             ProcessStatus targetStatus,
             string terminationReason,
             string? actorUserId = null,
-            CancellationToken ct = default,
-            string? lang = null);
+            CancellationToken ct = default);
     }
 }

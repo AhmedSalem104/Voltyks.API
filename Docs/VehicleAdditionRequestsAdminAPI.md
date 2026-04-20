@@ -228,7 +228,8 @@ Content-Type: application/json
 | `brandName` | string? | لو `useExistingBrandId` فاضي: يبحث case-insensitive عن brand بنفس الاسم، لو مش موجود يعمله جديد. |
 | `modelName` | string? | لو معبّاه، يبقى اسم الموديل الجديد (بدل اللي كتبه المستخدم). |
 | `capacity` | number? | لو معبّاه، يتستخدم مباشرة بدون parsing. لازم يكون > 0. |
-| `lang` | string? | `"en"` أو `"ar"` للـ notification اللي هيوصل للمستخدم. default: English. |
+
+> **Note:** لغة الـ notification مش بتتبعت في الـ body — بتتعتمد تلقائيًا على الـ `preferredLanguage` المحفوظة على حساب الـ user اللي بيستقبل الإشعار. شوف `Docs/NotificationsLocalizationAPI.md`.
 
 **لو الـ body كله فاضي/null:** الـ endpoint يستخدم البيانات الأصلية زي ما كتبها المستخدم (backward compatible).
 
@@ -285,11 +286,7 @@ Content-Type: application/json
 POST /api/admin/vehicle-addition-requests/{id}/decline
 ```
 
-**Body (اختياري):**
-```json
-{ "lang": "ar" }
-```
-- `lang`: `"en"` أو `"ar"` للـ notification. default: English.
+**Body:** مفيش (الـ notification language بيتعتمد على الـ user's stored preference)
 
 **Response:**
 ```json

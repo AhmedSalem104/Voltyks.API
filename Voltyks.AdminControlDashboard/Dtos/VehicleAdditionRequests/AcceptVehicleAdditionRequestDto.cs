@@ -1,4 +1,3 @@
-using Voltyks.Core.DTOs.Common;
 
 namespace Voltyks.AdminControlDashboard.Dtos.VehicleAdditionRequests
 {
@@ -6,10 +5,8 @@ namespace Voltyks.AdminControlDashboard.Dtos.VehicleAdditionRequests
     /// Optional payload for accepting a request. When null/omitted, the service
     /// uses the original submitted values. When provided, fields override them.
     /// </summary>
-    public class AcceptVehicleAdditionRequestDto : ILocalizedRequest
+    public class AcceptVehicleAdditionRequestDto
     {
-        /// <summary>Optional language for the user notification ("en"/"ar"). Defaults to "en".</summary>
-        public string? Lang { get; set; }
 
 
         /// <summary>
