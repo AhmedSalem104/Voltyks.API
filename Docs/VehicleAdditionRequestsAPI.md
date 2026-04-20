@@ -18,10 +18,10 @@
 
 ### Important Notes
 
-- **مفيش FCM Push Notifications** — الـ feature ده بيعتمد على:
-  - **SignalR** (real-time لو المستخدم متصل)
-  - **DB Notifications** (المستخدم يشوفها في قسم Notifications في التطبيق)
-- لو التطبيق مقفول، المستخدم مش هيوصله إشعار على شاشة القفل. هيشوف الرد لما يفتح التطبيق.
+- **الـ Notifications بتتبعت على 3 مسارات:**
+  - **FCM Push** — بيوصل حتى لو التطبيق مقفول (push على شاشة القفل)
+  - **SignalR** — real-time لو المستخدم فاتح التطبيق
+  - **DB Notifications** — المستخدم يشوفها في قسم Notifications في التطبيق (history)
 
 ---
 
@@ -202,9 +202,21 @@ GET /api/vehicle-addition-requests/my
 
 ## Notifications / الإشعارات
 
-بعد ما الأدمن يقبل أو يرفض الطلب، التطبيق بيستقبل إشعار عبر:
+بعد ما الأدمن يقبل أو يرفض الطلب، التطبيق بيستقبل إشعار عبر **3 مسارات في نفس الوقت**:
 
-### (A) SignalR — Real-time
+### (A) FCM Push Notification — بيوصل حتى لو التطبيق مقفول
+الـ Push Notification بيتبعت لكل الـ device tokens المسجلة للمستخدم عبر Firebase. الـ data payload:
+```json
+{
+  "requestId": "12",
+  "NotificationType": "VehicleAdditionRequest_Accepted",
+  "vehicleAdditionRequestId": "12",
+  "userRole": "vehicle_owner"
+}
+```
+> **ملاحظة:** `requestId` في الـ FCM payload = id الـ VehicleAdditionRequest (مش charging request).
+
+### (B) SignalR — Real-time
 لو المستخدم متصل بالـ SignalR hub، هيستقبل event اسمه `ReceiveNotification`.
 
 **الـ Payload شكله:**
@@ -222,7 +234,7 @@ GET /api/vehicle-addition-requests/my
 }
 ```
 
-### (B) DB Notifications — تقرأها من endpoint الـ notifications الموجود عندك
+### (C) DB Notifications — تقرأها من endpoint الـ notifications الموجود عندك
 الـ notification بتتسجل في جدول الـ Notifications، والمستخدم يقدر يشوفها لما يفتح شاشة الـ Notifications في التطبيق (الـ endpoint بتاع الـ notifications موجود من قبل).
 
 **الـ Record شكله:**
@@ -376,7 +388,7 @@ Form بسيط فيه:
 
 ### Important Reminders
 
-- الـ Feature ده **مش بيستخدم FCM**.
+- الـ Feature ده **بيستخدم FCM + SignalR + DB** للإشعارات — المستخدم هيستقبل الإشعار حتى لو التطبيق مقفول.
 - كل الرسائل من الـ backend بـ English حاليًا (ممكن تترجمها في الـ UI).
 - الـ DateTime في الـ responses بصيغة ISO 8601 UTC — حوّلها لـ local timezone للعرض.
 

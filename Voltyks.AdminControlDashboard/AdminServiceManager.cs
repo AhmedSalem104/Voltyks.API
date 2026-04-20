@@ -7,6 +7,7 @@ using Voltyks.AdminControlDashboard.Interfaces.Notifications;
 using Voltyks.AdminControlDashboard.Services;
 using Voltyks.AdminControlDashboard.Services.Complaints;
 using Voltyks.AdminControlDashboard.Services.Notifications;
+using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Interfaces.SMSEgypt;
@@ -28,7 +29,8 @@ namespace Voltyks.AdminControlDashboard
             UserManager<AppUser> userManager,
             ISmsEgyptService smsEgyptService,
             IRedisService redisService,
-            ISignalRService signalRService)
+            ISignalRService signalRService,
+            IFirebaseService firebaseService)
         {
             AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor, userManager, smsEgyptService, redisService);
             AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context, httpContextAccessor);
@@ -44,7 +46,7 @@ namespace Voltyks.AdminControlDashboard
             AdminCapacityService = new AdminCapacityService(context);
             AdminNotificationsService = new AdminNotificationsService(context);
             AdminStoreService = new AdminStoreService(context);
-            AdminVehicleAdditionRequestsService = new AdminVehicleAdditionRequestsService(context, signalRService);
+            AdminVehicleAdditionRequestsService = new AdminVehicleAdditionRequestsService(context, signalRService, firebaseService);
         }
 
         public IAdminUsersService AdminUsersService { get; }

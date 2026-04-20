@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Voltyks.AdminControlDashboard.Dtos.VehicleAdditionRequests;
 using Voltyks.AdminControlDashboard.Interfaces;
+using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Core.Constants;
 using Voltyks.Core.DTOs;
@@ -16,11 +17,16 @@ namespace Voltyks.AdminControlDashboard.Services
     {
         private readonly VoltyksDbContext _context;
         private readonly ISignalRService _signalRService;
+        private readonly IFirebaseService _firebaseService;
 
-        public AdminVehicleAdditionRequestsService(VoltyksDbContext context, ISignalRService signalRService)
+        public AdminVehicleAdditionRequestsService(
+            VoltyksDbContext context,
+            ISignalRService signalRService,
+            IFirebaseService firebaseService)
         {
             _context = context;
             _signalRService = signalRService;
+            _firebaseService = firebaseService;
         }
 
         public async Task<ApiResponse<PagedResult<AdminVehicleAdditionRequestDto>>> GetAllAsync(
@@ -266,7 +272,35 @@ namespace Voltyks.AdminControlDashboard.Services
             _context.Notifications.Add(notification);
             await _context.SaveChangesAsync(ct);
 
-            // 2) Real-time via SignalR (if user connected)
+            // 2) FCM push (works even if app is closed)
+            try
+            {
+                var tokens = await _context.Set<DeviceToken>()
+                    .AsNoTracking()
+                    .Where(t => t.UserId == userId && !string.IsNullOrEmpty(t.Token))
+                    .Select(t => t.Token)
+                    .ToListAsync(ct);
+
+                if (tokens.Count > 0)
+                {
+                    var extraData = new Dictionary<string, string>
+                    {
+                        ["vehicleAdditionRequestId"] = requestId.ToString(),
+                        ["NotificationType"] = type,
+                        ["userRole"] = "vehicle_owner"
+                    };
+
+                    await Task.WhenAll(tokens.Select(t =>
+                        _firebaseService.SendNotificationAsync(t, title, body, requestId, type, extraData)
+                    ));
+                }
+            }
+            catch
+            {
+                // FCM failure shouldn't block the accept/decline flow
+            }
+
+            // 3) Real-time via SignalR (if user connected)
             try
             {
                 await _signalRService.SendNotificationAsync(userId, title, body, new
