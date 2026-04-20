@@ -2,78 +2,72 @@ using System;
 
 namespace Voltyks.Persistence.Utilities
 {
+    /// <summary>
+    /// Egypt timezone helper using pure arithmetic — no dependency on
+    /// TimeZoneInfo or system tzdata (which is broken on Monster ASP hosting).
+    /// Egypt uses UTC+2 in winter and UTC+3 during DST.
+    /// DST rule: last Friday of April (00:00 local) → last Thursday of October (24:00 local).
+    /// </summary>
     public static class DateTimeHelper
     {
-        private static readonly TimeZoneInfo EgyptTimeZone = BuildEgyptTimeZone();
+        private static readonly TimeSpan StandardOffset = TimeSpan.FromHours(2);
+        private static readonly TimeSpan DaylightOffset = TimeSpan.FromHours(3);
 
         /// <summary>
-        /// Returns the current time in Egypt timezone.
-        /// Winter (no DST): UTC+2. Summer (last Friday of April → last Thursday of October): UTC+3.
+        /// Returns the current Egypt wall-clock time.
         /// The returned DateTime has <see cref="DateTimeKind.Unspecified"/>.
         /// </summary>
-        public static DateTime GetEgyptTime() =>
-            TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, EgyptTimeZone);
+        public static DateTime GetEgyptTime()
+        {
+            var utc = DateTime.UtcNow;
+            var offset = GetOffsetForUtc(utc);
+            return DateTime.SpecifyKind(utc.Add(offset), DateTimeKind.Unspecified);
+        }
 
-        /// <summary>
-        /// Converts a UTC DateTime to Egypt timezone.
-        /// </summary>
+        /// <summary>Convert a UTC DateTime to Egypt wall-clock time.</summary>
         public static DateTime ToEgyptTime(DateTime utc)
         {
             var utcValue = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
-            return TimeZoneInfo.ConvertTimeFromUtc(utcValue, EgyptTimeZone);
+            var offset = GetOffsetForUtc(utcValue);
+            return DateTime.SpecifyKind(utcValue.Add(offset), DateTimeKind.Unspecified);
+        }
+
+        /// <summary>Returns +02:00 in winter, +03:00 during Egypt DST.</summary>
+        public static TimeSpan GetEgyptUtcOffset(DateTime atUtc)
+        {
+            var utc = atUtc.Kind == DateTimeKind.Utc ? atUtc : DateTime.SpecifyKind(atUtc, DateTimeKind.Utc);
+            return GetOffsetForUtc(utc);
+        }
+
+        private static TimeSpan GetOffsetForUtc(DateTime utc)
+        {
+            return IsEgyptDstActive(utc) ? DaylightOffset : StandardOffset;
         }
 
         /// <summary>
-        /// Returns the Egypt UTC offset at the given UTC moment (+02:00 or +03:00 during DST).
+        /// DST starts at 00:00 Egypt (last Friday of April) = previous day 22:00 UTC.
+        /// DST ends at 24:00 Egypt DST (last Thursday of October) = same day 21:00 UTC.
         /// </summary>
-        public static TimeSpan GetEgyptUtcOffset(DateTime atUtc) =>
-            EgyptTimeZone.GetUtcOffset(atUtc);
-
-        private static TimeZoneInfo BuildEgyptTimeZone()
+        private static bool IsEgyptDstActive(DateTime utc)
         {
-            // Try system timezones first — works on Windows with correct tzdata and on Linux/Azure.
-            // Verify the base offset is actually +02:00 because some misconfigured hosts (e.g.
-            // Monster ASP) return a zero-offset zone for "Egypt Standard Time".
-            var expected = TimeSpan.FromHours(2);
+            var year = utc.Year;
 
-            try
-            {
-                var sys = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
-                if (sys.BaseUtcOffset == expected) return sys;
-            }
-            catch { /* not available, fall through */ }
+            var dstStartLocal = LastWeekdayOfMonth(year, 4, DayOfWeek.Friday);
+            var dstStartUtc = new DateTime(dstStartLocal.Year, dstStartLocal.Month, dstStartLocal.Day, 0, 0, 0, DateTimeKind.Utc)
+                .AddHours(-2); // 00:00 Egypt (UTC+2) == 22:00 UTC previous day
 
-            try
-            {
-                var sys = TimeZoneInfo.FindSystemTimeZoneById("Africa/Cairo");
-                if (sys.BaseUtcOffset == expected) return sys;
-            }
-            catch { /* not available, fall through */ }
+            var dstEndLocal = LastWeekdayOfMonth(year, 10, DayOfWeek.Thursday);
+            var dstEndUtc = new DateTime(dstEndLocal.Year, dstEndLocal.Month, dstEndLocal.Day, 0, 0, 0, DateTimeKind.Utc)
+                .AddDays(1).AddHours(-3); // 24:00 Egypt DST (UTC+3) == 21:00 UTC
 
-            // Fallback: build Egypt TZ explicitly with current DST rules (as of 2023).
-            // DST starts: last Friday of April at 00:00 (spring forward to 01:00).
-            // DST ends:   last Thursday of October at 23:59:59 (fall back).
-            var dstDelta = TimeSpan.FromHours(1);
-            var dstStart = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
-                timeOfDay: new DateTime(1, 1, 1, 0, 0, 0),
-                month: 4, week: 5, dayOfWeek: DayOfWeek.Friday);
-            var dstEnd = TimeZoneInfo.TransitionTime.CreateFloatingDateRule(
-                timeOfDay: new DateTime(1, 1, 1, 23, 59, 59),
-                month: 10, week: 5, dayOfWeek: DayOfWeek.Thursday);
-            var adjustment = TimeZoneInfo.AdjustmentRule.CreateAdjustmentRule(
-                dateStart: DateTime.MinValue.Date,
-                dateEnd: DateTime.MaxValue.Date,
-                daylightDelta: dstDelta,
-                daylightTransitionStart: dstStart,
-                daylightTransitionEnd: dstEnd);
+            return utc >= dstStartUtc && utc < dstEndUtc;
+        }
 
-            return TimeZoneInfo.CreateCustomTimeZone(
-                id: "Egypt (custom)",
-                baseUtcOffset: expected,
-                displayName: "(UTC+02:00) Egypt",
-                standardDisplayName: "Egypt Standard Time",
-                daylightDisplayName: "Egypt Daylight Time",
-                adjustmentRules: new[] { adjustment });
+        private static DateTime LastWeekdayOfMonth(int year, int month, DayOfWeek day)
+        {
+            var last = new DateTime(year, month, DateTime.DaysInMonth(year, month));
+            while (last.DayOfWeek != day) last = last.AddDays(-1);
+            return last;
         }
     }
 }
