@@ -2,6 +2,8 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.ServicesManager.ServicesManager;
+using Voltyks.Core.DTOs;
+using Voltyks.Core.DTOs.MobileAppConfig;
 
 namespace Voltyks.API.Controllers
 {
@@ -74,6 +76,36 @@ namespace Voltyks.API.Controllers
         {
             var result = await _appSettingsService.GetAdminsModeStatusAsync(ct);
             return Ok(result);
+        }
+
+        /// <summary>
+        /// GET /api/v1/app-config/app-info
+        /// Combined endpoint — replaces three separate calls (mobile-status,
+        /// charging-mode-status, registration-status) with one. Mobile apps
+        /// should call this on launch instead of hitting three endpoints.
+        /// </summary>
+        /// <param name="platform">Platform: "android" or "ios"</param>
+        /// <param name="version">App version: "1.2.0"</param>
+        [HttpGet("app-info")]
+        public async Task<IActionResult> GetAppInfo(
+            [FromQuery] string? platform = null,
+            [FromQuery] string? version = null,
+            CancellationToken ct = default)
+        {
+            var mobileStatus = await _serviceManager.MobileAppConfigService.GetStatusAsync(platform, version);
+            var chargingEnabled = await _appSettingsService.IsChargingModeEnabledAsync(ct);
+            var adminsModeActivated = await _appSettingsService.IsAdminsModeActivatedAsync(ct);
+
+            var dto = new AppInfoDto
+            {
+                IsEnabled = mobileStatus.Data?.IsEnabled ?? true,
+                IsVersionValid = mobileStatus.Data?.IsVersionValid ?? true,
+                MinVersion = mobileStatus.Data?.MinVersion,
+                ChargingModeEnabled = chargingEnabled,
+                AdminsModeActivated = adminsModeActivated
+            };
+
+            return Ok(new ApiResponse<AppInfoDto>(dto, "Success", true));
         }
     }
 }
