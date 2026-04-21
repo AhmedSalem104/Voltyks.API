@@ -541,7 +541,8 @@ namespace Voltyks.Core.DTOs.Processes
                             request.Id,
                             "ChargerOwner_ConfirmProcess",
                             ct,
-                            new Dictionary<string, string> { ["userRole"] = "vehicle_owner" }
+                            new Dictionary<string, string> { ["userRole"] = "vehicle_owner" },
+                            userTypeId: 2 // VehicleOwner
                         );
                         // SignalR Real-time
                         await _signalRService.SendPaymentCompletedAsync(process.Id, process.VehicleOwnerId, new
@@ -562,7 +563,8 @@ namespace Voltyks.Core.DTOs.Processes
                             request.Id,
                             "VehicleOwner_ConfirmProcess",
                             ct,
-                            new Dictionary<string, string> { ["userRole"] = "charger_owner" }
+                            new Dictionary<string, string> { ["userRole"] = "charger_owner" },
+                            userTypeId: 1 // ChargerOwner
                         );
                         // SignalR Real-time
                         await _signalRService.SendPaymentCompletedAsync(process.Id, process.ChargerOwnerId, new
@@ -597,7 +599,8 @@ namespace Voltyks.Core.DTOs.Processes
                         request.Id,
                         "Process_Started",
                         ct,
-                        new Dictionary<string, string> { ["userRole"] = isChargerOwner ? "vehicle_owner" : "charger_owner" }
+                        new Dictionary<string, string> { ["userRole"] = isChargerOwner ? "vehicle_owner" : "charger_owner" },
+                        userTypeId: isChargerOwner ? 2 : 1 // receiver: VehicleOwner=2 or ChargerOwner=1
                     );
                     // SignalR Real-time
                     await _signalRService.SendProcessStartedAsync(process.Id, receiverId, new
@@ -1146,8 +1149,9 @@ namespace Voltyks.Core.DTOs.Processes
             return new ApiResponse<object>(pagedResult, "My activities fetched", true);
         }
 
-        private async Task SendToUserAsync(string userId, string title, string body, int relatedRequestId, string notificationType, CancellationToken ct, Dictionary<string, string>? extraData = null)
+        private async Task SendToUserAsync(string userId, string title, string body, int relatedRequestId, string notificationType, CancellationToken ct, Dictionary<string, string>? extraData = null, int? userTypeId = null)
         {
+            // 1) FCM push to every registered device
             var tokens = await _ctx.Set<DeviceToken>()
                                    .AsNoTracking()
                                    .Where(t => t.UserId == userId && !string.IsNullOrEmpty(t.Token))
@@ -1158,6 +1162,23 @@ namespace Voltyks.Core.DTOs.Processes
             {
                 try { await _firebase.SendNotificationAsync(tk, title, body, relatedRequestId, notificationType, extraData); }
                 catch (Exception ex) { _logger.LogError(ex, "Failed to send notification to token {Token}", tk); }
+            }
+
+            // 2) Persist to DB so the notification shows up in the user's history
+            try
+            {
+                await AddNotificationAsync(
+                    receiverUserId: userId,
+                    relatedRequestId: relatedRequestId,
+                    title: title,
+                    body: body,
+                    userTypeId: userTypeId ?? 0,
+                    notificationType: notificationType,
+                    ct: ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist notification for user {UserId}", userId);
             }
         }
         private string CurrentUserId()
