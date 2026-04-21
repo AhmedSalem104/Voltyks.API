@@ -212,7 +212,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 var lang = await GetUserLanguageAsync(recipientUserId);
                 var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
                 var (title, body) = NotificationMessages.ChargerOwnerAccepted(lang, stationOwnerName);
-                var notificationType = "ChargerOwner_AcceptRequest";
+                var notificationType = NotificationTypes.ChargerOwner_AcceptRequest;
 
                 // Timer data للـ FCM notification
                 var timerData = new Dictionary<string, string>
@@ -302,7 +302,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     var lang = await GetUserLanguageAsync(recipientUserId);
                     var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
                     var (title, body) = NotificationMessages.ChargerOwnerRejected(lang, stationOwnerName);
-                    var notificationType = "ChargerOwner_RejectRequest";
+                    var notificationType = NotificationTypes.ChargerOwner_RejectRequest;
 
                     var sent = await SendAndPersistNotificationAsync(
                         receiverUserId: recipientUserId,
@@ -481,7 +481,7 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     var lang = await GetUserLanguageAsync(recipientUserId);
                     (title, body) = NotificationMessages.ChargerOwnerAborted(lang);
-                    notificationType = "ChargerOwner_ProcessAborted";
+                    notificationType = NotificationTypes.ChargerOwner_ProcessAborted;
                     recipientUserTypeId = 2; // VehicleOwner
                 }
                 else
@@ -492,7 +492,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     var driverName = request.CarOwner?.FullName ?? "the driver";
                     var lang = await GetUserLanguageAsync(recipientUserId);
                     (title, body) = NotificationMessages.VehicleOwnerAbortedAfterPayment(lang, driverName);
-                    notificationType = "VehicleOwner_ProcessAbortedAfterPaymentSuccessfully";
+                    notificationType = NotificationTypes.VehicleOwner_ProcessAbortedAfterPaymentSuccessfully;
                     recipientUserTypeId = 1; // ChargerOwner
                 }
 

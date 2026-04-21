@@ -18,6 +18,12 @@ namespace Voltyks.Core.Enums
         public const string Report_ChargerOwnerToVehicleOwner = "Report_ChargerOwnerToVehicleOwner";
         public const string Report_VehicleOwnerToChargerOwner = "Report_VehicleOwnerToChargerOwner";
 
+        // Process lifecycle
+        public const string Process_Started = "Process_Started";
+        public const string ChargerOwner_ConfirmProcess = "ChargerOwner_ConfirmProcess";
+        public const string VehicleOwner_ConfirmProcess = "VehicleOwner_ConfirmProcess";
+        public const string ChargerOwner_ProcessAborted = "ChargerOwner_ProcessAborted";
+
         // Process Termination (unified notification for all termination paths)
         public const string Process_Terminated = "Process_Terminated";
 

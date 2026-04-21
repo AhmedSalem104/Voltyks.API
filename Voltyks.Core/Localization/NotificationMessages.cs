@@ -55,11 +55,6 @@ namespace Voltyks.Core.Localization
 
         // ============ Process Lifecycle ============
 
-        public static (string Title, string Body) VehicleOwnerCreateProcess(string lang) =>
-            lang == Languages.Ar
-                ? ("بدأت عملية جديدة", "تم بدء عملية شحن جديدة لطلبك.")
-                : ("New Process Started", "A new charging process has been started for your request.");
-
         public static (string Title, string Body) ProcessConfirmationPending(string lang, decimal? amountCharged, decimal? amountPaid) =>
             lang == Languages.Ar
                 ? ("في انتظار تأكيد العملية", $"المبلغ المحصل: {(amountCharged ?? 0m):0.##} | المبلغ المدفوع: {(amountPaid ?? 0m):0.##}")

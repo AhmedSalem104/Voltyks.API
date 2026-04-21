@@ -539,7 +539,7 @@ namespace Voltyks.Core.DTOs.Processes
                             cTitle,
                             cBody,
                             request.Id,
-                            "ChargerOwner_ConfirmProcess",
+                            NotificationTypes.ChargerOwner_ConfirmProcess,
                             ct,
                             new Dictionary<string, string> { ["userRole"] = "vehicle_owner" },
                             userTypeId: 2 // VehicleOwner
@@ -561,7 +561,7 @@ namespace Voltyks.Core.DTOs.Processes
                             vTitle,
                             vBody,
                             request.Id,
-                            "VehicleOwner_ConfirmProcess",
+                            NotificationTypes.VehicleOwner_ConfirmProcess,
                             ct,
                             new Dictionary<string, string> { ["userRole"] = "charger_owner" },
                             userTypeId: 1 // ChargerOwner
@@ -597,7 +597,7 @@ namespace Voltyks.Core.DTOs.Processes
                         startedTitle,
                         startedBody,
                         request.Id,
-                        "Process_Started",
+                        NotificationTypes.Process_Started,
                         ct,
                         new Dictionary<string, string> { ["userRole"] = isChargerOwner ? "vehicle_owner" : "charger_owner" },
                         userTypeId: isChargerOwner ? 2 : 1 // receiver: VehicleOwner=2 or ChargerOwner=1
