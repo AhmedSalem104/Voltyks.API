@@ -12,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Redis;
+using Voltyks.Application.Interfaces.Telemetry;
 
 namespace Voltyks.Application.Services.Firebase
 {
@@ -23,12 +24,18 @@ namespace Voltyks.Application.Services.Firebase
         private readonly ILogger<FirebaseService> _logger;
         private readonly string _serviceAccountRelativePath;
         private readonly IRedisService _redisService;
+        private readonly IFcmTelemetry _telemetry;
         private GoogleCredential? _cachedCredential;
         private readonly SemaphoreSlim _credentialLock = new SemaphoreSlim(1, 1);
 
 
 
-        public FirebaseService(IConfiguration config, ILogger<FirebaseService> logger, IRedisService redisService, IHttpClientFactory httpClientFactory)
+        public FirebaseService(
+            IConfiguration config,
+            ILogger<FirebaseService> logger,
+            IRedisService redisService,
+            IHttpClientFactory httpClientFactory,
+            IFcmTelemetry telemetry)
         {
             _config = config;
             _logger = logger;
@@ -36,6 +43,28 @@ namespace Voltyks.Application.Services.Firebase
             _projectId = _config["Firebase:ProjectId"];
             _httpClientFactory = httpClientFactory;
             _redisService = redisService;
+            _telemetry = telemetry;
+        }
+
+        private static string TokenSuffix(string token) =>
+            string.IsNullOrEmpty(token)
+                ? "(empty)"
+                : token.Length <= 8 ? token : token[^8..];
+
+        private static string ExtractFcmErrorCode(string errorBody)
+        {
+            if (string.IsNullOrEmpty(errorBody)) return "UNKNOWN";
+
+            // FCM v1 error codes surface inside the JSON body as "errorCode":"VALUE"
+            // or inside a details array. Use ordinal contains for speed and PII safety.
+            if (errorBody.Contains("UNREGISTERED", System.StringComparison.OrdinalIgnoreCase)) return "UNREGISTERED";
+            if (errorBody.Contains("SENDER_ID_MISMATCH", System.StringComparison.OrdinalIgnoreCase)) return "SENDER_ID_MISMATCH";
+            if (errorBody.Contains("INVALID_ARGUMENT", System.StringComparison.OrdinalIgnoreCase)) return "INVALID_ARGUMENT";
+            if (errorBody.Contains("QUOTA_EXCEEDED", System.StringComparison.OrdinalIgnoreCase)) return "QUOTA_EXCEEDED";
+            if (errorBody.Contains("UNAVAILABLE", System.StringComparison.OrdinalIgnoreCase)) return "UNAVAILABLE";
+            if (errorBody.Contains("INTERNAL", System.StringComparison.OrdinalIgnoreCase)) return "INTERNAL";
+            if (errorBody.Contains("THIRD_PARTY_AUTH_ERROR", System.StringComparison.OrdinalIgnoreCase)) return "THIRD_PARTY_AUTH_ERROR";
+            return "UNKNOWN";
         }
 
         private async Task<GoogleCredential> GetOrCreateCredentialAsync()
@@ -78,6 +107,7 @@ namespace Voltyks.Application.Services.Firebase
     string notificationType,
     Dictionary<string, string>? extraData = null)
         {
+            var failureRecorded = false;
             try
             {
                 var credential = await GetOrCreateCredentialAsync();
@@ -155,11 +185,18 @@ namespace Voltyks.Application.Services.Firebase
                 if (!response.IsSuccessStatusCode)
                 {
                     var error = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("Firebase Error Response: {Error}", error);
+                    var errorCode = ExtractFcmErrorCode(error);
 
-                    var isUnregistered =
-                        error.Contains("\"errorCode\":\"UNREGISTERED\"", StringComparison.OrdinalIgnoreCase) ||
-                        error.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase);
+                    _logger.LogWarning(
+                        "FCM send failed. TokenSuffix={TokenSuffix} NotificationType={NotificationType} " +
+                        "RequestId={RequestId} StatusCode={StatusCode} ErrorCode={ErrorCode}",
+                        TokenSuffix(deviceToken), notificationType, chargingRequestID,
+                        (int)response.StatusCode, errorCode);
+
+                    _telemetry.RecordFailed(notificationType, errorCode);
+                    failureRecorded = true;
+
+                    var isUnregistered = errorCode == "UNREGISTERED";
 
                     if (response.StatusCode == HttpStatusCode.NotFound && isUnregistered)
                     {
@@ -184,11 +221,11 @@ namespace Voltyks.Application.Services.Firebase
                                 }
                             }
 
-                            _logger.LogWarning("⚠️ Removed UNREGISTERED FCM token: {Token}", deviceToken);
+                            _logger.LogWarning("Removed UNREGISTERED FCM token from Redis cache. TokenSuffix={TokenSuffix}", TokenSuffix(deviceToken));
                         }
                         catch (Exception ex2)
                         {
-                            _logger.LogError(ex2, "Failed to remove invalid FCM token from Redis");
+                            _logger.LogError(ex2, "Failed to remove invalid FCM token from Redis. TokenSuffix={TokenSuffix}", TokenSuffix(deviceToken));
                         }
 
                         // منرجعش Exception، بس بنوقف الإرسال للتوكِن ده
@@ -197,10 +234,23 @@ namespace Voltyks.Application.Services.Firebase
 
                     throw new Exception($"Firebase Error: {response.StatusCode} - {error}");
                 }
+
+                _telemetry.RecordSent(notificationType);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Exception in SendNotificationAsync");
+                if (!failureRecorded)
+                {
+                    _telemetry.RecordFailed(notificationType, ex.GetType().Name);
+                    _logger.LogError(ex,
+                        "FCM send exception. TokenSuffix={TokenSuffix} NotificationType={NotificationType} " +
+                        "RequestId={RequestId} ErrorClass={ErrorClass}",
+                        TokenSuffix(deviceToken), notificationType, chargingRequestID, ex.GetType().Name);
+                }
+                else
+                {
+                    _logger.LogError(ex, "Exception in SendNotificationAsync (already recorded in telemetry)");
+                }
                 throw;
             }
         }

@@ -393,6 +393,10 @@ namespace Voltyks.Application.Services.Background
                             _logger.LogWarning(ex, "Failed to send default rating notification to token for user {UserId}", userId);
                         }
                     }
+
+                    _logger.LogInformation(
+                        "FCM batch done. UserId={UserId} NotificationType={NotificationType} TokenCount={TokenCount} PersistedToDb={PersistedToDb}",
+                        userId, "DefaultRating_Applied", tokens.Count, true);
                 }
                 catch (Exception ex)
                 {

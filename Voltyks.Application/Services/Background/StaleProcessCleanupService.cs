@@ -274,6 +274,10 @@ namespace Voltyks.Application.Services.Background
                             }
                         }
                     }
+
+                    _logger.LogInformation(
+                        "FCM batch done. UserId={UserId} NotificationType={NotificationType} TokenCount={TokenCount} PersistedToDb={PersistedToDb}",
+                        userId, NotificationTypes.Process_Terminated, user.DeviceTokens?.Count ?? 0, true);
                 }
 
                 _logger.LogWarning("Expired orphaned request {RequestId} (was: {Status})", req.Id, previousStatus);

@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
@@ -38,10 +39,11 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ISignalRService _signalRService;
         private readonly IProcessesService _processesService;
+        private readonly ILogger<ChargingRequestService> _logger;
 
 
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService, ILogger<ChargingRequestService> logger)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
@@ -52,6 +54,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             _httpClientFactory = httpClientFactory;
             _signalRService = signalRService;
             _processesService = processesService;
+            _logger = logger;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -924,6 +927,10 @@ namespace Voltyks.Application.Services.ChargingRequest
                 userTypeId: userTypeId,
                 notificationType: notificationType
             );
+
+            _logger.LogInformation(
+                "FCM batch done. UserId={UserId} NotificationType={NotificationType} TokenCount={TokenCount} PersistedToDb={PersistedToDb}",
+                receiverUserId, notificationType, tokens.Count, true);
 
             return new NotificationResultDto(
                 NotificationId: notification.Id,

@@ -1,6 +1,7 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.AdminControlDashboard.Interfaces.Complaints;
 using Voltyks.AdminControlDashboard.Interfaces.Notifications;
@@ -30,7 +31,8 @@ namespace Voltyks.AdminControlDashboard
             ISmsEgyptService smsEgyptService,
             IRedisService redisService,
             ISignalRService signalRService,
-            IFirebaseService firebaseService)
+            IFirebaseService firebaseService,
+            ILogger<AdminVehicleAdditionRequestsService> vehicleAdditionRequestsLogger)
         {
             AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor, userManager, smsEgyptService, redisService);
             AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context, httpContextAccessor);
@@ -46,7 +48,7 @@ namespace Voltyks.AdminControlDashboard
             AdminCapacityService = new AdminCapacityService(context);
             AdminNotificationsService = new AdminNotificationsService(context);
             AdminStoreService = new AdminStoreService(context);
-            AdminVehicleAdditionRequestsService = new AdminVehicleAdditionRequestsService(context, signalRService, firebaseService);
+            AdminVehicleAdditionRequestsService = new AdminVehicleAdditionRequestsService(context, signalRService, firebaseService, vehicleAdditionRequestsLogger);
         }
 
         public IAdminUsersService AdminUsersService { get; }

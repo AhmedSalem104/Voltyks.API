@@ -1180,6 +1180,10 @@ namespace Voltyks.Core.DTOs.Processes
             {
                 _logger.LogError(ex, "Failed to persist notification for user {UserId}", userId);
             }
+
+            _logger.LogInformation(
+                "FCM batch done. UserId={UserId} NotificationType={NotificationType} TokenCount={TokenCount} PersistedToDb={PersistedToDb}",
+                userId, notificationType, tokens.Count, true);
         }
         private string CurrentUserId()
            => _http.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
@@ -1260,6 +1264,10 @@ namespace Voltyks.Core.DTOs.Processes
             var notification = await AddNotificationAsync(
                 receiverUserId, requestId, title, body, userTypeId, notificationType, ct
             );
+
+            _logger.LogInformation(
+                "FCM batch done. UserId={UserId} NotificationType={NotificationType} TokenCount={TokenCount} PersistedToDb={PersistedToDb}",
+                receiverUserId, notificationType, tokens.Count, true);
 
             // ⬅️ خزّن نسخة من الـ data داخل نتيجة الإشعار (اختياري لكنه عملي للديبج)
             return new NotificationResultDto(
@@ -1708,6 +1716,10 @@ namespace Voltyks.Core.DTOs.Processes
                                 }
                             }
                         }
+
+                        _logger.LogInformation(
+                            "FCM batch done. UserId={UserId} NotificationType={NotificationType} TokenCount={TokenCount} PersistedToDb={PersistedToDb}",
+                            uid, NotificationTypes.Process_Terminated, user.DeviceTokens?.Count ?? 0, true);
                     }
                 }
             }

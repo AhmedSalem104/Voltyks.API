@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Voltyks.AdminControlDashboard.Dtos.VehicleAdditionRequests;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Application.Interfaces.Firebase;
@@ -20,15 +21,18 @@ namespace Voltyks.AdminControlDashboard.Services
         private readonly VoltyksDbContext _context;
         private readonly ISignalRService _signalRService;
         private readonly IFirebaseService _firebaseService;
+        private readonly ILogger<AdminVehicleAdditionRequestsService> _logger;
 
         public AdminVehicleAdditionRequestsService(
             VoltyksDbContext context,
             ISignalRService signalRService,
-            IFirebaseService firebaseService)
+            IFirebaseService firebaseService,
+            ILogger<AdminVehicleAdditionRequestsService> logger)
         {
             _context = context;
             _signalRService = signalRService;
             _firebaseService = firebaseService;
+            _logger = logger;
         }
 
         public async Task<ApiResponse<PagedResult<AdminVehicleAdditionRequestDto>>> GetAllAsync(
@@ -475,6 +479,7 @@ namespace Voltyks.AdminControlDashboard.Services
             await _context.SaveChangesAsync(ct);
 
             // 2) FCM push (works even if app is closed)
+            var tokenCount = 0;
             try
             {
                 var tokens = await _context.Set<DeviceToken>()
@@ -482,6 +487,7 @@ namespace Voltyks.AdminControlDashboard.Services
                     .Where(t => t.UserId == userId && !string.IsNullOrEmpty(t.Token))
                     .Select(t => t.Token)
                     .ToListAsync(ct);
+                tokenCount = tokens.Count;
 
                 if (tokens.Count > 0)
                 {
@@ -497,10 +503,17 @@ namespace Voltyks.AdminControlDashboard.Services
                     ));
                 }
             }
-            catch
+            catch (Exception fcmEx)
             {
                 // FCM failure shouldn't block the accept/decline flow
+                _logger.LogWarning(fcmEx,
+                    "FCM push failed during NotifyUserAsync. UserId={UserId} NotificationType={NotificationType}",
+                    userId, type);
             }
+
+            _logger.LogInformation(
+                "FCM batch done. UserId={UserId} NotificationType={NotificationType} TokenCount={TokenCount} PersistedToDb={PersistedToDb}",
+                userId, type, tokenCount, true);
 
             // 3) Real-time via SignalR (if user connected)
             try
