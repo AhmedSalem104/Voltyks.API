@@ -1686,11 +1686,13 @@ namespace Voltyks.Application.Services.Auth
                 await context.SaveChangesAsync();
             }
         }
-        public static DateTime GetEgyptTime()
-        {
-            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
-        }
+        /// <summary>
+        /// All persisted timestamps are UTC (see DateTimeHelper + JSON converter that
+        /// projects to Egypt on the way out). Keep this helper returning UTC so every
+        /// in-service comparison — RequestedAt cut-offs, ban expiry, JWT expiry — stays
+        /// on the same clock as the values in the database.
+        /// </summary>
+        public static DateTime GetEgyptTime() => DateTime.UtcNow;
 
 
 
