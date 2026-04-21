@@ -208,7 +208,7 @@ namespace Voltyks.Application.Services.Background
             foreach (var req in orphanedRequests)
             {
                 var previousStatus = req.Status;
-                req.Status = "Expired";
+                req.Status = RequestStatuses.Expired;
 
                 // Send notification to both users
                 foreach (var userId in new[] { req.UserId, req.RecipientUserId })

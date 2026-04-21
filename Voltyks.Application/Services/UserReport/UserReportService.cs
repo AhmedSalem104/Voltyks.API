@@ -89,7 +89,7 @@ namespace Voltyks.Application.Services.UserReport
                 .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
             if (request != null)
             {
-                request.Status = "Completed";
+                request.Status = RequestStatuses.Completed;
                 _ctx.Update(request);
             }
 

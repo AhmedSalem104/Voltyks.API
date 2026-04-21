@@ -663,7 +663,7 @@ namespace Voltyks.Application.Services.Auth
                 .Include(c => c.Charger).ThenInclude(ch => ch.Capacity)
                 .Include(c => c.Charger).ThenInclude(ch => ch.PriceOption)
                 .Where(c => c.RecipientUserId == userId
-                         && c.Status == "Pending"
+                         && c.Status == RequestStatuses.Pending
                          && c.RequestedAt >= fiveMinutesAgo)
                 .OrderByDescending(c => c.RequestedAt);
 
@@ -1282,9 +1282,9 @@ namespace Voltyks.Application.Services.Auth
                     (c.UserId == userId || c.RecipientUserId == userId) &&
                     (
                         // Pending أقدم من 5 دقائق
-                        ((c.Status == "pending" || c.Status == "Pending") && c.RequestedAt <= cutoff)
+                        (c.Status == RequestStatuses.Pending && c.RequestedAt <= cutoff)
                         // أو مرفوض
-                        || (c.Status == "rejected" || c.Status == "Rejected")
+                        || c.Status == RequestStatuses.Rejected
                     ),
                 trackChanges: true   // مهم علشان نقدر نحذف
             )).ToList();

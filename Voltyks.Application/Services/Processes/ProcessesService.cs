@@ -116,11 +116,11 @@ namespace Voltyks.Core.DTOs.Processes
             if (req.UserId != me) return new ApiResponse<object>("Forbidden", false);
 
             // ✅ Prevent confirming aborted/rejected requests
-            if (req.Status == "Aborted" || req.Status == "Rejected")
+            if (req.Status == RequestStatuses.Aborted || req.Status == RequestStatuses.Rejected)
                 return new ApiResponse<object>($"Cannot confirm: request was {req.Status}", false);
 
             // ✅ Only allow confirm when request is in valid state
-            if (req.Status != "accepted" && req.Status != "Confirmed")
+            if (req.Status != RequestStatuses.Accepted && req.Status != RequestStatuses.Confirmed)
                 return new ApiResponse<object>($"Cannot confirm: request status is {req.Status}", false);
 
             var exists = await _ctx.Set<ProcessEntity>()
@@ -144,7 +144,7 @@ namespace Voltyks.Core.DTOs.Processes
             try
             {
                 await _ctx.AddAsync(process, ct);
-                req.Status = "PendingCompleted";
+                req.Status = RequestStatuses.PendingCompleted;
                 _ctx.Update(req);
 
                 await _ctx.SaveChangesAsync(ct);
@@ -301,7 +301,7 @@ namespace Voltyks.Core.DTOs.Processes
                     process.SubStatus = "awaiting_rating";
                     process.RatingWindowOpenedAt = DateTime.UtcNow;
                     process.DateCompleted = DateTimeHelper.GetEgyptTime();
-                    request.Status = "Completed";
+                    request.Status = RequestStatuses.Completed;
 
                     // Free both users immediately — rating is post-session, shouldn't lock them
                     foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
@@ -325,7 +325,7 @@ namespace Voltyks.Core.DTOs.Processes
                 }
                 else if (decision == "started")
                 {
-                    request.Status = "Started";
+                    request.Status = RequestStatuses.Started;
                     process.SubStatus = "charging_in_progress";
                 }
                 else if (decision == "aborted" || decision == "ended-by-report")
@@ -503,7 +503,7 @@ namespace Voltyks.Core.DTOs.Processes
                         process.DateCompleted = DateTimeHelper.GetEgyptTime();
                     if (process.RatingWindowOpenedAt == null)
                         process.RatingWindowOpenedAt = DateTime.UtcNow;
-                    request.Status = "Completed";
+                    request.Status = RequestStatuses.Completed;
 
                     // Free both users immediately — rating is post-session, shouldn't lock them
                     foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
@@ -577,7 +577,7 @@ namespace Voltyks.Core.DTOs.Processes
                 {
                     // بدء العملية: بنعلّم الطلب إنها بدأت
                     // لو عندك ProcessStatus.Started استخدمه؛ غير كده هنسيب Status زي ما هو ونعلم الطلب
-                    request.Status = "Started";
+                    request.Status = RequestStatuses.Started;
                     process.SubStatus = "charging_in_progress";
                     _ctx.Update(process);
                     _ctx.Update(request);
@@ -1070,7 +1070,7 @@ namespace Voltyks.Core.DTOs.Processes
                 var request = await _ctx.Set<ChargingRequestEntity>()
                     .FirstOrDefaultAsync(r => r.Id == process.ChargerRequestId, ct);
                 if (request != null)
-                    request.Status = "Completed";
+                    request.Status = RequestStatuses.Completed;
 
                 foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
                 {

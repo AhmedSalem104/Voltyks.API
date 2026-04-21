@@ -292,7 +292,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 foreach (var request in requests)
                 {
                     // Update request status to rejected
-                    request.Status = "Rejected";
+                    request.Status = RequestStatuses.Rejected;
                     _db.Entry(request).Property(r => r.Status).IsModified = true;
 
                     var recipientUserId = request.CarOwner?.Id;
@@ -991,7 +991,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 UserId = userId,
                 ChargerId = chargerId,
                 RequestedAt = DateTimeHelper.GetEgyptTime(),
-                Status = "pending",
+                Status = RequestStatuses.Pending,
                 KwNeeded = KwNeeded,
                 CurrentBatteryPercentage = CurrentBatteryPercentage,
                 Latitude = Latitude,
