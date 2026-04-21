@@ -27,6 +27,7 @@ using System.Text.Json.Serialization;
 using StackExchange.Redis;
 using System.Transactions;
 using Voltyks.Persistence.Entities.Identity;
+using Voltyks.Persistence.Utilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Data.SqlClient;
@@ -298,7 +299,7 @@ namespace Voltyks.Application.Services.Paymob
                 currency,
                 paymobOrderId,
                 txId,
-                GetEgyptTime()
+                DateTimeHelper.GetEgyptTime()
             );
 
             // 7) Response
@@ -616,7 +617,7 @@ namespace Voltyks.Application.Services.Paymob
         //            MerchantId = mid,
         //            ExpiryMonth = expMonth,
         //            ExpiryYear = expYear,
-        //            CreatedAt = GetEgyptTime()
+        //            CreatedAt = DateTimeHelper.GetEgyptTime()
         //        });
 
         //        _log?.LogWarning("Saved NEW card → user={userId}, last4={last4}, brand={brand}, token={cardToken}", userId, last4, brand, cardToken);
@@ -708,7 +709,7 @@ namespace Voltyks.Application.Services.Paymob
                 HttpStatus = 200,
                 HeadersJson = $"{{\"hmac\":\"{hmacFromQuery ?? "MISSING"}\",\"content-type\":\"{req.ContentType}\"}}",
                 RawPayload = rawBody.Length > 10000 ? rawBody.Substring(0, 10000) + "...[TRUNCATED]" : rawBody,
-                ReceivedAt = GetEgyptTime()
+                ReceivedAt = DateTimeHelper.GetEgyptTime()
             };
 
             // --------- 2) verify HMAC with correct event type ----------
@@ -789,7 +790,7 @@ namespace Voltyks.Application.Services.Paymob
                 RawPayload = rawPayload,
                 IsHmacValid = isHmacValid,
                 Status = CardTokenStatus.Pending,
-                ReceivedAt = GetEgyptTime()
+                ReceivedAt = DateTimeHelper.GetEgyptTime()
             };
 
             // 4. HMAC validation already done, but log if it failed
@@ -797,7 +798,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 logEntry.Status = CardTokenStatus.FailedHmac;
                 logEntry.FailureReason = "HMAC signature verification failed";
-                logEntry.ProcessedAt = GetEgyptTime();
+                logEntry.ProcessedAt = DateTimeHelper.GetEgyptTime();
                 await CardTokenWebhookLogs.AddAsync(logEntry);
                 await _uow.SaveChangesAsync();
 
@@ -818,7 +819,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 logEntry.Status = CardTokenStatus.FailedNoToken;
                 logEntry.FailureReason = "No token found in webhook payload";
-                logEntry.ProcessedAt = GetEgyptTime();
+                logEntry.ProcessedAt = DateTimeHelper.GetEgyptTime();
                 await CardTokenWebhookLogs.AddAsync(logEntry);
                 await _uow.SaveChangesAsync();
 
@@ -839,7 +840,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 logEntry.Status = CardTokenStatus.FailedNoUser;
                 logEntry.FailureReason = "Could not resolve UserId from webhook context";
-                logEntry.ProcessedAt = GetEgyptTime();
+                logEntry.ProcessedAt = DateTimeHelper.GetEgyptTime();
                 await CardTokenWebhookLogs.AddAsync(logEntry);
                 await _uow.SaveChangesAsync();
 
@@ -856,7 +857,7 @@ namespace Voltyks.Application.Services.Paymob
                 logEntry.Status = CardTokenStatus.Duplicate;
                 logEntry.FailureReason = $"Card with same token already exists (CardId: {existingCard.Id})";
                 logEntry.SavedCardId = existingCard.Id;
-                logEntry.ProcessedAt = GetEgyptTime();
+                logEntry.ProcessedAt = DateTimeHelper.GetEgyptTime();
                 await CardTokenWebhookLogs.AddAsync(logEntry);
                 await _uow.SaveChangesAsync();
 
@@ -877,7 +878,7 @@ namespace Voltyks.Application.Services.Paymob
                     ExpiryMonth = logEntry.ExpiryMonth,
                     ExpiryYear = logEntry.ExpiryYear,
                     MerchantId = TryParseLong(fields, "obj.merchant_id", "merchant_id", "obj.merchant.id", "merchant.id"),
-                    CreatedAt = GetEgyptTime()
+                    CreatedAt = DateTimeHelper.GetEgyptTime()
                 };
 
                 await SavedCards.AddAsync(newCard);
@@ -886,7 +887,7 @@ namespace Voltyks.Application.Services.Paymob
                 // Update log entry with success
                 logEntry.Status = CardTokenStatus.Saved;
                 logEntry.SavedCardId = newCard.Id;
-                logEntry.ProcessedAt = GetEgyptTime();
+                logEntry.ProcessedAt = DateTimeHelper.GetEgyptTime();
                 await CardTokenWebhookLogs.AddAsync(logEntry);
                 await _uow.SaveChangesAsync();
 
@@ -900,7 +901,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 logEntry.Status = CardTokenStatus.Duplicate;
                 logEntry.FailureReason = "Unique constraint violation (race condition)";
-                logEntry.ProcessedAt = GetEgyptTime();
+                logEntry.ProcessedAt = DateTimeHelper.GetEgyptTime();
                 await CardTokenWebhookLogs.AddAsync(logEntry);
                 await _uow.SaveChangesAsync();
 
@@ -911,7 +912,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 logEntry.Status = CardTokenStatus.FailedDatabase;
                 logEntry.FailureReason = $"Database error: {ex.Message}";
-                logEntry.ProcessedAt = GetEgyptTime();
+                logEntry.ProcessedAt = DateTimeHelper.GetEgyptTime();
                 await CardTokenWebhookLogs.AddAsync(logEntry);
                 await _uow.SaveChangesAsync();
 
@@ -1135,7 +1136,7 @@ namespace Voltyks.Application.Services.Paymob
 
             // Update order status
             order.Status = status;
-            order.UpdatedAt = GetEgyptTime();
+            order.UpdatedAt = DateTimeHelper.GetEgyptTime();
             if (paymobOrderId > 0 && !order.PaymobOrderId.HasValue)
                 order.PaymobOrderId = paymobOrderId;
 
@@ -1151,7 +1152,7 @@ namespace Voltyks.Application.Services.Paymob
                 existingTx.Status = status;
                 existingTx.IsSuccess = isSuccess;
                 existingTx.HmacVerified = true;
-                existingTx.UpdatedAt = GetEgyptTime();
+                existingTx.UpdatedAt = DateTimeHelper.GetEgyptTime();
                 PaymentTransactions.Update(existingTx);
             }
             else
@@ -1167,7 +1168,7 @@ namespace Voltyks.Application.Services.Paymob
                     txByOrderId.Status = status;
                     txByOrderId.IsSuccess = isSuccess;
                     txByOrderId.HmacVerified = true;
-                    txByOrderId.UpdatedAt = GetEgyptTime();
+                    txByOrderId.UpdatedAt = DateTimeHelper.GetEgyptTime();
                     PaymentTransactions.Update(txByOrderId);
                 }
                 else if (paymobTxId > 0)
@@ -1184,7 +1185,7 @@ namespace Voltyks.Application.Services.Paymob
                         IsSuccess = isSuccess,
                         HmacVerified = true,
                         IntegrationType = "Webhook",
-                        CreatedAt = GetEgyptTime()
+                        CreatedAt = DateTimeHelper.GetEgyptTime()
                     };
                     await PaymentTransactions.AddAsync(newTx);
                 }
@@ -1850,7 +1851,7 @@ namespace Voltyks.Application.Services.Paymob
                 IsHmacValid = true,
                 IsValid = true,
                 HttpStatus = 200,
-                ReceivedAt = GetEgyptTime()
+                ReceivedAt = DateTimeHelper.GetEgyptTime()
             });
             await _uow.SaveChangesAsync();
         }
@@ -1861,7 +1862,7 @@ namespace Voltyks.Application.Services.Paymob
             if (order is null) return;
 
             order.Status = status;
-            order.UpdatedAt = GetEgyptTime();
+            order.UpdatedAt = DateTimeHelper.GetEgyptTime();
 
             PaymentOrders.Update(order);
             await _uow.SaveChangesAsync();
@@ -1873,7 +1874,7 @@ namespace Voltyks.Application.Services.Paymob
             if (tx is null) return;
 
             mutate(tx);
-            tx.UpdatedAt = GetEgyptTime();
+            tx.UpdatedAt = DateTimeHelper.GetEgyptTime();
 
             PaymentTransactions.Update(tx);
             await _uow.SaveChangesAsync();
@@ -1969,7 +1970,7 @@ namespace Voltyks.Application.Services.Paymob
 
             order.PaymobOrderId = paymobOrderId;
             order.Status = "OrderCreated";
-            order.UpdatedAt = GetEgyptTime();
+            order.UpdatedAt = DateTimeHelper.GetEgyptTime();
             OrdersRepo.Update(order);
             await _uow.SaveChangesAsync();
 
@@ -1978,7 +1979,7 @@ namespace Voltyks.Application.Services.Paymob
         private bool IsKeyValid(PaymentOrder o)
             => !string.IsNullOrWhiteSpace(o.LastPaymentKey)
                && o.PaymentKeyExpiresAt.HasValue
-               && o.PaymentKeyExpiresAt.Value > GetEgyptTime().AddSeconds(30);
+               && o.PaymentKeyExpiresAt.Value > DateTimeHelper.GetEgyptTime().AddSeconds(30);
         private async Task<string> GetOrCreatePaymentKeyAsync(PaymentOrder order, long amountCents, string currency, BillingData billing, int integrationId, int expirationSeconds = 3600,bool tokenize = false)
         {
             if (IsKeyValid(order))
@@ -2014,9 +2015,9 @@ namespace Voltyks.Application.Services.Paymob
 
             var key = data.token;
             order.LastPaymentKey = key;
-            order.PaymentKeyExpiresAt = GetEgyptTime().AddSeconds(expirationSeconds);
+            order.PaymentKeyExpiresAt = DateTimeHelper.GetEgyptTime().AddSeconds(expirationSeconds);
             order.Status = "Pending";
-            order.UpdatedAt = GetEgyptTime();
+            order.UpdatedAt = DateTimeHelper.GetEgyptTime();
             OrdersRepo.Update(order);
             await _uow.SaveChangesAsync();
 
@@ -2073,7 +2074,7 @@ namespace Voltyks.Application.Services.Paymob
                     AmountCents = amountCents,
                     Currency = currency,
                     Status = "Pending",
-                    CreatedAt = GetEgyptTime(),
+                    CreatedAt = DateTimeHelper.GetEgyptTime(),
                     UserId = currentUserId
                 };
                 await OrdersRepo.AddAsync(order);
@@ -2082,7 +2083,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 order.AmountCents = amountCents;
                 order.Currency = currency;
-                order.UpdatedAt = GetEgyptTime();
+                order.UpdatedAt = DateTimeHelper.GetEgyptTime();
 
                 if (order.UserId != currentUserId)
                     order.UserId = currentUserId;
@@ -2138,7 +2139,7 @@ namespace Voltyks.Application.Services.Paymob
                 IntegrationType = integrationType,
                 Status = status,
                 IsSuccess = isSuccess,
-                CreatedAt = GetEgyptTime()
+                CreatedAt = DateTimeHelper.GetEgyptTime()
             };
             await TxRepo.AddAsync(tx);
             await _uow.SaveChangesAsync();
@@ -2149,7 +2150,7 @@ namespace Voltyks.Application.Services.Paymob
         //    if (order != null)
         //    {
         //        order.Status = status;
-        //        order.UpdatedAt = GetEgyptTime();
+        //        order.UpdatedAt = DateTimeHelper.GetEgyptTime();
         //        OrdersRepo.Update(order);
         //        await _uow.SaveChangesAsync();
         //    }
@@ -2160,7 +2161,7 @@ namespace Voltyks.Application.Services.Paymob
         //    if (tx != null)
         //    {
         //        mutate(tx);
-        //        tx.UpdatedAt = GetEgyptTime();
+        //        tx.UpdatedAt = DateTimeHelper.GetEgyptTime();
         //        TxRepo.Update(tx);
         //        await _uow.SaveChangesAsync();
         //    }
@@ -2177,11 +2178,6 @@ namespace Voltyks.Application.Services.Paymob
             if (!fields.TryGetValue(key, out var v) || v is null) return false;
             if (bool.TryParse(v, out var b)) return b;
             return v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase);
-        }
-        public static DateTime GetEgyptTime()
-        {
-            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
         }
 
         #region Card Token Webhook Log Queries
@@ -2332,7 +2328,7 @@ namespace Voltyks.Application.Services.Paymob
             {
                 AmountCents = request.AmountCents,
                 Currency = request.Currency,
-                ProcessedAt = GetEgyptTime()
+                ProcessedAt = DateTimeHelper.GetEgyptTime()
             };
 
             try

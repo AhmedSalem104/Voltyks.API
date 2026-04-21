@@ -12,6 +12,7 @@ using Voltyks.Persistence.Entities.Main;
 using FeesConfigEntity = Voltyks.Persistence.Entities.Main.FeesConfig;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using Voltyks.Persistence.Utilities;
 
 
 namespace Voltyks.Application.Services.FeesConfig
@@ -43,7 +44,7 @@ namespace Voltyks.Application.Services.FeesConfig
                     Id = SINGLE_ROW_ID,
                     MinimumFee = 40m,
                     Percentage = 10m,
-                    UpdatedAt = GetEgyptTime(),
+                    UpdatedAt = DateTimeHelper.GetEgyptTime(),
                     UpdatedBy = "system"
                 };
                 await repo.AddAsync(row);
@@ -66,7 +67,7 @@ namespace Voltyks.Application.Services.FeesConfig
             var row = await repo.GetFirstOrDefaultAsync(x => x.Id == SINGLE_ROW_ID);
 
             var updatedBy = GetCurrentUserName() ?? GetCurrentUserId() ?? "system";
-            var nowUtc = GetEgyptTime();
+            var nowUtc = DateTimeHelper.GetEgyptTime();
 
             if (row is null)
             {
@@ -110,11 +111,6 @@ namespace Voltyks.Application.Services.FeesConfig
                 ?? u.FindFirst("id")?.Value;
         }
 
-        public static DateTime GetEgyptTime()
-        {
-            TimeZoneInfo egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
-        }
 
 
 

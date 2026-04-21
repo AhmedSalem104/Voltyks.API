@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Voltyks.Application.Services.Background.Backup;
+using Voltyks.Persistence.Utilities;
 
 namespace Voltyks.Application.Services.Background
 {
@@ -60,8 +61,9 @@ namespace Voltyks.Application.Services.Background
 
         private TimeSpan CalculateDelayUntilNextRun()
         {
-            var egyptZone = TimeZoneInfo.FindSystemTimeZoneById("Egypt Standard Time");
-            var nowEgypt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, egyptZone);
+            // Use DateTimeHelper (host-independent, works on Monster ASP).
+            var utcNow = DateTime.UtcNow;
+            var nowEgypt = DateTimeHelper.ToEgyptTime(utcNow);
 
             if (!TimeSpan.TryParse(_options.DailyBackupTime, out var targetTime))
                 targetTime = new TimeSpan(3, 0, 0);
@@ -69,8 +71,10 @@ namespace Voltyks.Application.Services.Background
             var todayTarget = nowEgypt.Date.Add(targetTime);
             var nextRun = nowEgypt < todayTarget ? todayTarget : todayTarget.AddDays(1);
 
-            var nextRunUtc = TimeZoneInfo.ConvertTimeToUtc(nextRun, egyptZone);
-            var delay = nextRunUtc - DateTime.UtcNow;
+            // Convert next run (Egypt local) back to UTC using the current Egypt offset.
+            var offset = DateTimeHelper.GetEgyptUtcOffset(utcNow);
+            var nextRunUtc = nextRun - offset;
+            var delay = nextRunUtc - utcNow;
 
             return delay < TimeSpan.FromMinutes(1) ? TimeSpan.FromMinutes(1) : delay;
         }
