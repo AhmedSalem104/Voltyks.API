@@ -1654,8 +1654,8 @@ namespace Voltyks.Core.DTOs.Processes
                         _ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
                     }
 
-                    // Send Process_Terminated notification via FCM (only if not already terminal)
-                    if (!isAlreadyTerminal && user.DeviceTokens?.Any() == true)
+                    // Send Process_Terminated notification (only if not already terminal)
+                    if (!isAlreadyTerminal)
                     {
                         var extraData = new Dictionary<string, string>
                         {
@@ -1670,21 +1670,42 @@ namespace Voltyks.Core.DTOs.Processes
                         var userLang = Languages.Normalize(user.PreferredLanguage);
                         var (terminatedTitle, terminatedBody) = NotificationMessages.ProcessTerminated(userLang);
 
-                        foreach (var token in user.DeviceTokens)
+                        // Persist to DB (like the rest of the system)
+                        try
                         {
-                            try
+                            await AddNotificationAsync(
+                                receiverUserId: uid,
+                                relatedRequestId: process.ChargerRequestId,
+                                title: terminatedTitle,
+                                body: terminatedBody,
+                                userTypeId: uid == process.VehicleOwnerId ? 2 : 1,
+                                notificationType: NotificationTypes.Process_Terminated,
+                                ct: ct);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to persist termination notification for user {UserId}", uid);
+                        }
+
+                        // FCM push (best-effort side channel)
+                        if (user.DeviceTokens?.Any() == true)
+                        {
+                            foreach (var token in user.DeviceTokens)
                             {
-                                await _firebase.SendNotificationAsync(
-                                    token.Token,
-                                    terminatedTitle,
-                                    terminatedBody,
-                                    process.ChargerRequestId,
-                                    NotificationTypes.Process_Terminated,
-                                    extraData);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogWarning(ex, "Failed to send termination notification to token");
+                                try
+                                {
+                                    await _firebase.SendNotificationAsync(
+                                        token.Token,
+                                        terminatedTitle,
+                                        terminatedBody,
+                                        process.ChargerRequestId,
+                                        NotificationTypes.Process_Terminated,
+                                        extraData);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogWarning(ex, "Failed to send termination notification to token");
+                                }
                             }
                         }
                     }

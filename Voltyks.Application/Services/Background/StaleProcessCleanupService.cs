@@ -228,25 +228,50 @@ namespace Voltyks.Application.Services.Background
                         .Include(u => u.DeviceTokens)
                         .FirstOrDefaultAsync(u => u.Id == userId, ct);
 
-                    if (user?.DeviceTokens?.Any() != true) continue;
+                    if (user == null) continue;
 
                     // Use the receiver's stored preferred language
                     var (expTitle, expBody) = NotificationMessages.ProcessExpired(Languages.Normalize(user.PreferredLanguage));
-                    foreach (var token in user.DeviceTokens)
+
+                    // Persist to DB (like the rest of the system)
+                    try
                     {
-                        try
+                        ctx.Set<Notification>().Add(new Notification
                         {
-                            await firebaseService.SendNotificationAsync(
-                                token.Token,
-                                expTitle,
-                                expBody,
-                                req.Id,
-                                NotificationTypes.Process_Terminated,
-                                extraData);
-                        }
-                        catch (Exception ex)
+                            UserId = userId,
+                            Title = expTitle,
+                            Body = expBody,
+                            IsRead = false,
+                            SentAt = DateTimeHelper.GetEgyptTime(),
+                            RelatedRequestId = req.Id,
+                            UserTypeId = userId == req.UserId ? 2 : 1,
+                            Type = NotificationTypes.Process_Terminated
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to persist expiry notification for user {UserId}", userId);
+                    }
+
+                    // FCM push (best-effort side channel)
+                    if (user.DeviceTokens?.Any() == true)
+                    {
+                        foreach (var token in user.DeviceTokens)
                         {
-                            _logger.LogWarning(ex, "Failed to send expiry notification to token for request {RequestId}", req.Id);
+                            try
+                            {
+                                await firebaseService.SendNotificationAsync(
+                                    token.Token,
+                                    expTitle,
+                                    expBody,
+                                    req.Id,
+                                    NotificationTypes.Process_Terminated,
+                                    extraData);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to send expiry notification to token for request {RequestId}", req.Id);
+                            }
                         }
                     }
                 }

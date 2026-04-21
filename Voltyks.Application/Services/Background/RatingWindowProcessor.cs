@@ -337,9 +337,6 @@ namespace Voltyks.Application.Services.Background
                         .Select(t => t.Token)
                         .ToListAsync(ct);
 
-                    if (tokens.Count == 0)
-                        continue;
-
                     var extraData = new Dictionary<string, string>
                     {
                         ["processId"] = processId.ToString(),
@@ -356,6 +353,29 @@ namespace Voltyks.Application.Services.Background
                             .Select(u => u.PreferredLanguage)
                             .FirstOrDefaultAsync(ct));
                     var (defaultTitle, defaultBody) = NotificationMessages.DefaultRatingApplied(receiverLang, DefaultRating, processId);
+
+                    // Persist to DB (like the rest of the system)
+                    try
+                    {
+                        _ctx.Set<Notification>().Add(new Notification
+                        {
+                            UserId = userId,
+                            Title = defaultTitle,
+                            Body = defaultBody,
+                            IsRead = false,
+                            SentAt = DateTimeHelper.GetEgyptTime(),
+                            RelatedRequestId = requestId,
+                            UserTypeId = userRole == "vehicle_owner" ? 2 : 1,
+                            Type = "DefaultRating_Applied"
+                        });
+                        await _ctx.SaveChangesAsync(ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to persist default rating notification for user {UserId}", userId);
+                    }
+
+                    // FCM push (best-effort side channel)
                     foreach (var token in tokens)
                     {
                         try
