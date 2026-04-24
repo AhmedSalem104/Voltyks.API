@@ -43,6 +43,20 @@ namespace Voltyks.Persistence.Utilities
             return GetOffsetForUtc(utc);
         }
 
+        /// <summary>
+        /// Serializes a UTC-stored DateTime as an ISO 8601 string with the
+        /// Egypt offset applied (e.g. "2026-04-23T13:23:11.6869846+02:00").
+        /// Use for wire formats that bypass the JSON converter — timer
+        /// strings inside FCM extraData dictionaries, SignalR payloads,
+        /// uiContext fields, etc.
+        /// </summary>
+        public static string ToEgyptIsoString(DateTime utc)
+        {
+            var u = utc.Kind == DateTimeKind.Utc ? utc : DateTime.SpecifyKind(utc, DateTimeKind.Utc);
+            var offset = GetOffsetForUtc(u);
+            return new DateTimeOffset(u).ToOffset(offset).ToString("o");
+        }
+
         private static TimeSpan GetOffsetForUtc(DateTime utc)
         {
             return IsEgyptDstActive(utc) ? DaylightOffset : StandardOffset;

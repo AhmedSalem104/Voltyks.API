@@ -220,7 +220,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                 // Timer data للـ FCM notification
                 var timerData = new Dictionary<string, string>
                 {
-                    ["timerStartedAt"] = request.RespondedAt?.ToString("o") ?? "",
+                    ["timerStartedAt"] = request.RespondedAt.HasValue
+                        ? DateTimeHelper.ToEgyptIsoString(request.RespondedAt.Value)
+                        : "",
                     ["timerDurationMinutes"] = "10",
                     ["userRole"] = "vehicle_owner"
                 };

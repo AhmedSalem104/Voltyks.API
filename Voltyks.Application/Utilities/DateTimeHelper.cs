@@ -16,5 +16,8 @@ namespace Voltyks.Application.Utilities
 
         public static TimeSpan GetEgyptUtcOffset(DateTime atUtc) =>
             Voltyks.Persistence.Utilities.DateTimeHelper.GetEgyptUtcOffset(atUtc);
+
+        public static string ToEgyptIsoString(DateTime utc) =>
+            Voltyks.Persistence.Utilities.DateTimeHelper.ToEgyptIsoString(utc);
     }
 }

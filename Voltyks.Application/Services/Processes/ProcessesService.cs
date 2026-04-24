@@ -1426,13 +1426,13 @@ namespace Voltyks.Core.DTOs.Processes
             if (statusLower == "accepted")
             {
                 if (req.RespondedAt.HasValue)
-                    uiContext.TimerStartedAt = req.RespondedAt.Value.ToString("o");
+                    uiContext.TimerStartedAt = DateTimeHelper.ToEgyptIsoString(req.RespondedAt.Value);
                 uiContext.TimerDurationMinutes = "10";
             }
             else if (statusLower == "confirmed")
             {
                 if (req.ConfirmedAt.HasValue)
-                    uiContext.TimerStartedAt = req.ConfirmedAt.Value.ToString("o");
+                    uiContext.TimerStartedAt = DateTimeHelper.ToEgyptIsoString(req.ConfirmedAt.Value);
                 uiContext.TimerDurationMinutes = "15";
             }
 
