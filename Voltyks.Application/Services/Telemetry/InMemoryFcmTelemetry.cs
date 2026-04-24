@@ -35,10 +35,8 @@ namespace Voltyks.Application.Services.Telemetry
         public FcmTelemetrySnapshot GetSnapshot() => new(
             Sent: Interlocked.Read(ref _sent),
             Failed: Interlocked.Read(ref _failed),
+            SentByNotificationType: new Dictionary<string, long>(_sentByNotificationType),
             FailedByErrorCode: new Dictionary<string, long>(_failedByErrorCode),
             FailedByNotificationType: new Dictionary<string, long>(_failedByNotificationType));
-
-        public IReadOnlyDictionary<string, long> SentByNotificationType =>
-            new Dictionary<string, long>(_sentByNotificationType);
     }
 }

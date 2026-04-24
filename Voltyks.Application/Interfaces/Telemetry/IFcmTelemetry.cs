@@ -12,6 +12,7 @@ namespace Voltyks.Application.Interfaces.Telemetry
     public record FcmTelemetrySnapshot(
         long Sent,
         long Failed,
+        IReadOnlyDictionary<string, long> SentByNotificationType,
         IReadOnlyDictionary<string, long> FailedByErrorCode,
         IReadOnlyDictionary<string, long> FailedByNotificationType);
 }
