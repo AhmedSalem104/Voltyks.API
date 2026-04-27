@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Voltyks.AdminControlDashboard.Dtos.VehicleAdditionRequests;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Core.Constants;
 using Voltyks.Core.DTOs;
@@ -22,17 +23,20 @@ namespace Voltyks.AdminControlDashboard.Services
         private readonly ISignalRService _signalRService;
         private readonly IFirebaseService _firebaseService;
         private readonly ILogger<AdminVehicleAdditionRequestsService> _logger;
+        private readonly INotificationTemplateResolver _templateResolver;
 
         public AdminVehicleAdditionRequestsService(
             VoltyksDbContext context,
             ISignalRService signalRService,
             IFirebaseService firebaseService,
-            ILogger<AdminVehicleAdditionRequestsService> logger)
+            ILogger<AdminVehicleAdditionRequestsService> logger,
+            INotificationTemplateResolver templateResolver)
         {
             _context = context;
             _signalRService = signalRService;
             _firebaseService = firebaseService;
             _logger = logger;
+            _templateResolver = templateResolver;
         }
 
         public async Task<ApiResponse<PagedResult<AdminVehicleAdditionRequestDto>>> GetAllAsync(
@@ -389,7 +393,8 @@ namespace Voltyks.AdminControlDashboard.Services
 
                 // Notify user (DB + FCM + SignalR) using the receiver's stored language
                 var lang = await GetUserLanguageAsync(request.UserId, ct);
-                var (title, body) = NotificationMessages.VehicleAdditionAccepted(lang);
+                var (title, body) = await _templateResolver.ResolveAsync(
+                    "VehicleAdditionAccepted", lang, null, ct);
                 await NotifyUserAsync(
                     userId: request.UserId,
                     requestId: request.Id,
@@ -434,7 +439,8 @@ namespace Voltyks.AdminControlDashboard.Services
 
                 // Notify user (DB + FCM + SignalR) using the receiver's stored language
                 var lang = await GetUserLanguageAsync(request.UserId, ct);
-                var (title, msgBody) = NotificationMessages.VehicleAdditionDeclined(lang);
+                var (title, msgBody) = await _templateResolver.ResolveAsync(
+                    "VehicleAdditionDeclined", lang, null, ct);
                 await NotifyUserAsync(
                     userId: request.UserId,
                     requestId: request.Id,

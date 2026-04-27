@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.Redis;
@@ -37,8 +38,9 @@ namespace Voltyks.Core.DTOs.Processes
         private readonly IRedisService _redisService;
         private readonly IPaginationService _paginationService;
         private readonly ISignalRService _signalRService;
+        private readonly INotificationTemplateResolver _templateResolver;
 
-        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger, IRedisService redisService, IPaginationService paginationService, ISignalRService signalRService)
+        public ProcessesService(VoltyksDbContext ctx, IHttpContextAccessor http, IFirebaseService firebase, ILogger<ProcessesService> logger, IRedisService redisService, IPaginationService paginationService, ISignalRService signalRService, INotificationTemplateResolver templateResolver)
         {
             _ctx = ctx; _http = http;
             _firebase = firebase;
@@ -46,6 +48,7 @@ namespace Voltyks.Core.DTOs.Processes
             _redisService = redisService;
             _paginationService = paginationService;
             _signalRService = signalRService;
+            _templateResolver = templateResolver;
         }
 
         //        await tx.CommitAsync(ct);
@@ -186,7 +189,14 @@ namespace Voltyks.Core.DTOs.Processes
                 await _redisService.RemoveAsync($"complaint_last:{process.ChargerOwnerId}");
 
                 var lang = await GetUserLanguageAsync(process.ChargerOwnerId, ct);
-                var (title, body) = NotificationMessages.ProcessConfirmationPending(lang, process.AmountCharged, process.AmountPaid);
+                var (title, body) = await _templateResolver.ResolveAsync(
+                    "ProcessConfirmationPending", lang,
+                    new Dictionary<string, string>
+                    {
+                        ["amountCharged"] = (process.AmountCharged ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture),
+                        ["amountPaid"] = (process.AmountPaid ?? 0m).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                    },
+                    ct);
 
                 // extraData للـ FCM فقط
                 var extraData = new Dictionary<string, string>
@@ -349,8 +359,11 @@ namespace Voltyks.Core.DTOs.Processes
                 if (dto.AmountPaid != null) changes.Add($"paid: {dto.AmountPaid:0.##}");
 
                 var (title, body) = changes.Any()
-                    ? NotificationMessages.VehicleOwnerUpdateProcessWithFields(lang, string.Join(", ", changes))
-                    : NotificationMessages.VehicleOwnerUpdateProcess(lang);
+                    ? await _templateResolver.ResolveAsync(
+                        "VehicleOwnerUpdateProcessWithFields", lang,
+                        new Dictionary<string, string> { ["fieldsCsv"] = string.Join(", ", changes) }, ct)
+                    : await _templateResolver.ResolveAsync(
+                        "VehicleOwnerUpdateProcess", lang, null, ct);
 
                 // extraData للـ FCM فقط
                 var extraData = new Dictionary<string, string>
@@ -533,7 +546,8 @@ namespace Voltyks.Core.DTOs.Processes
                     if (isChargerOwner)
                     {
                         var vehicleOwnerLang = await GetUserLanguageAsync(process.VehicleOwnerId, ct);
-                        var (cTitle, cBody) = NotificationMessages.ProcessConfirmedByCharger(vehicleOwnerLang);
+                        var (cTitle, cBody) = await _templateResolver.ResolveAsync(
+                            "ProcessConfirmedByCharger", vehicleOwnerLang, null, ct);
                         await SendToUserAsync(
                             process.VehicleOwnerId,
                             cTitle,
@@ -555,7 +569,8 @@ namespace Voltyks.Core.DTOs.Processes
                     else // Vehicle Owner
                     {
                         var chargerOwnerLang = await GetUserLanguageAsync(process.ChargerOwnerId, ct);
-                        var (vTitle, vBody) = NotificationMessages.ProcessConfirmedByVehicle(chargerOwnerLang);
+                        var (vTitle, vBody) = await _templateResolver.ResolveAsync(
+                            "ProcessConfirmedByVehicle", chargerOwnerLang, null, ct);
                         await SendToUserAsync(
                             process.ChargerOwnerId,
                             vTitle,
@@ -591,7 +606,9 @@ namespace Voltyks.Core.DTOs.Processes
                     var whoStarted = isChargerOwner
                         ? (langStarted == Languages.Ar ? "صاحب الشاحن" : "Charger owner")
                         : (langStarted == Languages.Ar ? "صاحب السيارة" : "Vehicle owner");
-                    var (startedTitle, startedBody) = NotificationMessages.ProcessStarted(langStarted, whoStarted);
+                    var (startedTitle, startedBody) = await _templateResolver.ResolveAsync(
+                        "ProcessStarted", langStarted,
+                        new Dictionary<string, string> { ["whoStarted"] = whoStarted }, ct);
                     await SendToUserAsync(
                         receiverId,
                         startedTitle,
@@ -900,7 +917,14 @@ namespace Voltyks.Core.DTOs.Processes
             int userTypeId = receiverIsChargerOwner ? 1 : 2; // 1 = ChargerOwner, 2 = VehicleOwner
 
             var ratingLang = await GetUserLanguageAsync(receiverUserId, ct);
-            var (title, body) = NotificationMessages.SubmitRating(ratingLang, dto.RatingForOther, process.Id);
+            var (title, body) = await _templateResolver.ResolveAsync(
+                "SubmitRating", ratingLang,
+                new Dictionary<string, string>
+                {
+                    ["rating"] = dto.RatingForOther.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture),
+                    ["processId"] = process.Id.ToString()
+                },
+                ct);
             var notificationType = receiverIsChargerOwner
                 ? "VehicleOwner_SubmitRating"   // VO قيّم CO
                 : "ChargerOwner_SubmitRating";  // CO قيّم VO
@@ -1676,7 +1700,8 @@ namespace Voltyks.Core.DTOs.Processes
 
                         // Each receiver gets the notification in THEIR stored preferred language
                         var userLang = Languages.Normalize(user.PreferredLanguage);
-                        var (terminatedTitle, terminatedBody) = NotificationMessages.ProcessTerminated(userLang);
+                        var (terminatedTitle, terminatedBody) = await _templateResolver.ResolveAsync(
+                            "ProcessTerminated", userLang, null, ct);
 
                         // Persist to DB (like the rest of the system)
                         try

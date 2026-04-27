@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Utilities;
 using Voltyks.Core.Constants;
@@ -63,9 +64,10 @@ namespace Voltyks.Application.Services.Background
             var ctx = scope.ServiceProvider.GetRequiredService<VoltyksDbContext>();
             var processesService = scope.ServiceProvider.GetRequiredService<IProcessesService>();
             var firebaseService = scope.ServiceProvider.GetRequiredService<IFirebaseService>();
+            var templateResolver = scope.ServiceProvider.GetRequiredService<INotificationTemplateResolver>();
 
             // 1. Cleanup orphaned ChargingRequests (pending/accepted without Process)
-            await CleanupOrphanedRequestsAsync(ctx, firebaseService, ct);
+            await CleanupOrphanedRequestsAsync(ctx, firebaseService, templateResolver, ct);
 
             // 2. Cleanup stale user activities
             var usersToCheck = await ctx.Set<AppUser>()
@@ -182,6 +184,7 @@ namespace Voltyks.Application.Services.Background
         private async Task CleanupOrphanedRequestsAsync(
             VoltyksDbContext ctx,
             IFirebaseService firebaseService,
+            INotificationTemplateResolver templateResolver,
             CancellationToken ct)
         {
             var now = DateTimeHelper.GetEgyptTime();
@@ -231,7 +234,8 @@ namespace Voltyks.Application.Services.Background
                     if (user == null) continue;
 
                     // Use the receiver's stored preferred language
-                    var (expTitle, expBody) = NotificationMessages.ProcessExpired(Languages.Normalize(user.PreferredLanguage));
+                    var (expTitle, expBody) = await templateResolver.ResolveAsync(
+                        "ProcessExpired", Languages.Normalize(user.PreferredLanguage), null, ct);
 
                     // Persist to DB (like the rest of the system)
                     try

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Utilities;
 using Voltyks.Persistence.Data;
@@ -316,10 +317,12 @@ namespace Voltyks.Application.Services.Background
                 return;
 
             IFirebaseService? firebase = null;
+            INotificationTemplateResolver? templateResolver = null;
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 firebase = scope.ServiceProvider.GetRequiredService<IFirebaseService>();
+                templateResolver = scope.ServiceProvider.GetRequiredService<INotificationTemplateResolver>();
             }
             catch (Exception ex)
             {
@@ -352,7 +355,15 @@ namespace Voltyks.Application.Services.Background
                             .Where(u => u.Id == userId)
                             .Select(u => u.PreferredLanguage)
                             .FirstOrDefaultAsync(ct));
-                    var (defaultTitle, defaultBody) = NotificationMessages.DefaultRatingApplied(receiverLang, DefaultRating, processId);
+                    var (defaultTitle, defaultBody) = templateResolver != null
+                        ? await templateResolver.ResolveAsync(
+                            "DefaultRatingApplied", receiverLang,
+                            new Dictionary<string, string>
+                            {
+                                ["rating"] = DefaultRating.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture),
+                                ["processId"] = processId.ToString()
+                            }, ct)
+                        : NotificationMessages.DefaultRatingApplied(receiverLang, DefaultRating, processId);
 
                     // Persist to DB (like the rest of the system)
                     try

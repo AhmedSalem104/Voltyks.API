@@ -23,6 +23,7 @@ using Voltyks.Core.Enums;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.Localization;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Utilities;
 using Voltyks.Application.Interfaces.SignalR;
@@ -38,8 +39,9 @@ namespace Voltyks.Application.Services.UserReport
         private readonly IFirebaseService _firebase;
         private readonly ISignalRService _signalRService;
         private readonly IProcessesService _processesService;
+        private readonly INotificationTemplateResolver _templateResolver;
 
-        public UserReportService(VoltyksDbContext ctx, IMapper mapper, IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase, ISignalRService signalRService, IProcessesService processesService)
+        public UserReportService(VoltyksDbContext ctx, IMapper mapper, IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase, ISignalRService signalRService, IProcessesService processesService, INotificationTemplateResolver templateResolver)
         {
             _ctx = ctx;
             _mapper = mapper;
@@ -48,6 +50,7 @@ namespace Voltyks.Application.Services.UserReport
             _firebase = firebase;
             _signalRService = signalRService;
             _processesService = processesService;
+            _templateResolver = templateResolver;
         }
 
         public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
@@ -165,7 +168,10 @@ namespace Voltyks.Application.Services.UserReport
                     .Where(u => u.Id == receiverUserId)
                     .Select(u => u.PreferredLanguage)
                     .FirstOrDefaultAsync(ct));
-            var (title, body) = NotificationMessages.ReportFiled(reportLang, reporterName);
+            var (title, body) = await _templateResolver.ResolveAsync(
+                "ReportFiled", reportLang,
+                new Dictionary<string, string> { ["reporterName"] = reporterName },
+                ct);
 
             // data الإضافية داخل الـ push
             var extraData = new Dictionary<string, string>

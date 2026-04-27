@@ -10,6 +10,7 @@ using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Utilities;
@@ -40,10 +41,11 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly ISignalRService _signalRService;
         private readonly IProcessesService _processesService;
         private readonly ILogger<ChargingRequestService> _logger;
+        private readonly INotificationTemplateResolver _templateResolver;
 
 
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService, ILogger<ChargingRequestService> logger)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService, ILogger<ChargingRequestService> logger, INotificationTemplateResolver templateResolver)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
@@ -55,6 +57,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             _signalRService = signalRService;
             _processesService = processesService;
             _logger = logger;
+            _templateResolver = templateResolver;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -157,7 +160,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                 // 2) جهّز بيانات الإشعار
                 var recipientUserId = charger.UserId; // صاحب المحطة
                 var lang = await GetUserLanguageAsync(recipientUserId);
-                var (title, body) = NotificationMessages.VehicleOwnerRequestCharger(lang);
+                var (title, body) = await _templateResolver.ResolveAsync(
+                    "VehicleOwnerRequestCharger", lang, null);
                 var notificationType = NotificationTypes.VehicleOwner_RequestCharger; // ثوابت
                 var userTypeId = (int)NotificationUserType.ChargerOwner;              // 1
 
@@ -214,7 +218,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
                 var lang = await GetUserLanguageAsync(recipientUserId);
                 var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
-                var (title, body) = NotificationMessages.ChargerOwnerAccepted(lang, stationOwnerName);
+                var (title, body) = await _templateResolver.ResolveAsync(
+                    "ChargerOwnerAccepted", lang,
+                    new Dictionary<string, string> { ["stationOwnerName"] = stationOwnerName });
                 var notificationType = NotificationTypes.ChargerOwner_AcceptRequest;
 
                 // Timer data للـ FCM notification
@@ -306,7 +312,9 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     var lang = await GetUserLanguageAsync(recipientUserId);
                     var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
-                    var (title, body) = NotificationMessages.ChargerOwnerRejected(lang, stationOwnerName);
+                    var (title, body) = await _templateResolver.ResolveAsync(
+                        "ChargerOwnerRejected", lang,
+                        new Dictionary<string, string> { ["stationOwnerName"] = stationOwnerName });
                     var notificationType = NotificationTypes.ChargerOwner_RejectRequest;
 
                     var sent = await SendAndPersistNotificationAsync(
@@ -416,7 +424,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                 var recipientUserId = request.CarOwner?.Id; // VehicleOwner
                 var lang = await GetUserLanguageAsync(recipientUserId);
                 var stationOwnerName = request.Charger?.User?.FullName ?? "the station";
-                var (title, body) = NotificationMessages.ChargerOwnerConfirmed(lang, stationOwnerName);
+                var (title, body) = await _templateResolver.ResolveAsync(
+                    "ChargerOwnerConfirmed", lang,
+                    new Dictionary<string, string> { ["stationOwnerName"] = stationOwnerName });
                 var notificationType = NotificationTypes.ChargerOwner_ConfirmedProcessSuccessfully;
 
                 // إرسال الإشعار
@@ -485,7 +495,8 @@ namespace Voltyks.Application.Services.ChargingRequest
                     await ApplyAbortFeesForChargerOwnerAsync(request, userId);
 
                     var lang = await GetUserLanguageAsync(recipientUserId);
-                    (title, body) = NotificationMessages.ChargerOwnerAborted(lang);
+                    (title, body) = await _templateResolver.ResolveAsync(
+                        "ChargerOwnerAborted", lang, null);
                     notificationType = NotificationTypes.ChargerOwner_ProcessAborted;
                     recipientUserTypeId = 2; // VehicleOwner
                 }
@@ -496,7 +507,9 @@ namespace Voltyks.Application.Services.ChargingRequest
 
                     var driverName = request.CarOwner?.FullName ?? "the driver";
                     var lang = await GetUserLanguageAsync(recipientUserId);
-                    (title, body) = NotificationMessages.VehicleOwnerAbortedAfterPayment(lang, driverName);
+                    (title, body) = await _templateResolver.ResolveAsync(
+                        "VehicleOwnerAbortedAfterPayment", lang,
+                        new Dictionary<string, string> { ["driverName"] = driverName });
                     notificationType = NotificationTypes.VehicleOwner_ProcessAbortedAfterPaymentSuccessfully;
                     recipientUserTypeId = 1; // ChargerOwner
                 }
