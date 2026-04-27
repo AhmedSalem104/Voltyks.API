@@ -34,7 +34,8 @@ namespace Voltyks.AdminControlDashboard
             ISignalRService signalRService,
             IFirebaseService firebaseService,
             ILogger<AdminVehicleAdditionRequestsService> vehicleAdditionRequestsLogger,
-            INotificationTemplateResolver templateResolver)
+            INotificationTemplateResolver templateResolver,
+            ILogger<AdminNotificationCenterService> notificationCenterLogger)
         {
             AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor, userManager, smsEgyptService, redisService);
             AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context, httpContextAccessor);
@@ -49,6 +50,7 @@ namespace Voltyks.AdminControlDashboard
             AdminComplaintsService = new AdminComplaintsService(context);
             AdminCapacityService = new AdminCapacityService(context);
             AdminNotificationsService = new AdminNotificationsService(context);
+            AdminNotificationCenterService = new AdminNotificationCenterService(context, templateResolver, firebaseService, notificationCenterLogger);
             AdminStoreService = new AdminStoreService(context);
             AdminVehicleAdditionRequestsService = new AdminVehicleAdditionRequestsService(context, signalRService, firebaseService, vehicleAdditionRequestsLogger, templateResolver);
         }
@@ -66,6 +68,7 @@ namespace Voltyks.AdminControlDashboard
         public IAdminComplaintsService AdminComplaintsService { get; }
         public IAdminCapacityService AdminCapacityService { get; }
         public IAdminNotificationsService AdminNotificationsService { get; }
+        public IAdminNotificationCenterService AdminNotificationCenterService { get; }
         public IAdminStoreService AdminStoreService { get; }
         public IAdminVehicleAdditionRequestsService AdminVehicleAdditionRequestsService { get; }
     }

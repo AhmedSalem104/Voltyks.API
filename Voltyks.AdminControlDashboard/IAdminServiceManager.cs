@@ -19,6 +19,7 @@ namespace Voltyks.AdminControlDashboard
         IAdminComplaintsService AdminComplaintsService { get; }
         IAdminCapacityService AdminCapacityService { get; }
         IAdminNotificationsService AdminNotificationsService { get; }
+        IAdminNotificationCenterService AdminNotificationCenterService { get; }
         IAdminStoreService AdminStoreService { get; }
         IAdminVehicleAdditionRequestsService AdminVehicleAdditionRequestsService { get; }
     }
