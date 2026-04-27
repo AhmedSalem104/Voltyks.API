@@ -73,6 +73,10 @@ namespace Voltyks.Persistence.Data
         // App Settings
         public DbSet<AppSettings> AppSettings { get; set; }
 
+        // Admin Notification Center
+        public DbSet<NotificationTemplate> NotificationTemplates { get; set; }
+        public DbSet<NotificationBroadcast> NotificationBroadcasts { get; set; }
+
         // Store Module
         public DbSet<StoreCategory> StoreCategories { get; set; }
         public DbSet<StoreProduct> StoreProducts { get; set; }
