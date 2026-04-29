@@ -507,10 +507,17 @@ namespace Voltyks.AdminControlDashboard.Services
             }
             catch (Exception ex)
             {
+                var errors = new List<string> { ex.Message };
+                var inner = ex.InnerException;
+                while (inner != null)
+                {
+                    errors.Add($"Inner: {inner.Message}");
+                    inner = inner.InnerException;
+                }
                 return new ApiResponse<object>(
                     message: "Failed to permanently delete user. User may have related data that prevents deletion.",
                     status: false,
-                    errors: new List<string> { ex.Message });
+                    errors: errors);
             }
         }
 
