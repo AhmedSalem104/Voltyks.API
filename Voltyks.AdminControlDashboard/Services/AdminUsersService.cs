@@ -454,6 +454,48 @@ namespace Voltyks.AdminControlDashboard.Services
                 if (webhookLogs.Any())
                     _context.Set<CardTokenWebhookLog>().RemoveRange(webhookLogs);
 
+                // 17. Delete Processes (user as VehicleOwner or ChargerOwner)
+                var processes = await _context.Set<Process>()
+                    .Where(p => p.VehicleOwnerId == userId || p.ChargerOwnerId == userId)
+                    .ToListAsync(ct);
+                if (processes.Any())
+                    _context.Set<Process>().RemoveRange(processes);
+
+                // 18. Delete ChargingRequests where user is the RecipientUserId (charger owner)
+                //     — covers requests that didn't go through user.Chargers join above
+                var requestsAsRecipient = await _context.Set<ChargingRequest>()
+                    .Where(r => r.RecipientUserId == userId)
+                    .ToListAsync(ct);
+                if (requestsAsRecipient.Any())
+                    _context.Set<ChargingRequest>().RemoveRange(requestsAsRecipient);
+
+                // 19. Delete VehicleAdditionRequests submitted by user
+                var vehicleAdditionRequests = await _context.Set<VehicleAdditionRequest>()
+                    .Where(r => r.UserId == userId)
+                    .ToListAsync(ct);
+                if (vehicleAdditionRequests.Any())
+                    _context.Set<VehicleAdditionRequest>().RemoveRange(vehicleAdditionRequests);
+
+                // 20. Null-out audit references where the user is the admin actor
+                //     (we keep the audit row, just drop the FK to the deleted user)
+                var processedRequests = await _context.Set<VehicleAdditionRequest>()
+                    .Where(r => r.ProcessedBy == userId)
+                    .ToListAsync(ct);
+                foreach (var r in processedRequests)
+                    r.ProcessedBy = null;
+
+                var broadcastsByAdmin = await _context.Set<NotificationBroadcast>()
+                    .Where(b => b.AdminUserId == userId)
+                    .ToListAsync(ct);
+                foreach (var b in broadcastsByAdmin)
+                    b.AdminUserId = "deleted-admin";
+
+                var customizedTemplates = await _context.Set<NotificationTemplate>()
+                    .Where(t => t.UpdatedBy == userId)
+                    .ToListAsync(ct);
+                foreach (var t in customizedTemplates)
+                    t.UpdatedBy = null;
+
                 // ========== FINALLY DELETE USER ==========
                 _context.Users.Remove(user);
                 await _context.SaveChangesAsync(ct);
