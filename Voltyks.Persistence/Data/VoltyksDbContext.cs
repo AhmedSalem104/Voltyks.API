@@ -43,6 +43,7 @@ namespace Voltyks.Persistence.Data
         public DbSet<PaymentAction> PaymentActions => Set<PaymentAction>();
         public DbSet<UserSavedCard> UserSavedCards => Set<UserSavedCard>();
         public DbSet<CardTokenWebhookLog> CardTokenWebhookLogs => Set<CardTokenWebhookLog>();
+        public DbSet<RevokedCardToken> RevokedCardTokens => Set<RevokedCardToken>();
 
 
 
