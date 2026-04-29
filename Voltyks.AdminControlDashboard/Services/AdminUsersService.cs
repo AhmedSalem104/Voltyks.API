@@ -386,9 +386,15 @@ namespace Voltyks.AdminControlDashboard.Services
                     _context.Set<ChargingRequest>().RemoveRange(user.ChargingRequests);
 
                 // 8. Delete ChargingRequests ON user's chargers (must delete before chargers)
-                if (user.Chargers?.Any() == true)
+                //    Query chargers directly — the AppUser.Chargers nav is disconnected from
+                //    Charger.User config (.WithMany() without inverse) so the Include can be
+                //    incomplete. Direct query is the safe pattern used for Vehicles etc.
+                var userChargers = await _context.Set<Charger>()
+                    .Where(c => c.UserId == userId)
+                    .ToListAsync(ct);
+                if (userChargers.Any())
                 {
-                    var chargerIds = user.Chargers.Select(c => c.Id).ToList();
+                    var chargerIds = userChargers.Select(c => c.Id).ToList();
                     var requestsOnUserChargers = await _context.Set<ChargingRequest>()
                         .Where(r => chargerIds.Contains(r.ChargerId))
                         .ToListAsync(ct);
@@ -396,7 +402,7 @@ namespace Voltyks.AdminControlDashboard.Services
                         _context.Set<ChargingRequest>().RemoveRange(requestsOnUserChargers);
 
                     // 9. Delete Chargers (must delete after their requests)
-                    _context.Set<Charger>().RemoveRange(user.Chargers);
+                    _context.Set<Charger>().RemoveRange(userChargers);
                 }
 
                 // 10. Delete StoreReservations
