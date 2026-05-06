@@ -212,8 +212,16 @@ namespace Voltyks.API.Extentions
                 options.AppSecret = configuration["Authentication:Facebook:client_secret"];
             });
 
-            // Add Authorization service for role-based authorization
-            services.AddAuthorization();
+            // Add Authorization service for role-based authorization.
+            // Secure-by-default: any endpoint without [AllowAnonymous] requires
+            // an authenticated user. Endpoints with [Authorize(Roles=...)] still
+            // enforce their role check on top.
+            services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
 
             // ✅ Firebase Admin Initialization
             if (FirebaseApp.DefaultInstance == null)

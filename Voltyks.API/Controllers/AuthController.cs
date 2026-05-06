@@ -34,6 +34,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("Login")]
+        [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDTO loginDTO)
         {
             var result = await serviceManager.AuthService.LoginAsync(loginDTO);
@@ -45,6 +46,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("register")]
+        [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] RegisterDTO registerDTO)
         {
             var result = await serviceManager.AuthService.RegisterAsync(registerDTO);
@@ -71,6 +73,7 @@ namespace Voltyks.Presentation
         // }
 
         [HttpPost("RefreshToken")]
+        [AllowAnonymous]
         public IActionResult RefreshJwtToken()
         {
             return BadRequest(new ApiResponse<object>(
@@ -82,6 +85,7 @@ namespace Voltyks.Presentation
         // ========== END REFRESH TOKEN DISABLED ==========
 
         [HttpPost("CheckPhoneNumberExists")]
+        [AllowAnonymous]
         public async Task<IActionResult> CheckPhoneNumberExists([FromBody] PhoneNumberDto phoneNumberDto)
         {
             if (string.IsNullOrWhiteSpace(phoneNumberDto?.PhoneNumber))
@@ -96,6 +100,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("CheckEmailExists")]
+        [AllowAnonymous]
         public async Task<IActionResult> CheckEmailExists([FromBody] EmailDto emailDto)
         {
             if (string.IsNullOrWhiteSpace(emailDto?.Email))
@@ -110,6 +115,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("Logout")]
+        [AllowAnonymous]
         public async Task<IActionResult> Logout([FromBody] TokenDto tokenDto)
         {
 
@@ -123,6 +129,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("forget-password")]
+        [AllowAnonymous]
         public async Task<IActionResult> ForgetPassword([FromBody] ForgetPasswordDto model)
         {
             if (!ModelState.IsValid)
@@ -137,6 +144,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("verify-forget-password-otp")]
+        [AllowAnonymous]
         public async Task<IActionResult> VerifyForgetPasswordOtp([FromBody] VerifyForgetPasswordOtpDto model)
         {
             if (!ModelState.IsValid)
@@ -151,6 +159,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("reset-password")]
+        [AllowAnonymous]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
         {
             if (!ModelState.IsValid)
@@ -183,6 +192,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("SendSmsEgyptOtp")]
+        [AllowAnonymous]
         public async Task<IActionResult> SendOtp([FromBody] SendSmsEgyptOtpDto dto)
         {
             if (!ModelState.IsValid)
@@ -193,6 +203,7 @@ namespace Voltyks.Presentation
         }
 
         [HttpPost("VerifySmsEgyptOtp")]
+        [AllowAnonymous]
         public async Task<IActionResult> VerifyOtp([FromBody] SmsEgyptVerifyOtpDto dto)
         {
             if (!ModelState.IsValid)

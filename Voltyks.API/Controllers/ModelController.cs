@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.ServicesManager.ServicesManager;
 using Voltyks.Core.DTOs.ModelDTOs;
@@ -7,6 +8,7 @@ namespace Voltyks.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     public class ModelController(IServiceManager _serviceManager) : ControllerBase
     {
         [HttpGet("GetModelsByBrandId")]

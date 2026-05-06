@@ -18,6 +18,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetCapacity")]
+        [AllowAnonymous]
         [ResponseCache(Duration = 3600)] // 1 hour cache
         public async Task<IActionResult> GetCapacity()
         {
@@ -26,6 +27,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetProtocol")]
+        [AllowAnonymous]
         [ResponseCache(Duration = 3600)] // 1 hour cache
         public async Task<IActionResult> GetProtocol()
         {
@@ -34,6 +36,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetPrices")]
+        [AllowAnonymous]
         [ResponseCache(Duration = 1800)] // 30 min cache
         public async Task<IActionResult> GetPriceBasedOnCapacity()
         {

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.ServicesManager.ServicesManager;
@@ -9,6 +10,7 @@ namespace Voltyks.API.Controllers
 {
     [ApiController]
     [Route("api/v1/app-config")]
+    [AllowAnonymous]
     public class AppConfigController : ControllerBase
     {
         private readonly IServiceManager _serviceManager;

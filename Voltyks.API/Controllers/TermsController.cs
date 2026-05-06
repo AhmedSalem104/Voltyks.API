@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.Interfaces.Terms;
@@ -17,6 +18,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> Get([FromQuery] string lang = "en", [FromQuery] int? version = null, CancellationToken ct = default)
         {
             var result = await _terms.GetAsync(lang, version, ct);

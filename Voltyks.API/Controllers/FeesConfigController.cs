@@ -17,6 +17,7 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> Get()
         {
             var res = await _service.GetAsync();

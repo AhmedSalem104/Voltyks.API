@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Voltyks.Application.ServicesManager.ServicesManager;
 
 namespace Voltyks.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [AllowAnonymous]
     public class BrandController : ControllerBase
     {
         private readonly IServiceManager _service;
