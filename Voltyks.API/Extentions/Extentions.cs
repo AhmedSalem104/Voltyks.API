@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.IO.Compression;
 using System.Data.Entity.Infrastructure;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
@@ -525,6 +526,33 @@ namespace Voltyks.API.Extentions
 
                         var result = JsonSerializer.Serialize(response);
                         return context.Response.WriteAsync(result);
+                    },
+                    // After signature/lifetime/issuer/audience pass, confirm the
+                    // user behind the token still exists and is not deleted or
+                    // banned. JWT is stateless so a token issued before a user
+                    // was deleted would otherwise remain usable until expiry.
+                    OnTokenValidated = async context =>
+                    {
+                        var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                        if (string.IsNullOrEmpty(userId))
+                        {
+                            context.Fail("Token is missing a user identifier.");
+                            return;
+                        }
+
+                        var db = context.HttpContext.RequestServices
+                            .GetRequiredService<VoltyksDbContext>();
+
+                        var status = await db.Users
+                            .AsNoTracking()
+                            .Where(u => u.Id == userId)
+                            .Select(u => new { u.IsDeleted, u.IsBanned })
+                            .FirstOrDefaultAsync();
+
+                        if (status == null || status.IsDeleted || status.IsBanned)
+                        {
+                            context.Fail("User account is no longer active.");
+                        }
                     }
                 };
 
