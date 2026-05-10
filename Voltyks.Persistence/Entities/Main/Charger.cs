@@ -30,6 +30,7 @@ namespace Voltyks.Persistence.Entities.Main
 
 
         public ICollection<ChargingRequest> ChargingRequests { get; set; }
+        public ICollection<ChargerAdapter> Adapters { get; set; } = new List<ChargerAdapter>();
 
 
 

@@ -15,6 +15,7 @@ using System.Threading.Channels;
 using static System.Net.Mime.MediaTypeNames;
 using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Interfaces.FeesConfig;
+using Microsoft.EntityFrameworkCore;
 
 namespace Voltyks.Application.Interfaces.ChargerStation
 {
@@ -259,12 +260,17 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
         private async Task<List<Charger>> GetChargersFromDbAsync(NearChargerSearchDto searchDto, string currentUserId)
         {
-            // فصل منطق عرض الشاحن عن Adapter فقط
-            // الـ Adapter تكون معلومة إضافية وليست شرط للظهور
-            // لكن IsAvailable و IsActive لازم يكونوا true
+            // الشاحن يظهر لو نوعه يطابق المطلوب أو لو في ChargerAdapters صف بيقول إنه بيدعم
+            // البروتوكول المطلوب عبر adapter — الـ many-to-many هي source of truth الداخلي
+            var supportedChargerIds = await _unitOfWork.GetRepository<Charger, int>()
+                .Query()
+                .Where(c => c.Adapters.Any(a => a.ProtocolId == searchDto.ProtocolId))
+                .Select(c => c.Id)
+                .ToListAsync();
+
             return (await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
                c => !c.IsDeleted && c.IsActive &&
-                    c.ProtocolId == searchDto.ProtocolId &&
+                    (c.ProtocolId == searchDto.ProtocolId || supportedChargerIds.Contains(c.Id)) &&
                     c.User.IsAvailable == true &&
                     c.User.IsBanned == false &&
                     c.User.Id != currentUserId,
@@ -410,6 +416,19 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             charger.AddressId = addressId;
             charger.Adaptor = dto.Adaptor;
             charger.IsActive = chargingModeEnabled; // Inactive لو الوضع مُعطّل
+
+            // Internal sync: لو الـ Adaptor flag = true، نحط صف في ChargerAdapters
+            // لكل بروتوكول تاني — ده بيخلي الـ search اللاحق يلاقي الشاحن في
+            // cross-protocol queries بدون أي تغيير في الـ DTO أو الـ response.
+            if (dto.Adaptor == true)
+            {
+                var otherProtocols = await _unitOfWork.GetRepository<Protocol, int>()
+                    .GetAllAsync(p => p.Id != dto.ProtocolId);
+                foreach (var p in otherProtocols)
+                {
+                    charger.Adapters.Add(new ChargerAdapter { ProtocolId = p.Id });
+                }
+            }
 
             await _unitOfWork.GetRepository<Charger, int>().AddAsync(charger);
             await _unitOfWork.SaveChangesAsync();
