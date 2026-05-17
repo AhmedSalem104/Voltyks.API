@@ -10,6 +10,7 @@ using Voltyks.Application.Interfaces;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
+using Voltyks.Application.Interfaces.Geocoding;
 using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.SignalR;
@@ -42,10 +43,11 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly IProcessesService _processesService;
         private readonly ILogger<ChargingRequestService> _logger;
         private readonly INotificationTemplateResolver _templateResolver;
+        private readonly IGeocodingService _geocodingService;
 
 
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService, ILogger<ChargingRequestService> logger, INotificationTemplateResolver templateResolver)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService, ILogger<ChargingRequestService> logger, INotificationTemplateResolver templateResolver, IGeocodingService geocodingService)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
@@ -58,6 +60,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             _processesService = processesService;
             _logger = logger;
             _templateResolver = templateResolver;
+            _geocodingService = geocodingService;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -670,7 +673,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 {
                     try
                     {
-                        var (area, street) = await GetAddressFromLatLongNominatimAsync(request.Latitude, request.Longitude);
+                        var (area, street) = await _geocodingService.GetAddressAsync(request.Latitude, request.Longitude);
                         if (!string.IsNullOrWhiteSpace(area)) vehicleArea = area;
                         if (!string.IsNullOrWhiteSpace(street)) vehicleStreet = street;
                     }
@@ -726,72 +729,6 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
             }
         }    
-        public async Task<(string Area, string Street)> GetAddressFromLatLongNominatimAsync(double latitude, double longitude)
-        {
-            try
-            {
-                // Nominatim API (مجاني)
-                string url = $"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={latitude}&lon={longitude}&addressdetails=1&accept-language=ar";
-
-                var client = _httpClientFactory.CreateClient();
-                client.Timeout = TimeSpan.FromSeconds(10);
-                // لازم User-Agent واضح (اسم مشروعك/ايميل تواصل)
-                client.DefaultRequestHeaders.UserAgent.Clear();
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("VoltyksApp", "1.0"));
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("(support@voltyks.com)"));
-
-                var resp = await client.GetAsync(url);
-                if (!resp.IsSuccessStatusCode)
-                    return ("N/A", "N/A");
-
-                var body = await resp.Content.ReadAsStringAsync();
-                var json = JObject.Parse(body);
-                var address = json["address"] as JObject;
-                if (address == null)
-                    return ("N/A", "N/A");
-
-                // نحاول نطلع الشارع
-                // Nominatim ممكن يرجع street تحت مفاتيح مختلفة (road, pedestrian, footway...)
-                string street =
-                    (string)address["road"] ??
-                    (string)address["pedestrian"] ??
-                    (string)address["footway"] ??
-                    (string)address["path"] ??
-                    (string)address["residential"] ??
-                    (string)address["neighbourhood"] ??
-                    "N/A";
-
-                // نحاول نطلع المنطقة/الحَي/المدينة
-                // بنستخدم fallback ذكي حسب المتاح
-                string area =
-                    (string)address["suburb"] ??
-                    (string)address["neighbourhood"] ??
-                    (string)address["city_district"] ??
-                    (string)address["city"] ??
-                    (string)address["town"] ??
-                    (string)address["village"] ??
-                    (string)address["county"] ??
-                    (string)address["state_district"] ??
-                    (string)address["state"] ??
-                    "N/A";
-
-                return (area, street);
-            }
-            catch (HttpRequestException)
-            {
-                return ("N/A", "N/A");
-            }
-            catch (TaskCanceledException)
-            {
-                return ("N/A", "N/A");
-            }
-            catch (Exception)
-            {
-                return ("N/A", "N/A");
-            }
-        }
         public async Task<ApiResponse<decimal>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
         {
             var req = await _db.Set<ChargingRequestEntity>()
