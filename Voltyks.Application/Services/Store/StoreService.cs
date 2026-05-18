@@ -15,6 +15,7 @@ using Voltyks.Core.DTOs.Store.Categories;
 using Voltyks.Core.DTOs.Store.Products;
 using Voltyks.Core.DTOs.Store.Reservations;
 using Voltyks.Core.Enums;
+using Voltyks.Core.Utilities;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Main;
 using Voltyks.Persistence.Entities.Main.Store;
@@ -116,7 +117,7 @@ namespace Voltyks.Application.Services.Store
                         CategoryName = p.Category != null ? p.Category.Name : "",
                         Name = p.Name,
                         Slug = p.Slug,
-                        Price = p.Price,
+                        Price = MoneyRounding.ToInt(p.Price),
                         Currency = p.Currency,
                         ThumbnailImage = GetFirstImage(p.ImagesJson),
                         Status = p.Status,
@@ -289,8 +290,8 @@ namespace Voltyks.Application.Services.Store
                     ProductName = product.Name,
                     ProductThumbnail = GetFirstImage(product.ImagesJson),
                     Quantity = reservation.Quantity,
-                    UnitPrice = reservation.UnitPrice,
-                    TotalPrice = reservation.TotalPrice,
+                    UnitPrice = MoneyRounding.ToInt(reservation.UnitPrice),
+                    TotalPrice = MoneyRounding.ToInt(reservation.TotalPrice),
                     Currency = product.Currency,
                     Status = reservation.Status,
                     PaymentStatus = reservation.PaymentStatus,
@@ -331,8 +332,8 @@ namespace Voltyks.Application.Services.Store
                         ProductName = r.Product != null ? r.Product.Name : "",
                         ProductThumbnail = r.Product != null ? GetFirstImage(r.Product.ImagesJson) : null,
                         Quantity = r.Quantity,
-                        UnitPrice = r.UnitPrice,
-                        TotalPrice = r.TotalPrice,
+                        UnitPrice = MoneyRounding.ToInt(r.UnitPrice),
+                        TotalPrice = MoneyRounding.ToInt(r.TotalPrice),
                         Currency = r.Product != null ? r.Product.Currency : "EGP",
                         Status = r.Status,
                         PaymentStatus = r.PaymentStatus,
@@ -390,8 +391,8 @@ namespace Voltyks.Application.Services.Store
                     ProductName = reservation.Product?.Name ?? "",
                     ProductThumbnail = GetFirstImage(reservation.Product?.ImagesJson),
                     Quantity = reservation.Quantity,
-                    UnitPrice = reservation.UnitPrice,
-                    TotalPrice = reservation.TotalPrice,
+                    UnitPrice = MoneyRounding.ToInt(reservation.UnitPrice),
+                    TotalPrice = MoneyRounding.ToInt(reservation.TotalPrice),
                     Currency = reservation.Product?.Currency ?? "EGP",
                     Status = reservation.Status,
                     PaymentStatus = reservation.PaymentStatus,
@@ -503,7 +504,7 @@ namespace Voltyks.Application.Services.Store
                 Name = product.Name,
                 Slug = product.Slug,
                 Description = product.Description,
-                Price = product.Price,
+                Price = MoneyRounding.ToInt(product.Price),
                 Currency = product.Currency,
                 Images = ParseImages(product.ImagesJson),
                 Specifications = ParseSpecifications(product.SpecificationsJson),

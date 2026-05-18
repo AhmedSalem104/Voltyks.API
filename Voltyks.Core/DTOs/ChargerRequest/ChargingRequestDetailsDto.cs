@@ -31,7 +31,7 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         public double KwNeeded { get; set; }
         public int CurrentBatteryPercentage { get; set; }
 
-        public decimal PricePerHour { get; set; }
+        public int PricePerHour { get; set; }
         public double TimeNeeded { get; set; }  // Time to charge in MINUTES
         public bool AdapterNeeded { get; set; }
         public string AdapterAvailability { get; set; }
@@ -46,8 +46,8 @@ namespace Voltyks.Core.DTOs.ChargerRequest
 
         // Extras
         public double EstimatedArrival { get; set; }
-        public decimal EstimatedPrice { get; set; }
-        public decimal BaseAmount { get; set; }
+        public int EstimatedPrice { get; set; }
+        public int BaseAmount { get; set; }
         public decimal VoltyksFees { get; set; }
 
 

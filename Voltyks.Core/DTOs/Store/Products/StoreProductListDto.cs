@@ -7,7 +7,7 @@ namespace Voltyks.Core.DTOs.Store.Products
         public string CategoryName { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
-        public decimal Price { get; set; }
+        public int Price { get; set; }
         public string Currency { get; set; } = "EGP";
         public string? ThumbnailImage { get; set; }
         public string Status { get; set; } = string.Empty;

@@ -28,19 +28,13 @@ namespace Voltyks.Core.DTOs.Charger
         public CapacityDto Capacity { get; set; }
 
 
-        public decimal PricePerHour { get; set; }
+        public int PricePerHour { get; set; }
         public string AdapterAvailability { get; set; }
 
-        public double PriceEstimated { get; set; }
+        public int PriceEstimated { get; set; }
 
-        /// <summary>
-        /// Base charging cost before fees (PricePerHour × ChargingTimeInHours)
-        /// </summary>
-        public decimal BaseAmount { get; set; }
+        public int BaseAmount { get; set; }
 
-        /// <summary>
-        /// Voltyks platform fees
-        /// </summary>
         public decimal VoltyksFees { get; set; }
 
         /// <summary>

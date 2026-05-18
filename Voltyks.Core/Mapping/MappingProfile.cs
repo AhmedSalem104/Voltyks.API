@@ -7,6 +7,7 @@ using Voltyks.Core.DTOs.FeesConfig;
 using Voltyks.Core.DTOs.ModelDTOs;
 using Voltyks.Core.DTOs.Report;
 using Voltyks.Core.DTOs.VehicleDTOs;
+using Voltyks.Core.Utilities;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
 using ChargerDto = Voltyks.Core.DTOs.Charger.ChargerDto;
@@ -26,7 +27,8 @@ namespace Voltyks.Core.Mapping
             CreateMap<Capacity, CapacityDto>().ReverseMap();
             CreateMap<Protocol, ProtocolDto>();
             CreateMap<PriceOption, PriceByCapacityDto>();
-            CreateMap<PriceOption, PriceOptionDto>();
+            CreateMap<PriceOption, PriceOptionDto>()
+                .ForMember(dest => dest.Price, opt => opt.MapFrom(src => MoneyRounding.ToInt(src.Value)));
             CreateMap<AppUser, UserDetailsDto>();
 
 
@@ -62,7 +64,7 @@ namespace Voltyks.Core.Mapping
             CreateMap<Charger, ChargerDto>()
                 .ForMember(dest => dest.Protocol, opt => opt.MapFrom(src => src.Protocol != null ? src.Protocol.Name : null))
                 .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => src.Capacity != null ? src.Capacity.kw : 0))
-                .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption != null ? src.PriceOption.Value : 0))
+                .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption != null ? MoneyRounding.ToInt(src.PriceOption.Value) : 0))
                 .ForMember(dest => dest.Area, opt => opt.MapFrom(src => src.Address != null ? src.Address.Area : null))
                 .ForMember(dest => dest.Street, opt => opt.MapFrom(src => src.Address != null ? src.Address.Street : null))
                 .ForMember(dest => dest.BuildingNumber, opt => opt.MapFrom(src => src.Address != null ? src.Address.BuildingNumber : null))
@@ -81,7 +83,7 @@ namespace Voltyks.Core.Mapping
                 .ForMember(dest => dest.Street, opt => opt.MapFrom(src => src.Address.Street))
                 .ForMember(dest => dest.Protocol, opt => opt.MapFrom(src => src.Protocol.Name))
                 .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => $"{src.Capacity.kw} KW/h"))
-                .ForMember(dest => dest.PricePerHour, opt => opt.MapFrom(src => $"{src.PriceOption.Value}/1Hr"))
+                .ForMember(dest => dest.PricePerHour, opt => opt.MapFrom(src => MoneyRounding.ToInt(src.PriceOption.Value)))
                 .ForMember(dest => dest.AdapterAvailability, opt => opt.MapFrom(src => (bool)src.Adaptor ? "Available" : "Not Available"))
                 .ForMember(dest => dest.PriceEstimated, opt => opt.Ignore())
                 .ForMember(dest => dest.DistanceInKm, opt => opt.Ignore())
@@ -91,7 +93,7 @@ namespace Voltyks.Core.Mapping
             CreateMap<Charger, NearChargerDto>()
                 .ForMember(dest => dest.ChargerId, opt => opt.MapFrom(src => src.Id))
                 .ForMember(dest => dest.Capacity, opt => opt.MapFrom(src => src.Capacity.kw))
-                .ForMember(dest => dest.Price, opt => opt.MapFrom(src => src.PriceOption.Value))
+                .ForMember(dest => dest.Price, opt => opt.MapFrom(src => MoneyRounding.ToInt(src.PriceOption.Value)))
                 .ForMember(dest => dest.Latitude, opt => opt.MapFrom(src => src.Address.Latitude))
                 .ForMember(dest => dest.Longitude, opt => opt.MapFrom(src => src.Address.Longitude))
                 .ForMember(dest => dest.DistanceInKm, opt => opt.Ignore()) // نحسبها يدوي
@@ -111,7 +113,7 @@ namespace Voltyks.Core.Mapping
                 .ForMember(d => d.ChargerId, o => o.MapFrom(s => s.ChargerId))
                 .ForMember(d => d.Protocol, o => o.MapFrom(s => s.Charger.Protocol != null ? s.Charger.Protocol.Name : "Unknown"))
                 .ForMember(d => d.CapacityKw, o => o.MapFrom(s => s.Charger.Capacity != null ? s.Charger.Capacity.kw : 0))
-                .ForMember(d => d.PricePerHour, o => o.MapFrom(s => s.Charger.PriceOption != null ? s.Charger.PriceOption.Value : 0))
+                .ForMember(d => d.PricePerHour, o => o.MapFrom(s => s.Charger.PriceOption != null ? MoneyRounding.ToInt(s.Charger.PriceOption.Value) : 0))
                 // TimeNeeded in MINUTES (unified with ChargerService)
                 .ForMember(d => d.TimeNeeded, o => o.MapFrom(s => s.Charger.Capacity != null && s.Charger.Capacity.kw > 0
                     ? Math.Round((s.KwNeeded / s.Charger.Capacity.kw) * 60, 0) : 0))

@@ -16,6 +16,7 @@ using Voltyks.Application.Interfaces.Processes;
 using Voltyks.Application.Interfaces.SignalR;
 using Voltyks.Application.Utilities;
 using Voltyks.Core.Constants;
+using Voltyks.Core.Utilities;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.Enums;
@@ -702,7 +703,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     ChargerId = request.ChargerId,
                     Protocol = request.Charger.Protocol?.Name ?? "Unknown",
                     CapacityKw = request.Charger.Capacity?.kw ?? 0,
-                    PricePerHour = request.Charger.PriceOption?.Value ?? 0,
+                    PricePerHour = MoneyRounding.ToInt(request.Charger.PriceOption?.Value ?? 0m),
                     // TimeNeeded in MINUTES (unified with ChargerService)
                     TimeNeeded = request.Charger.Capacity?.kw > 0
                         ? Math.Round((request.KwNeeded / request.Charger.Capacity.kw) * 60, 0)
@@ -714,10 +715,10 @@ namespace Voltyks.Application.Services.ChargingRequest
                     VehicleArea = vehicleArea,
                     VehicleStreet = vehicleStreet,
                     EstimatedArrival = estimatedArrival,
-                    BaseAmount = request.BaseAmount,
+                    BaseAmount = MoneyRounding.ToInt(request.BaseAmount),
                     VoltyksFees = request.VoltyksFees,
                     //EstimatedPrice = request.EstimatedPrice,
-                    EstimatedPrice = estimatedPriceFinal,
+                    EstimatedPrice = MoneyRounding.ToInt(estimatedPriceFinal),
                     DistanceInKm = distanceKm
 
                 };

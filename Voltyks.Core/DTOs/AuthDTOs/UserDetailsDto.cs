@@ -29,7 +29,7 @@ namespace Voltyks.Core.DTOs.AuthDTOs
     public class PriceOptionDto
     {
         public string OptionName { get; set; }
-        public decimal Price { get; set; }
+        public int Price { get; set; }
     }
 
 

@@ -11,7 +11,7 @@ namespace Voltyks.Core.DTOs.Charger
         public int Id { get; set; }
         public string Protocol { get; set; }
         public int Capacity { get; set; }
-        public decimal Price { get; set; }
+        public int Price { get; set; }
         public string Area { get; set; }
         public string Street { get; set; }
         public string BuildingNumber { get; set; }

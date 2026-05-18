@@ -15,6 +15,7 @@ using System.Threading.Channels;
 using static System.Net.Mime.MediaTypeNames;
 using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Interfaces.FeesConfig;
+using Voltyks.Core.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Voltyks.Application.Interfaces.ChargerStation
@@ -239,7 +240,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 Longitude = charger.Address.Longitude,
                 Protocol = charger.Protocol?.Name,
                 Capacity = charger.Capacity != null ? new CapacityDto { KW = charger.Capacity.kw } : null,
-                PricePerHour = charger.PriceOption != null ? charger.PriceOption.Value : 0m,
+                PricePerHour = charger.PriceOption != null ? MoneyRounding.ToInt(charger.PriceOption.Value) : 0,
         
 
                 AdapterAvailability = charger.Adaptor == true ? "Available" : "Not Available",
@@ -337,7 +338,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
 
             // 1) حساب PriceEstimated (السعر الأصلي)
             decimal priceEstimated = charger.PriceOption.Value * (decimal)sessionDurationHr;
-            dto.PriceEstimated = (double)Math.Round(priceEstimated, 2);
+            dto.PriceEstimated = MoneyRounding.ToInt(priceEstimated);
 
             // 2) حساب VoltyksFees من PriceEstimated
             var feesCfg = await _feesConfigService.GetAsync();
@@ -345,7 +346,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             dto.VoltyksFees = voltyksFee;
 
             // 3) حساب BaseAmount = PriceEstimated - VoltyksFees
-            dto.BaseAmount = Math.Max(priceEstimated - voltyksFee, 0m);
+            dto.BaseAmount = MoneyRounding.ToInt(Math.Max(priceEstimated - voltyksFee, 0m));
 
             // TimeNeeded is already set in GetChargerByIdAsync
         }

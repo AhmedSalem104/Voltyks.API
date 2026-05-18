@@ -9,8 +9,8 @@ namespace Voltyks.Core.DTOs.Store.Reservations
         public string ProductName { get; set; } = string.Empty;
         public string? ProductThumbnail { get; set; }
         public int Quantity { get; set; }
-        public decimal UnitPrice { get; set; }
-        public decimal TotalPrice { get; set; }
+        public int UnitPrice { get; set; }
+        public int TotalPrice { get; set; }
         public string Currency { get; set; } = "EGP";
         public string Status { get; set; } = string.Empty;
         public string PaymentStatus { get; set; } = string.Empty;

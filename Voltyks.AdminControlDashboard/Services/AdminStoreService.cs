@@ -10,6 +10,7 @@ using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.Common;
 using Voltyks.Core.DTOs.Store.Admin;
+using Voltyks.Core.Utilities;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Main.Store;
 
@@ -390,7 +391,7 @@ namespace Voltyks.AdminControlDashboard.Services
                     Name = p.Name,
                     Slug = p.Slug,
                     Description = p.Description,
-                    Price = p.Price,
+                    Price = MoneyRounding.ToInt(p.Price),
                     Currency = p.Currency,
                     Images = ParseImages(p.ImagesJson),
                     Specifications = ParseSpecifications(p.SpecificationsJson),
@@ -437,7 +438,7 @@ namespace Voltyks.AdminControlDashboard.Services
                     Name = product.Name,
                     Slug = product.Slug,
                     Description = product.Description,
-                    Price = product.Price,
+                    Price = MoneyRounding.ToInt(product.Price),
                     Currency = product.Currency,
                     Images = ParseImages(product.ImagesJson),
                     Specifications = ParseSpecifications(product.SpecificationsJson),
@@ -517,7 +518,7 @@ namespace Voltyks.AdminControlDashboard.Services
                     Name = product.Name,
                     Slug = product.Slug,
                     Description = product.Description,
-                    Price = product.Price,
+                    Price = MoneyRounding.ToInt(product.Price),
                     Currency = product.Currency,
                     Images = dto.Images ?? new List<string>(),
                     Specifications = dto.Specifications,
@@ -621,7 +622,7 @@ namespace Voltyks.AdminControlDashboard.Services
                     Name = product.Name,
                     Slug = product.Slug,
                     Description = product.Description,
-                    Price = product.Price,
+                    Price = MoneyRounding.ToInt(product.Price),
                     Currency = product.Currency,
                     Images = ParseImages(product.ImagesJson),
                     Specifications = ParseSpecifications(product.SpecificationsJson),
@@ -808,8 +809,8 @@ namespace Voltyks.AdminControlDashboard.Services
                         ProductName = r.Product != null ? r.Product.Name : "",
                         ProductThumbnail = r.Product != null ? GetFirstImage(r.Product.ImagesJson) : null,
                         Quantity = r.Quantity,
-                        UnitPrice = r.UnitPrice,
-                        TotalPrice = r.TotalPrice,
+                        UnitPrice = (int)Math.Round(r.UnitPrice),
+                        TotalPrice = (int)Math.Round(r.TotalPrice),
                         Currency = r.Product != null ? r.Product.Currency : "EGP",
                         Status = r.Status,
                         PaymentStatus = r.PaymentStatus,
@@ -865,8 +866,8 @@ namespace Voltyks.AdminControlDashboard.Services
                     ProductName = reservation.Product?.Name ?? "",
                     ProductThumbnail = GetFirstImage(reservation.Product?.ImagesJson),
                     Quantity = reservation.Quantity,
-                    UnitPrice = reservation.UnitPrice,
-                    TotalPrice = reservation.TotalPrice,
+                    UnitPrice = MoneyRounding.ToInt(reservation.UnitPrice),
+                    TotalPrice = MoneyRounding.ToInt(reservation.TotalPrice),
                     Currency = reservation.Product?.Currency ?? "EGP",
                     Status = reservation.Status,
                     PaymentStatus = reservation.PaymentStatus,

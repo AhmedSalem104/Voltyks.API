@@ -11,7 +11,7 @@ namespace Voltyks.Core.DTOs.Store.Admin
         public string Name { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public decimal Price { get; set; }
+        public int Price { get; set; }
         public string Currency { get; set; } = "EGP";
         public List<string> Images { get; set; } = new();
         public Dictionary<string, string>? Specifications { get; set; }

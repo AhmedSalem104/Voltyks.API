@@ -10,7 +10,7 @@ namespace Voltyks.Core.DTOs.Charger
     {
         public int ChargerId { get; set; }
         public int Capacity { get; set; }
-        public decimal Price { get; set; }
+        public int Price { get; set; }
         public double DistanceInKm { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }

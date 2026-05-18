@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Core.Exceptions;
 using Voltyks.Core.DTOs.AuthDTOs;
+using Voltyks.Core.Utilities;
 using Google.Apis.Auth;
 using Newtonsoft.Json;
 using System.ComponentModel.DataAnnotations;
@@ -709,9 +710,9 @@ namespace Voltyks.Application.Services.Auth
                                   * (decimal)req.KwNeeded
                                   / (decimal)req.Charger.Capacity.kw;
                     }
-                    dto.BaseAmount = baseAmt;
+                    dto.BaseAmount = MoneyRounding.ToInt(baseAmt);
                     dto.VoltyksFees = req.VoltyksFees;
-                    dto.EstimatedPrice = Math.Max(baseAmt - req.VoltyksFees, 0m);
+                    dto.EstimatedPrice = MoneyRounding.ToInt(Math.Max(baseAmt - req.VoltyksFees, 0m));
                 }
                 // (6) عنوان موقع السيارة (اختياري)
                 string vehicleArea = "N/A";
