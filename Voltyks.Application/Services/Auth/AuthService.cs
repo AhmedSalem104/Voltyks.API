@@ -711,7 +711,7 @@ namespace Voltyks.Application.Services.Auth
                                   / (decimal)req.Charger.Capacity.kw;
                     }
                     dto.BaseAmount = MoneyRounding.ToInt(baseAmt);
-                    dto.VoltyksFees = req.VoltyksFees;
+                    dto.VoltyksFees = MoneyRounding.ToInt(req.VoltyksFees);
                     dto.EstimatedPrice = MoneyRounding.ToInt(Math.Max(baseAmt - req.VoltyksFees, 0m));
                 }
                 // (6) عنوان موقع السيارة (اختياري)

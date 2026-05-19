@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Voltyks.AdminControlDashboard.Dtos.Process;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Core.DTOs;
+using Voltyks.Core.Utilities;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 
@@ -69,9 +70,9 @@ namespace Voltyks.AdminControlDashboard.Services
                     Status = p.Status.ToString(),
                     DateCreated = p.DateCreated,
                     DateCompleted = p.DateCompleted,
-                    EstimatedPrice = p.EstimatedPrice,
-                    AmountPaid = p.AmountPaid,
-                    AmountCharged = p.AmountCharged,
+                    EstimatedPrice = MoneyRounding.ToIntOrNull(p.EstimatedPrice),
+                    AmountPaid = MoneyRounding.ToIntOrNull(p.AmountPaid),
+                    AmountCharged = MoneyRounding.ToIntOrNull(p.AmountCharged),
                     VehicleOwnerRating = p.VehicleOwnerRating,
                     ChargerOwnerRating = p.ChargerOwnerRating,
 
@@ -102,15 +103,15 @@ namespace Voltyks.AdminControlDashboard.Services
                     RequestedAt = cr?.RequestedAt ?? DateTime.MinValue,
                     RespondedAt = cr?.RespondedAt,
                     ConfirmedAt = cr?.ConfirmedAt,
-                    BaseAmount = cr?.BaseAmount ?? 0,
-                    VoltyksFees = cr?.VoltyksFees ?? 0,
-                    RequestEstimatedPrice = cr?.EstimatedPrice ?? 0,
+                    BaseAmount = MoneyRounding.ToInt(cr?.BaseAmount ?? 0),
+                    VoltyksFees = MoneyRounding.ToInt(cr?.VoltyksFees ?? 0),
+                    RequestEstimatedPrice = MoneyRounding.ToInt(cr?.EstimatedPrice ?? 0),
 
                     // Charger
                     ChargerId = charger?.Id ?? 0,
                     ChargerProtocol = charger?.Protocol?.Name ?? "",
                     ChargerCapacityKw = charger?.Capacity?.kw ?? 0,
-                    ChargerPrice = charger?.PriceOption?.Value ?? 0,
+                    ChargerPrice = MoneyRounding.ToInt(charger?.PriceOption?.Value ?? 0),
                     ChargerHasAdaptor = charger?.Adaptor ?? false,
                     ChargerRating = charger?.AverageRating ?? 0,
                     ChargerIsActive = charger?.IsActive ?? false,

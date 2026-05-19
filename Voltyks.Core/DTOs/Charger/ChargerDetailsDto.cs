@@ -35,7 +35,7 @@ namespace Voltyks.Core.DTOs.Charger
 
         public int BaseAmount { get; set; }
 
-        public decimal VoltyksFees { get; set; }
+        public int VoltyksFees { get; set; }
 
         /// <summary>
         /// Estimated charging time in MINUTES based on KwNeed and charger capacity

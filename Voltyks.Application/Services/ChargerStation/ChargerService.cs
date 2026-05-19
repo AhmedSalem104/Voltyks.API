@@ -343,7 +343,7 @@ namespace Voltyks.Application.Interfaces.ChargerStation
             // 2) حساب VoltyksFees من PriceEstimated
             var feesCfg = await _feesConfigService.GetAsync();
             decimal voltyksFee = ApplyFeesRules(priceEstimated, feesCfg.Data.Percentage, feesCfg.Data.MinimumFee);
-            dto.VoltyksFees = voltyksFee;
+            dto.VoltyksFees = MoneyRounding.ToInt(voltyksFee);
 
             // 3) حساب BaseAmount = PriceEstimated - VoltyksFees
             dto.BaseAmount = MoneyRounding.ToInt(Math.Max(priceEstimated - voltyksFee, 0m));

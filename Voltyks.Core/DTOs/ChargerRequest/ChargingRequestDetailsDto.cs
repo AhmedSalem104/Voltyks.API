@@ -48,7 +48,7 @@ namespace Voltyks.Core.DTOs.ChargerRequest
         public double EstimatedArrival { get; set; }
         public int EstimatedPrice { get; set; }
         public int BaseAmount { get; set; }
-        public decimal VoltyksFees { get; set; }
+        public int VoltyksFees { get; set; }
 
 
         public double DistanceInKm { get; set; }

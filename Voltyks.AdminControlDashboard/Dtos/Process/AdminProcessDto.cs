@@ -10,9 +10,9 @@ namespace Voltyks.AdminControlDashboard.Dtos.Process
         public DateTime? DateCompleted { get; set; }
 
         // Payment Info
-        public decimal? EstimatedPrice { get; set; }
-        public decimal? AmountPaid { get; set; }
-        public decimal? AmountCharged { get; set; }
+        public int? EstimatedPrice { get; set; }
+        public int? AmountPaid { get; set; }
+        public int? AmountCharged { get; set; }
 
         // Ratings
         public double? VehicleOwnerRating { get; set; }
@@ -45,15 +45,15 @@ namespace Voltyks.AdminControlDashboard.Dtos.Process
         public DateTime RequestedAt { get; set; }
         public DateTime? RespondedAt { get; set; }
         public DateTime? ConfirmedAt { get; set; }
-        public decimal BaseAmount { get; set; }
-        public decimal VoltyksFees { get; set; }
-        public decimal RequestEstimatedPrice { get; set; }
+        public int BaseAmount { get; set; }
+        public int VoltyksFees { get; set; }
+        public int RequestEstimatedPrice { get; set; }
 
         // Charger Details
         public int ChargerId { get; set; }
         public string ChargerProtocol { get; set; } = "";
         public int ChargerCapacityKw { get; set; }
-        public decimal ChargerPrice { get; set; }
+        public int ChargerPrice { get; set; }
         public bool ChargerHasAdaptor { get; set; }
         public double ChargerRating { get; set; }
         public bool ChargerIsActive { get; set; }

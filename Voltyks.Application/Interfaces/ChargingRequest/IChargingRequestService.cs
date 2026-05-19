@@ -23,7 +23,7 @@ namespace Voltyks.Application.Interfaces.ChargingRequest
         Task<ApiResponse<ChargingRequestDetailsDto>> GetRequestDetailsAsync(RequestDetailsDto dto);
 
 
-        Task<ApiResponse<decimal>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default);
+        Task<ApiResponse<int>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default);
         Task<ApiResponse<object>> TransferVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default);
     }
 

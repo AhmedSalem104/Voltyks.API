@@ -716,7 +716,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                     VehicleStreet = vehicleStreet,
                     EstimatedArrival = estimatedArrival,
                     BaseAmount = MoneyRounding.ToInt(request.BaseAmount),
-                    VoltyksFees = request.VoltyksFees,
+                    VoltyksFees = MoneyRounding.ToInt(request.VoltyksFees),
                     //EstimatedPrice = request.EstimatedPrice,
                     EstimatedPrice = MoneyRounding.ToInt(estimatedPriceFinal),
                     DistanceInKm = distanceKm
@@ -730,7 +730,7 @@ namespace Voltyks.Application.Services.ChargingRequest
                 return new ApiResponse<ChargingRequestDetailsDto>(null, ex.Message, false);
             }
         }    
-        public async Task<ApiResponse<decimal>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
+        public async Task<ApiResponse<int>> GetVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
         {
             var req = await _db.Set<ChargingRequestEntity>()
                 .AsNoTracking()
@@ -739,9 +739,9 @@ namespace Voltyks.Application.Services.ChargingRequest
                 .FirstOrDefaultAsync(ct);
 
             if (req is null)
-                return new ApiResponse<decimal>("Request not found", status: false);
+                return new ApiResponse<int>("Request not found", status: false);
 
-            return new ApiResponse<decimal>(req.VoltyksFees, "Fees fetched successfully", true);
+            return new ApiResponse<int>(MoneyRounding.ToInt(req.VoltyksFees), "Fees fetched successfully", true);
         }
 
         public async Task<ApiResponse<object>> TransferVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
@@ -793,7 +793,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             var data = new
             {
                 requestId = req.Id,
-                feesTransferred = req.VoltyksFees,
+                feesTransferred = MoneyRounding.ToInt(req.VoltyksFees),
                 userId = carOwner.Id,
                 userNewWallet = carOwner.Wallet,
                 recipientUserId = stationOwner.Id,
