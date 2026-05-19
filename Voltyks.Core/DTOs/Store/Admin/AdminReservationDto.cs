@@ -28,7 +28,7 @@ namespace Voltyks.Core.DTOs.Store.Admin
         public string PaymentStatus { get; set; } = string.Empty;
         public string? PaymentMethod { get; set; }
         public string? PaymentReference { get; set; }
-        public decimal? PaidAmount { get; set; }
+        public int? PaidAmount { get; set; }
         public DateTime? PaidAt { get; set; }
 
         // Delivery

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Voltyks.AdminControlDashboard.Dtos.Chargers;
 using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Core.DTOs;
+using Voltyks.Core.Utilities;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
@@ -49,7 +50,7 @@ namespace Voltyks.AdminControlDashboard.Services
                         CapacityId = c.CapacityId,
                         CapacityKw = c.Capacity.kw,
                         PriceOptionId = c.PriceOptionId,
-                        PriceValue = c.PriceOption.Value,
+                        PriceValue = (int)Math.Round(c.PriceOption.Value),
                         AddressId = c.AddressId,
                         Area = c.Address.Area,
                         Street = c.Address.Street,
@@ -100,7 +101,7 @@ namespace Voltyks.AdminControlDashboard.Services
                         CapacityId = c.CapacityId,
                         CapacityKw = c.Capacity.kw,
                         PriceOptionId = c.PriceOptionId,
-                        PriceValue = c.PriceOption.Value,
+                        PriceValue = (int)Math.Round(c.PriceOption.Value),
                         AddressId = c.AddressId,
                         Area = c.Address.Area,
                         Street = c.Address.Street,
@@ -214,7 +215,7 @@ namespace Voltyks.AdminControlDashboard.Services
                     CapacityId = charger.CapacityId,
                     CapacityKw = capacity.kw,
                     PriceOptionId = charger.PriceOptionId,
-                    PriceValue = priceOption.Value,
+                    PriceValue = MoneyRounding.ToInt(priceOption.Value),
                     AddressId = charger.AddressId,
                     Area = address.Area,
                     Street = address.Street,
@@ -316,7 +317,7 @@ namespace Voltyks.AdminControlDashboard.Services
                     CapacityId = charger.CapacityId,
                     CapacityKw = capacity.kw,
                     PriceOptionId = charger.PriceOptionId,
-                    PriceValue = priceOption.Value,
+                    PriceValue = MoneyRounding.ToInt(priceOption.Value),
                     AddressId = charger.AddressId,
                     Area = charger.Address.Area,
                     Street = charger.Address.Street,

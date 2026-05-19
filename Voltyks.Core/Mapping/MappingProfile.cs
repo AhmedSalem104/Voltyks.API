@@ -136,7 +136,8 @@ namespace Voltyks.Core.Mapping
 
           
             // من Entity لعرض النتيجة
-            CreateMap<FeesConfig, FeesConfigDto>();
+            CreateMap<FeesConfig, FeesConfigDto>()
+                .ForMember(dest => dest.MinimumFee, opt => opt.MapFrom(src => MoneyRounding.ToInt(src.MinimumFee)));
 
             // من DTO لتحديث القيم للـ Entity
             CreateMap<FeesConfigUpdateDto, FeesConfig>()

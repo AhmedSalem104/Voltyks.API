@@ -8,7 +8,7 @@ namespace Voltyks.Core.DTOs.FeesConfig
 {
     public class FeesConfigDto
     {
-        public decimal MinimumFee { get; set; }
+        public int MinimumFee { get; set; }
         public decimal Percentage { get; set; }
 
         // للعرض فقط

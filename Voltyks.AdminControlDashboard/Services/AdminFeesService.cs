@@ -6,6 +6,7 @@ using Voltyks.AdminControlDashboard.Interfaces;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Core.DTOs;
 using Voltyks.Core.DTOs.FeesConfig;
+using Voltyks.Core.Utilities;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Identity;
 using Voltyks.Persistence.Entities.Main;
@@ -77,7 +78,7 @@ namespace Voltyks.AdminControlDashboard.Services
                 }
 
                 return new ApiResponse<object>(
-                    data: new { minimumFee = dto.MinimumFee, percentage = dto.Percentage },
+                    data: new { minimumFee = MoneyRounding.ToInt(dto.MinimumFee), percentage = dto.Percentage },
                     message: "Fees updated successfully",
                     status: true);
             }

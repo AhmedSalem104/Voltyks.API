@@ -15,7 +15,7 @@ namespace Voltyks.AdminControlDashboard.Dtos.Chargers
         public int CapacityKw { get; set; }
 
         public int PriceOptionId { get; set; }
-        public decimal PriceValue { get; set; }
+        public int PriceValue { get; set; }
 
         public int AddressId { get; set; }
         public string Area { get; set; } = "";
