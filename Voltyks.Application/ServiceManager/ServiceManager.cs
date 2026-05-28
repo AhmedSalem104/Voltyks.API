@@ -72,7 +72,8 @@ namespace Voltyks.Application.ServicesManager
     ILogger<ChargingRequestService> chargingRequestLogger,
     Voltyks.Application.Interfaces.Notifications.INotificationTemplateResolver templateResolver,
     IGeocodingService geocodingService,
-    Voltyks.Application.Interfaces.Caching.ICacheService cacheService) : IServiceManager
+    Voltyks.Application.Interfaces.Caching.ICacheService cacheService,
+    ILogger<Voltyks.Application.Services.UserReport.UserReportService> userReportLogger) : IServiceManager
     {
 
         public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService, appSettingsService, geocodingService, cacheService);
@@ -86,7 +87,7 @@ namespace Voltyks.Application.ServicesManager
         public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor, cacheService);
         public ITermsService TermsService { get; } = new TermsService(context);
         public IProcessesService ProcessesService  { get; } = processesService;
-        public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService, processesService, templateResolver);
+        public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService, processesService, templateResolver, userReportLogger);
         public IMobileAppConfigService MobileAppConfigService { get; } = new MobileAppConfigService(unitOfWork);
         public IStoreService StoreService { get; } = new StoreService(context, httpContextAccessor, signalRService);
 

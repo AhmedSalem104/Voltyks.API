@@ -864,12 +864,26 @@ namespace Voltyks.Application.Services.ChargingRequest
 
             var tokens = await GetDeviceTokens(receiverUserId) ?? new List<string>();
 
-            // إرسال متوازي أسرع + أهدى
+            // إرسال متوازي أسرع + أهدى — per-token isolation so a single failing
+            // device (UNREGISTERED, timeout, 5xx, network) can't abort the whole
+            // notification path and leave Notification DB row + SignalR broadcast
+            // unsent. Mirrors the per-token try/catch already used in
+            // ProcessesService.TerminateProcessAsync and AdminNotificationCenterService.
             if (tokens.Count > 0)
             {
-                await System.Threading.Tasks.Task.WhenAll(tokens.Select(t =>
-                    _firebaseService.SendNotificationAsync(t, title, body, requestId, notificationType, extraData)
-                ));
+                await System.Threading.Tasks.Task.WhenAll(tokens.Select(async t =>
+                {
+                    try
+                    {
+                        await _firebaseService.SendNotificationAsync(t, title, body, requestId, notificationType, extraData);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex,
+                            "FCM send failed for one token; continuing batch. NotificationType={NotificationType} RequestId={RequestId}",
+                            notificationType, requestId);
+                    }
+                }));
             }
 
             var notification = await AddNotificationAsync(

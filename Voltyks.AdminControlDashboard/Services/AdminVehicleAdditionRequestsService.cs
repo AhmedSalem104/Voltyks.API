@@ -504,14 +504,29 @@ namespace Voltyks.AdminControlDashboard.Services
                         ["userRole"] = "vehicle_owner"
                     };
 
-                    await Task.WhenAll(tokens.Select(t =>
-                        _firebaseService.SendNotificationAsync(t, title, body, requestId, type, extraData)
-                    ));
+                    // Per-token isolation gives finer-grained telemetry (one log per
+                    // failing device instead of one log per whole batch) while still
+                    // not blocking the accept/decline flow. Same pattern as the rest
+                    // of the notification dispatch sites.
+                    await Task.WhenAll(tokens.Select(async t =>
+                    {
+                        try
+                        {
+                            await _firebaseService.SendNotificationAsync(t, title, body, requestId, type, extraData);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex,
+                                "FCM send failed for one token; continuing batch. NotificationType={NotificationType} UserId={UserId} RequestId={RequestId}",
+                                type, userId, requestId);
+                        }
+                    }));
                 }
             }
             catch (Exception fcmEx)
             {
-                // FCM failure shouldn't block the accept/decline flow
+                // Outer safety net — kept as a belt-and-suspenders guard in case the
+                // token-fetch or extraData build above ever throws.
                 _logger.LogWarning(fcmEx,
                     "FCM push failed during NotifyUserAsync. UserId={UserId} NotificationType={NotificationType}",
                     userId, type);

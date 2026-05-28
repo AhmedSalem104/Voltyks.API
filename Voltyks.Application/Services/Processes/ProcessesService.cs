@@ -1276,13 +1276,25 @@ namespace Voltyks.Core.DTOs.Processes
                                    .Select(t => t.Token)
                                    .ToListAsync(ct);
 
+            // Per-token isolation so a single failing device can't abort the whole
+            // notification path and leave the Notification DB row + downstream SignalR
+            // broadcast unsent. Same pattern as TerminateProcessAsync (line 1726).
             if (tokens.Count > 0)
             {
-                await Task.WhenAll(tokens.Select(tk =>
-                    _firebase.SendNotificationAsync(
-                        tk, title, body, requestId, notificationType, data
-                    )
-                ));
+                await Task.WhenAll(tokens.Select(async tk =>
+                {
+                    try
+                    {
+                        await _firebase.SendNotificationAsync(
+                            tk, title, body, requestId, notificationType, data);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex,
+                            "FCM send failed for one token; continuing batch. NotificationType={NotificationType} RequestId={RequestId} ProcessId={ProcessId}",
+                            notificationType, requestId, processId);
+                    }
+                }));
             }
 
             var notification = await AddNotificationAsync(
