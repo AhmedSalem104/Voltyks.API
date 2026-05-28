@@ -8,11 +8,15 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Google.Apis.Auth.OAuth2;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.Telemetry;
+using Voltyks.Persistence.Data;
+using Voltyks.Persistence.Entities.Main;
 
 namespace Voltyks.Application.Services.Firebase
 {
@@ -25,6 +29,7 @@ namespace Voltyks.Application.Services.Firebase
         private readonly string _serviceAccountRelativePath;
         private readonly IRedisService _redisService;
         private readonly IFcmTelemetry _telemetry;
+        private readonly IServiceScopeFactory _scopeFactory;
         private GoogleCredential? _cachedCredential;
         private readonly SemaphoreSlim _credentialLock = new SemaphoreSlim(1, 1);
 
@@ -35,7 +40,8 @@ namespace Voltyks.Application.Services.Firebase
             ILogger<FirebaseService> logger,
             IRedisService redisService,
             IHttpClientFactory httpClientFactory,
-            IFcmTelemetry telemetry)
+            IFcmTelemetry telemetry,
+            IServiceScopeFactory scopeFactory)
         {
             _config = config;
             _logger = logger;
@@ -44,6 +50,38 @@ namespace Voltyks.Application.Services.Firebase
             _httpClientFactory = httpClientFactory;
             _redisService = redisService;
             _telemetry = telemetry;
+            _scopeFactory = scopeFactory;
+        }
+
+        // Stale UNREGISTERED tokens delivered to FCM mean the device app was uninstalled,
+        // the user cleared app data, or the token was rotated. Leaving them in the
+        // DeviceTokens table amplifies every subsequent notification fire (1 push per
+        // stale token, all delivered to nobody). Delete them on a fresh isolated scope
+        // so the cleanup never interferes with the caller's tracked entities or
+        // outer transaction.
+        private async Task TryRemoveStaleDeviceTokenAsync(string deviceToken)
+        {
+            if (string.IsNullOrWhiteSpace(deviceToken)) return;
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<VoltyksDbContext>();
+                var deleted = await db.Set<DeviceToken>()
+                    .Where(t => t.Token == deviceToken)
+                    .ExecuteDeleteAsync();
+                if (deleted > 0)
+                {
+                    _logger.LogInformation(
+                        "Removed {Count} UNREGISTERED FCM token row(s) from DeviceTokens. TokenSuffix={TokenSuffix}",
+                        deleted, TokenSuffix(deviceToken));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to remove UNREGISTERED FCM token row from DeviceTokens. TokenSuffix={TokenSuffix}",
+                    TokenSuffix(deviceToken));
+            }
         }
 
         private static string TokenSuffix(string token) =>
@@ -227,6 +265,10 @@ namespace Voltyks.Application.Services.Firebase
                         {
                             _logger.LogError(ex2, "Failed to remove invalid FCM token from Redis. TokenSuffix={TokenSuffix}", TokenSuffix(deviceToken));
                         }
+
+                        // Also remove the stale token row from the DeviceTokens table so
+                        // future notification fans-out don't keep iterating it.
+                        await TryRemoveStaleDeviceTokenAsync(deviceToken);
 
                         // منرجعش Exception، بس بنوقف الإرسال للتوكِن ده
                         return;

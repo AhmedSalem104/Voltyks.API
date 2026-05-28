@@ -78,7 +78,7 @@ namespace Voltyks.Persistence.Data.Configurations.Store
 
             builder.HasIndex(r => r.CreatedAt)
                    .HasDatabaseName("IX_StoreReservations_CreatedAt");
-
+                
             // "My reservations" feed (per-user, newest first)
             builder.HasIndex(r => new { r.UserId, r.CreatedAt })
                    .IsDescending(false, true)

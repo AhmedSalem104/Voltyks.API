@@ -21,6 +21,11 @@ namespace Voltyks.Application.Services.Redis
             var db = _redis.GetDatabase();
             await db.StringSetAsync(key, value, expiry);
         }
+        public async Task<bool> TrySetIfNotExistsAsync(string key, string value, TimeSpan expiry)
+        {
+            var db = _redis.GetDatabase();
+            return await db.StringSetAsync(key, value, expiry, When.NotExists);
+        }
         public async Task<string?> GetAsync(string key)
         {
             var db = _redis.GetDatabase();
