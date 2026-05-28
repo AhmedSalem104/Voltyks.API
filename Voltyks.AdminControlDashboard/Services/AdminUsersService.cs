@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Voltyks.AdminControlDashboard.Dtos.Users;
 using Voltyks.AdminControlDashboard.Interfaces;
+using Voltyks.Application.Interfaces.Caching;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SMSEgypt;
+using Voltyks.Application.Services.Caching;
 using Voltyks.Core.DTOs;
 using Voltyks.Infrastructure.UnitOfWork;
 using Voltyks.Persistence.Data;
@@ -26,6 +28,7 @@ namespace Voltyks.AdminControlDashboard.Services
         private readonly UserManager<AppUser> _userManager;
         private readonly ISmsEgyptService _smsEgyptService;
         private readonly IRedisService _redisService;
+        private readonly ICacheService _cacheService;
 
         public AdminUsersService(
             VoltyksDbContext context,
@@ -34,7 +37,8 @@ namespace Voltyks.AdminControlDashboard.Services
             IHttpContextAccessor httpContextAccessor,
             UserManager<AppUser> userManager,
             ISmsEgyptService smsEgyptService,
-            IRedisService redisService)
+            IRedisService redisService,
+            ICacheService cacheService)
         {
             _context = context;
             _unitOfWork = unitOfWork;
@@ -43,6 +47,13 @@ namespace Voltyks.AdminControlDashboard.Services
             _userManager = userManager;
             _smsEgyptService = smsEgyptService;
             _redisService = redisService;
+            _cacheService = cacheService;
+        }
+
+        private async Task InvalidateUserStatusCacheAsync(string userId)
+        {
+            try { await _cacheService.RemoveAsync(CacheKeys.UserStatusById(userId)); }
+            catch { /* cache backend unavailable — staleness bounded by short TTL */ }
         }
 
         private string? GetCurrentUserId()
@@ -162,6 +173,7 @@ namespace Voltyks.AdminControlDashboard.Services
 
                 user.IsBanned = !user.IsBanned;
                 await _context.SaveChangesAsync(ct);
+                await InvalidateUserStatusCacheAsync(userId);
 
                 return new ApiResponse<object>(
                     data: new { userId, isBanned = user.IsBanned },
@@ -299,6 +311,7 @@ namespace Voltyks.AdminControlDashboard.Services
                 user.IsDeleted = true;
                 user.DeletedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync(ct);
+                await InvalidateUserStatusCacheAsync(userId);
 
                 return new ApiResponse<object>(
                     data: new { userId, isDeleted = true, deletedAt = user.DeletedAt },
@@ -505,6 +518,7 @@ namespace Voltyks.AdminControlDashboard.Services
                 // ========== FINALLY DELETE USER ==========
                 _context.Users.Remove(user);
                 await _context.SaveChangesAsync(ct);
+                await InvalidateUserStatusCacheAsync(userId);
 
                 return new ApiResponse<object>(
                     data: new { userId, permanentlyDeleted = true },
@@ -546,6 +560,7 @@ namespace Voltyks.AdminControlDashboard.Services
                 user.IsDeleted = false;
                 user.DeletedAt = null;
                 await _context.SaveChangesAsync(ct);
+                await InvalidateUserStatusCacheAsync(userId);
 
                 return new ApiResponse<object>(
                     data: new { userId, isDeleted = false, restored = true },

@@ -223,7 +223,7 @@ namespace Voltyks.Application.Services.SMSEgypt
                 return false;
             }
 
-            _logger.LogInformation("SMS Egypt response for phone {Phone}: {Body}", phoneNumber, responseBody);
+            _logger.LogDebug("SMS Egypt response for phone {Phone}: {Body}", phoneNumber, responseBody);
             return true;
         }
 

@@ -71,10 +71,11 @@ namespace Voltyks.Application.ServicesManager
     ILogger<SmsEgyptService> smsLogger,
     ILogger<ChargingRequestService> chargingRequestLogger,
     Voltyks.Application.Interfaces.Notifications.INotificationTemplateResolver templateResolver,
-    IGeocodingService geocodingService) : IServiceManager
+    IGeocodingService geocodingService,
+    Voltyks.Application.Interfaces.Caching.ICacheService cacheService) : IServiceManager
     {
 
-        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService, appSettingsService, geocodingService);
+        public IAuthService AuthService { get; } = new AuthService(userManager, httpContextAccessor, options, redisService, configuration, mapper, unitOfWork, context, vehicleService, signalRService, appSettingsService, geocodingService, cacheService);
         public ISmsEgyptService SmsEgyptService { get; } = new SmsEgyptService(redisService, httpClientFactory, SmsSettings, userManager, smsLogger);
         public IBrandService BrandService { get; } = new BrandService(unitOfWork);
         public IModelService ModelService  { get; } = new ModelService(unitOfWork, mapper);
@@ -82,7 +83,7 @@ namespace Voltyks.Application.ServicesManager
         public IChargerService ChargerService { get; } = new ChargerService(unitOfWork, mapper, httpContextAccessor, appSettingsService, feesConfigService);
         public IChargingRequestService ChargingRequestService { get; } = new ChargingRequestService(unitOfWork, firebaseService, httpContextAccessor, vehicleService, feesConfigService,context, httpClientFactory, signalRService, processesService, chargingRequestLogger, templateResolver, geocodingService);
         public IPaymobService PaymobService { get; } = new PaymobService(_http, _opt, unitOfWork, _log, tokenProvider, httpContextAccessor, httpClientFactory, userManager, redisService);
-        public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor);
+        public IFeesConfigService FeesConfigService { get; } = new FeesConfigService(unitOfWork, mapper, httpContextAccessor, cacheService);
         public ITermsService TermsService { get; } = new TermsService(context);
         public IProcessesService ProcessesService  { get; } = processesService;
         public IUserReportService UserReportService  { get; } = new UserReportService(context, mapper, unitOfWork, httpContextAccessor, firebaseService, signalRService, processesService, templateResolver);

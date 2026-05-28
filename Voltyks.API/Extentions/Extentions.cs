@@ -43,6 +43,7 @@ using Voltyks.Application.Services.Terms;
 using Voltyks.AdminControlDashboard;
 using Voltyks.Application.Interfaces.Caching;
 using Voltyks.Application.Services.Caching;
+using CacheKeys = Voltyks.Application.Services.Caching.CacheKeys;
 using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Services.Pagination;
 using Voltyks.API.Hubs;
@@ -244,8 +245,10 @@ namespace Voltyks.API.Extentions
             // Add Interceptor
             services.AddScoped<ChargingRequestCleanupInterceptor>();
 
-            // Single DbContext registration with interceptor + resilience
-            services.AddDbContext<VoltyksDbContext>((sp, options) =>
+            // Pooled DbContext registration with stateless interceptor + resilience.
+            // ChargingRequestCleanupInterceptor reads ChangeTracker state per-call and
+            // holds no fields, so the pool can recycle contexts safely between requests.
+            services.AddDbContextPool<VoltyksDbContext>((sp, options) =>
             {
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"), sqlOptions =>
                 {
@@ -529,8 +532,10 @@ namespace Voltyks.API.Extentions
                     },
                     // After signature/lifetime/issuer/audience pass, confirm the
                     // user behind the token still exists and is not deleted or
-                    // banned. JWT is stateless so a token issued before a user
-                    // was deleted would otherwise remain usable until expiry.
+                    // banned. Cached with short TTL via ICacheService (Redis) to
+                    // avoid a DB round-trip on every authenticated request;
+                    // staleness window is bounded by NinetySeconds and the cache
+                    // is invalidated on ban/unban/soft-delete/restore.
                     OnTokenValidated = async context =>
                     {
                         var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -540,16 +545,32 @@ namespace Voltyks.API.Extentions
                             return;
                         }
 
-                        var db = context.HttpContext.RequestServices
-                            .GetRequiredService<VoltyksDbContext>();
+                        var sp = context.HttpContext.RequestServices;
+                        var cache = sp.GetRequiredService<ICacheService>();
+                        var key = CacheKeys.UserStatusById(userId);
 
-                        var status = await db.Users
-                            .AsNoTracking()
-                            .Where(u => u.Id == userId)
-                            .Select(u => new { u.IsDeleted, u.IsBanned })
-                            .FirstOrDefaultAsync();
+                        UserStatusEntry? entry = null;
+                        try { entry = await cache.GetAsync<UserStatusEntry>(key); }
+                        catch { /* cache backend unavailable — fall through to DB */ }
 
-                        if (status == null || status.IsDeleted || status.IsBanned)
+                        if (entry == null)
+                        {
+                            var db = sp.GetRequiredService<VoltyksDbContext>();
+                            var status = await db.Users
+                                .AsNoTracking()
+                                .Where(u => u.Id == userId)
+                                .Select(u => new { u.IsDeleted, u.IsBanned })
+                                .FirstOrDefaultAsync();
+
+                            entry = status == null
+                                ? new UserStatusEntry { Exists = false }
+                                : new UserStatusEntry { Exists = true, IsDeleted = status.IsDeleted, IsBanned = status.IsBanned };
+
+                            try { await cache.SetAsync(key, entry, CacheKeys.Duration.NinetySeconds); }
+                            catch { /* cache backend unavailable — proceed with DB result */ }
+                        }
+
+                        if (!entry.Exists || entry.IsDeleted || entry.IsBanned)
                         {
                             context.Fail("User account is no longer active.");
                         }

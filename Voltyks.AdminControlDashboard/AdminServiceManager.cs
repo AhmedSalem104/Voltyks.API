@@ -9,6 +9,7 @@ using Voltyks.AdminControlDashboard.Interfaces.Notifications;
 using Voltyks.AdminControlDashboard.Services;
 using Voltyks.AdminControlDashboard.Services.Complaints;
 using Voltyks.AdminControlDashboard.Services.Notifications;
+using Voltyks.Application.Interfaces.Caching;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SignalR;
@@ -35,9 +36,10 @@ namespace Voltyks.AdminControlDashboard
             IFirebaseService firebaseService,
             ILogger<AdminVehicleAdditionRequestsService> vehicleAdditionRequestsLogger,
             INotificationTemplateResolver templateResolver,
-            ILogger<AdminNotificationCenterService> notificationCenterLogger)
+            ILogger<AdminNotificationCenterService> notificationCenterLogger,
+            ICacheService cacheService)
         {
-            AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor, userManager, smsEgyptService, redisService);
+            AdminUsersService = new AdminUsersService(context, unitOfWork, mapper, httpContextAccessor, userManager, smsEgyptService, redisService, cacheService);
             AdminFeesService = new AdminFeesService(serviceManager.FeesConfigService, context, httpContextAccessor);
             AdminTermsService = new AdminTermsService(serviceManager.TermsService, context);
             AdminProtocolService = new AdminProtocolService(context);

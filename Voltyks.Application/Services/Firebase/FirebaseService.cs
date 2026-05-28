@@ -169,8 +169,8 @@ namespace Voltyks.Application.Services.Firebase
                 };
 
                 var json = JsonSerializer.Serialize(payload);
-                _logger.LogInformation("Sending FCM to token: {Token}", deviceToken);
-                _logger.LogInformation("Payload: {Payload}", json);
+                _logger.LogDebug("Sending FCM to token: {Token}", deviceToken);
+                _logger.LogDebug("Payload: {Payload}", json);
 
                 var request = new HttpRequestMessage(
                     HttpMethod.Post,
@@ -180,7 +180,7 @@ namespace Voltyks.Application.Services.Firebase
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var response = await _httpClientFactory.CreateClient().SendAsync(request);
-                _logger.LogInformation("Status Code: {Code}", response.StatusCode);
+                _logger.LogDebug("Status Code: {Code}", response.StatusCode);
 
                 if (!response.IsSuccessStatusCode)
                 {

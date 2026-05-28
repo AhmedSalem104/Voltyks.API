@@ -39,6 +39,8 @@ using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
 using Voltyks.Application.Utilities;
+using Voltyks.Application.Interfaces.Caching;
+using Voltyks.Application.Services.Caching;
 
 namespace Voltyks.Application.Services.Auth
 {
@@ -54,6 +56,7 @@ namespace Voltyks.Application.Services.Auth
         , ISignalRService signalRService
         , IAppSettingsService appSettingsService
         , IGeocodingService _geocodingService
+        , ICacheService _cacheService
 
         ) : IAuthService
     {
@@ -91,6 +94,8 @@ namespace Voltyks.Application.Services.Auth
                 var errs = result.Errors.Select(e => e.Description).ToList();
                 return new ApiResponse<object>("Failed to update user", status: false, errors: errs);
             }
+            try { await _cacheService.RemoveAsync(CacheKeys.UserStatusById(user.Id)); }
+            catch { /* cache backend unavailable — staleness bounded by short TTL */ }
 
             var msg = user.IsBanned ? "User banned successfully" : "User unbanned successfully";
             var data = new { userId = user.Id, isBanned = user.IsBanned };
@@ -121,6 +126,8 @@ namespace Voltyks.Application.Services.Auth
                 user.UserShouldBeBanned = true;
                 context.Update(user);
                 await context.SaveChangesAsync();
+                try { await _cacheService.RemoveAsync(CacheKeys.UserStatusById(user.Id)); }
+                catch { /* cache backend unavailable — staleness bounded by short TTL */ }
             }
             await HandleUserBanAsync(user);
 
@@ -1619,6 +1626,8 @@ namespace Voltyks.Application.Services.Auth
                 user.UserShouldBeBanned = true;
                 context.Update(user);
                 await context.SaveChangesAsync();
+                try { await _cacheService.RemoveAsync(CacheKeys.UserStatusById(user.Id)); }
+                catch { /* cache backend unavailable — staleness bounded by short TTL */ }
             }
         }
         /// <summary>
