@@ -269,12 +269,30 @@ namespace Voltyks.Application.Interfaces.ChargerStation
                 .Select(c => c.Id)
                 .ToListAsync();
 
+            // SQL-side bounding-box pre-filter: 1° latitude ≈ 111 km, longitude scales by
+            // cos(lat). The box is a superset of the radius circle so the C# Haversine
+            // filter below still returns the exact same set — we just stop materializing
+            // chargers that are clearly outside the user's range. Falls back to no-op for
+            // edge inputs (radius <= 0 or pole-adjacent searches where cos(lat) → 0).
+            const double KmPerDegLat = 111.0;
+            double cosLat = Math.Cos(searchDto.Latitude * Math.PI / 180.0);
+            bool applyBoundingBox = searchDto.SearchRangeInKm > 0 && Math.Abs(cosLat) > 1e-9;
+            double latDelta = applyBoundingBox ? (searchDto.SearchRangeInKm / KmPerDegLat) : 0;
+            double lngDelta = applyBoundingBox ? (searchDto.SearchRangeInKm / (KmPerDegLat * Math.Abs(cosLat))) : 0;
+            double minLat = searchDto.Latitude - latDelta;
+            double maxLat = searchDto.Latitude + latDelta;
+            double minLng = searchDto.Longitude - lngDelta;
+            double maxLng = searchDto.Longitude + lngDelta;
+
             return (await _unitOfWork.GetRepository<Charger, int>().GetAllWithIncludeAsync(
                c => !c.IsDeleted && c.IsActive &&
                     (c.ProtocolId == searchDto.ProtocolId || supportedChargerIds.Contains(c.Id)) &&
                     c.User.IsAvailable == true &&
                     c.User.IsBanned == false &&
-                    c.User.Id != currentUserId,
+                    c.User.Id != currentUserId &&
+                    (!applyBoundingBox ||
+                        (c.Address.Latitude >= minLat && c.Address.Latitude <= maxLat &&
+                         c.Address.Longitude >= minLng && c.Address.Longitude <= maxLng)),
                false,
                c => c.Capacity,
                c => c.PriceOption,
