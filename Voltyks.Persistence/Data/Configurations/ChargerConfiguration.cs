@@ -56,6 +56,10 @@ namespace Voltyks.Persistence.Data.Configurations
 
             builder.HasIndex(c => new { c.IsDeleted, c.IsActive, c.ProtocolId })
                    .HasDatabaseName("IX_Chargers_IsDeleted_IsActive_ProtocolId");
+
+            // "My chargers" listing (per-user, active and not-deleted)
+            builder.HasIndex(c => new { c.UserId, c.IsActive, c.IsDeleted })
+                   .HasDatabaseName("IX_Chargers_UserId_IsActive_IsDeleted");
         }
     }
 

@@ -242,8 +242,9 @@ namespace Voltyks.API.Extentions
                 catch { /* Skip Firebase if initialization fails */ }
             }
 
-            // Add Interceptor
-            services.AddScoped<ChargingRequestCleanupInterceptor>();
+            // Add Interceptor — stateless (no fields, reads ChangeTracker per call),
+            // so it must be Singleton to be consumed by the singleton DbContext pool.
+            services.AddSingleton<ChargingRequestCleanupInterceptor>();
 
             // Pooled DbContext registration with stateless interceptor + resilience.
             // ChargingRequestCleanupInterceptor reads ChangeTracker state per-call and

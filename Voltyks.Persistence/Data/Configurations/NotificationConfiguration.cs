@@ -33,6 +33,11 @@ namespace Voltyks.Persistence.Data.Configurations
             builder.HasIndex(n => n.IsAdminNotification)
                    .HasDatabaseName("IX_Notifications_IsAdminNotification");
 
+            // User notification feed (per-user, newest first)
+            builder.HasIndex(n => new { n.UserId, n.SentAt })
+                   .IsDescending(false, true)
+                   .HasDatabaseName("IX_Notifications_UserId_SentAt");
+
             builder.Property(n => n.Type).HasMaxLength(100);
         }
     }

@@ -36,6 +36,15 @@ namespace Voltyks.Persistence.Data.Configurations
 
             builder.HasIndex(p => p.ChargerRequestId)
                    .HasDatabaseName("IX_Processes_ChargerRequestId");
+
+            // Activity feed indexes (per-owner, newest first)
+            builder.HasIndex(p => new { p.VehicleOwnerId, p.DateCreated })
+                   .IsDescending(false, true)
+                   .HasDatabaseName("IX_Processes_VehicleOwnerId_DateCreated");
+
+            builder.HasIndex(p => new { p.ChargerOwnerId, p.DateCreated })
+                   .IsDescending(false, true)
+                   .HasDatabaseName("IX_Processes_ChargerOwnerId_DateCreated");
         }
     }
 }

@@ -23,16 +23,10 @@ namespace Voltyks.Application.Services.AllowServices
         {
 
 
-            services.AddDbContext<VoltyksDbContext>(options =>
-            {
-                //options.UseSqlServer(builder.Configuration["ConnectionStrings:DefaultConnection"]);
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"));
-            });
-
-            //services.AddDbContext<IdentityVoltyksDbContext>(options =>
-            //{
-            //    options.UseSqlServer(configuration.GetConnectionString("IdentityConnection"));
-            //});
+            // NOTE: DbContext is registered as a pool in Voltyks.API/Extentions/Extentions.cs
+            // (AddDbContextPool with interceptor + retry-on-failure). Don't re-register here —
+            // a scoped AddDbContext alongside the singleton pool creates conflicting
+            // DbContextOptions descriptors and breaks dotnet ef tooling.
 
             services.AddScoped<IDbInitializer, DbInitializer>(); // Allow DI For DbInitializer
 

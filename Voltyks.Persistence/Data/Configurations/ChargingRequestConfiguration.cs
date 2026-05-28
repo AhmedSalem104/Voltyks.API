@@ -53,6 +53,11 @@ namespace Voltyks.Persistence.Data.Configurations
 
             builder.HasIndex(r => r.RecipientUserId)
                    .HasDatabaseName("IX_ChargingRequests_RecipientUserId");
+
+            // Station owner inbox (per-recipient, by status, newest first)
+            builder.HasIndex(r => new { r.RecipientUserId, r.Status, r.RequestedAt })
+                   .IsDescending(false, false, true)
+                   .HasDatabaseName("IX_ChargingRequests_RecipientUserId_Status_RequestedAt");
         }
     }
 
