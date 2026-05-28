@@ -195,6 +195,17 @@ namespace Voltyks.API.Extentions
             {
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
+
+            // Named clients with explicit timeouts so an unresponsive upstream can't
+            // hang the request thread indefinitely.
+            services.AddHttpClient("firebase-fcm", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+            services.AddHttpClient("sms-egypt", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
             services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
             services.AddScoped<PaymobService>();
 

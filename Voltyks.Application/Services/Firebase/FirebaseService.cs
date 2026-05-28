@@ -179,7 +179,7 @@ namespace Voltyks.Application.Services.Firebase
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
-                var response = await _httpClientFactory.CreateClient().SendAsync(request);
+                var response = await _httpClientFactory.CreateClient("firebase-fcm").SendAsync(request);
                 _logger.LogDebug("Status Code: {Code}", response.StatusCode);
 
                 if (!response.IsSuccessStatusCode)

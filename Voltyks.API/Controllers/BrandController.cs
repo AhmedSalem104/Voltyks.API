@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Voltyks.Application.ServicesManager.ServicesManager;
 
 namespace Voltyks.API.Controllers
@@ -17,7 +18,8 @@ namespace Voltyks.API.Controllers
         }
 
         [HttpGet("GetAllBrands")]
-        [ResponseCache(Duration = 3600)] // 1 hour cache
+        [ResponseCache(Duration = 3600)] // 1 hour HTTP cache header for downstream proxies
+        [OutputCache(PolicyName = "StaticData")] // 30 min server-side cache
         public async Task<IActionResult> GetAll()
         {
             var result = await _service.BrandService.GetAllAsync();
