@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Voltyks.Application.Interfaces.AppSettings;
-using Voltyks.Application.Interfaces.Caching;
-using Voltyks.Application.Services.Caching;
 using Voltyks.Core.DTOs;
 using Voltyks.Persistence.Data;
 using Voltyks.Persistence.Entities.Main;
@@ -11,12 +9,10 @@ namespace Voltyks.Application.Services.AppSettings
     public class AppSettingsService : IAppSettingsService
     {
         private readonly VoltyksDbContext _context;
-        private readonly ICacheService _cacheService;
 
-        public AppSettingsService(VoltyksDbContext context, ICacheService cacheService)
+        public AppSettingsService(VoltyksDbContext context)
         {
             _context = context;
-            _cacheService = cacheService;
         }
 
         private async Task<Persistence.Entities.Main.AppSettings> GetOrCreateSettingsAsync(CancellationToken ct = default)
@@ -36,54 +32,23 @@ namespace Voltyks.Application.Services.AppSettings
             return settings;
         }
 
-        private async Task<AppSettingsSnapshot> GetSnapshotAsync(CancellationToken ct = default)
-        {
-            AppSettingsSnapshot? cached = null;
-            try { cached = await _cacheService.GetAsync<AppSettingsSnapshot>(CacheKeys.AppSettings); }
-            catch { /* cache backend unavailable — fall through to DB */ }
-
-            if (cached is not null)
-                return cached;
-
-            var settings = await GetOrCreateSettingsAsync(ct);
-            var snapshot = new AppSettingsSnapshot
-            {
-                ChargingModeEnabled = settings.ChargingModeEnabled,
-                AdminsModeActivated = settings.AdminsModeActivated,
-                ChargingModeEnabledAt = settings.ChargingModeEnabledAt,
-                UpdatedBy = settings.UpdatedBy,
-                UpdatedAt = settings.UpdatedAt
-            };
-
-            try { await _cacheService.SetAsync(CacheKeys.AppSettings, snapshot, CacheKeys.Duration.FifteenMinutes); }
-            catch { /* cache backend unavailable — proceed with DB result */ }
-
-            return snapshot;
-        }
-
-        private async Task InvalidateSnapshotAsync()
-        {
-            try { await _cacheService.RemoveAsync(CacheKeys.AppSettings); }
-            catch { /* cache backend unavailable — staleness bounded by TTL */ }
-        }
-
         public async Task<bool> IsChargingModeEnabledAsync(CancellationToken ct = default)
         {
-            var snapshot = await GetSnapshotAsync(ct);
-            return snapshot.ChargingModeEnabled;
+            var settings = await GetOrCreateSettingsAsync(ct);
+            return settings.ChargingModeEnabled;
         }
 
         public async Task<ApiResponse<object>> GetChargingModeStatusAsync(CancellationToken ct = default)
         {
-            var snapshot = await GetSnapshotAsync(ct);
+            var settings = await GetOrCreateSettingsAsync(ct);
 
             var data = new
             {
-                chargingModeEnabled = snapshot.ChargingModeEnabled,
-                enabledAt = snapshot.ChargingModeEnabledAt,
-                updatedBy = snapshot.UpdatedBy,
-                updatedAt = snapshot.UpdatedAt,
-                message = snapshot.ChargingModeEnabled
+                chargingModeEnabled = settings.ChargingModeEnabled,
+                enabledAt = settings.ChargingModeEnabledAt,
+                updatedBy = settings.UpdatedBy,
+                updatedAt = settings.UpdatedAt,
+                message = settings.ChargingModeEnabled
                     ? "Charging is fully operational"
                     : "Charging is in setup mode. New chargers will be activated by admin."
             };
@@ -106,7 +71,6 @@ namespace Voltyks.Application.Services.AppSettings
 
             _context.AppSettings.Update(settings);
             await _context.SaveChangesAsync(ct);
-            await InvalidateSnapshotAsync();
 
             var message = enabled
                 ? "Charging mode enabled successfully"
@@ -117,19 +81,19 @@ namespace Voltyks.Application.Services.AppSettings
 
         public async Task<bool> IsAdminsModeActivatedAsync(CancellationToken ct = default)
         {
-            var snapshot = await GetSnapshotAsync(ct);
-            return snapshot.AdminsModeActivated;
+            var settings = await GetOrCreateSettingsAsync(ct);
+            return settings.AdminsModeActivated;
         }
 
         public async Task<ApiResponse<object>> GetAdminsModeStatusAsync(CancellationToken ct = default)
         {
-            var snapshot = await GetSnapshotAsync(ct);
+            var settings = await GetOrCreateSettingsAsync(ct);
 
             var data = new
             {
-                adminsModeActivated = snapshot.AdminsModeActivated,
-                registrationEnabled = !snapshot.AdminsModeActivated,
-                message = snapshot.AdminsModeActivated
+                adminsModeActivated = settings.AdminsModeActivated,
+                registrationEnabled = !settings.AdminsModeActivated,
+                message = settings.AdminsModeActivated
                     ? "System is in admin-only mode. New registrations are disabled."
                     : "Registration is open for new users."
             };
@@ -147,7 +111,6 @@ namespace Voltyks.Application.Services.AppSettings
 
             _context.AppSettings.Update(settings);
             await _context.SaveChangesAsync(ct);
-            await InvalidateSnapshotAsync();
 
             var message = activated
                 ? "Admins mode activated — new registrations are now disabled"

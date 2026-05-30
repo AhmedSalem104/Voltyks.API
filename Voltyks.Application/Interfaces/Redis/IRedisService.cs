@@ -11,14 +11,9 @@ namespace Voltyks.Application.Interfaces.Redis
         Task SetAsync(string key, string value, TimeSpan? expiry = null);
         Task<string?> GetAsync(string key);
         Task RemoveAsync(string key);
-        Task<long> IncrementAsync(string key);
-        Task ExpireAsync(string key, TimeSpan ttl);
+        Task<long> IncrementAsync(string key);          
+        Task ExpireAsync(string key, TimeSpan ttl);       
         Task<IEnumerable<string>> GetAllKeysAsync(string pattern = "*");
-
-        // SETNX with TTL — returns true if this caller acquired the key, false if another
-        // caller already holds it. Used for short-lived distributed locks (e.g. dedupe
-        // notification dispatch across concurrent invocations).
-        Task<bool> TrySetIfNotExistsAsync(string key, string value, TimeSpan expiry);
 
     }
 

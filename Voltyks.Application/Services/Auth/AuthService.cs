@@ -39,8 +39,6 @@ using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
 using Voltyks.Application.Utilities;
-using Voltyks.Application.Interfaces.Caching;
-using Voltyks.Application.Services.Caching;
 
 namespace Voltyks.Application.Services.Auth
 {
@@ -56,7 +54,6 @@ namespace Voltyks.Application.Services.Auth
         , ISignalRService signalRService
         , IAppSettingsService appSettingsService
         , IGeocodingService _geocodingService
-        , ICacheService _cacheService
 
         ) : IAuthService
     {
@@ -94,8 +91,6 @@ namespace Voltyks.Application.Services.Auth
                 var errs = result.Errors.Select(e => e.Description).ToList();
                 return new ApiResponse<object>("Failed to update user", status: false, errors: errs);
             }
-            try { await _cacheService.RemoveAsync(CacheKeys.UserStatusById(user.Id)); }
-            catch { /* cache backend unavailable — staleness bounded by short TTL */ }
 
             var msg = user.IsBanned ? "User banned successfully" : "User unbanned successfully";
             var data = new { userId = user.Id, isBanned = user.IsBanned };
@@ -126,8 +121,6 @@ namespace Voltyks.Application.Services.Auth
                 user.UserShouldBeBanned = true;
                 context.Update(user);
                 await context.SaveChangesAsync();
-                try { await _cacheService.RemoveAsync(CacheKeys.UserStatusById(user.Id)); }
-                catch { /* cache backend unavailable — staleness bounded by short TTL */ }
             }
             await HandleUserBanAsync(user);
 
@@ -687,44 +680,6 @@ namespace Voltyks.Application.Services.Auth
 
             var list = _mapper.Map<List<ChargingRequestDetailsDto>>(requests);
 
-            // Batch the two per-item external lookups before the loop so they happen in
-            // parallel / a single round-trip instead of sequentially per request:
-            //   1) Geocoding — each call is cache-friendly via NominatimGeocodingService's
-            //      24h cache; firing the unique coords concurrently turns a cold first
-            //      render of N requests from N sequential network hops into one burst.
-            //   2) Vehicles — the previous _vehicleService.GetVehiclesByUserIdAsync call
-            //      inside the loop was an N+1; batch one query keyed by CarOwner.Id.
-            var geoByCoord = new Dictionary<(double Lat, double Lng), (string Area, string Street)>();
-            try
-            {
-                var coordTasks = requests
-                    .Select(r => (r.Latitude, r.Longitude))
-                    .Distinct()
-                    .ToDictionary(c => c, c => _geocodingService.GetAddressAsync(c.Latitude, c.Longitude, ct));
-                if (coordTasks.Count > 0)
-                {
-                    await Task.WhenAll(coordTasks.Values);
-                    foreach (var kv in coordTasks)
-                        geoByCoord[kv.Key] = kv.Value.Result;
-                }
-            }
-            catch { /* preserve original "fall back to N/A" behaviour on geocoding failure */ }
-
-            var ownerIds = requests.Select(r => r.CarOwner.Id).Distinct().ToList();
-            var firstVehicleByOwner = new Dictionary<string, Vehicle>();
-            if (ownerIds.Count > 0)
-            {
-                var ownerVehicles = await context.Vehicles
-                    .AsNoTracking()
-                    .Include(v => v.Brand)
-                    .Include(v => v.Model)
-                    .Where(v => ownerIds.Contains(v.UserId) && !v.IsDeleted)
-                    .OrderBy(v => v.Id) // mirror the implicit FirstOrDefault() ordering from the previous per-call query
-                    .ToListAsync(ct);
-                foreach (var g in ownerVehicles.GroupBy(v => v.UserId))
-                    firstVehicleByOwner[g.Key] = g.First();
-            }
-
             for (int i = 0; i < list.Count; i++)
             {
                 var req = requests[i];
@@ -759,26 +714,31 @@ namespace Voltyks.Application.Services.Auth
                     dto.VoltyksFees = MoneyRounding.ToInt(req.VoltyksFees);
                     dto.EstimatedPrice = MoneyRounding.ToInt(Math.Max(baseAmt - req.VoltyksFees, 0m));
                 }
-
-                // (6) عنوان موقع السيارة (اختياري) — من الـ batched dictionary
+                // (6) عنوان موقع السيارة (اختياري)
                 string vehicleArea = "N/A";
                 string vehicleStreet = "N/A";
-                if (geoByCoord.TryGetValue((req.Latitude, req.Longitude), out var geo))
+                if (req.Latitude != null && req.Longitude != null)
                 {
-                    if (!string.IsNullOrWhiteSpace(geo.Area)) vehicleArea = geo.Area;
-                    if (!string.IsNullOrWhiteSpace(geo.Street)) vehicleStreet = geo.Street;
-                    dto.VehicleArea = vehicleArea;
-                    dto.VehicleStreet = vehicleStreet;
+                    try
+                    {
+                        var (area, street) = await _geocodingService.GetAddressAsync(req.Latitude, req.Longitude);
+                        if (!string.IsNullOrWhiteSpace(area)) vehicleArea = area;
+                        if (!string.IsNullOrWhiteSpace(street)) vehicleStreet = street;
+                        dto.VehicleArea = vehicleArea;
+                        dto.VehicleStreet = vehicleStreet;
+                    }
+                    catch { /* تجاهل وخلّيها N/A */ }
                 }
-
-                // بيانات السيارة (أول سيارة للمستخدم صاحب الطلب) — من الـ batched dictionary
-                if (firstVehicleByOwner.TryGetValue(req.CarOwner.Id, out var vehicle))
+                // بيانات السيارة (أول سيارة للمستخدم صاحب الطلب)
+                var vehicles = await _vehicleService.GetVehiclesByUserIdAsync(req.CarOwner.Id);
+                var vehicle = vehicles?.Data?.FirstOrDefault();
+                if (vehicle != null)
                 {
-                    dto.VehicleBrand = vehicle.Brand?.Name;
-                    dto.VehicleModel = vehicle.Model?.Name;
+                    dto.VehicleBrand = vehicle.BrandName;
+                    dto.VehicleModel = vehicle.ModelName;
                     dto.VehicleColor = vehicle.Color;
                     dto.VehiclePlate = vehicle.Plate;
-                    dto.VehicleCapacity = vehicle.Model?.Capacity ?? 0;
+                    dto.VehicleCapacity = vehicle.Capacity;
                 }
             }
 
@@ -1659,8 +1619,6 @@ namespace Voltyks.Application.Services.Auth
                 user.UserShouldBeBanned = true;
                 context.Update(user);
                 await context.SaveChangesAsync();
-                try { await _cacheService.RemoveAsync(CacheKeys.UserStatusById(user.Id)); }
-                catch { /* cache backend unavailable — staleness bounded by short TTL */ }
             }
         }
         /// <summary>

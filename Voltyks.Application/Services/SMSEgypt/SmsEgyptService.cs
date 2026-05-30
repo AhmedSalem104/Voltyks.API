@@ -212,7 +212,7 @@ namespace Voltyks.Application.Services.SMSEgypt
             string message = customMessage ?? $"Your Voltyks verification code is {otp}";
             string fullUrl = $"{_smsSettings.Value.BaseUrl}?username={_smsSettings.Value.Username}&password={_smsSettings.Value.Password}&sendername={_smsSettings.Value.SenderName}&message={Uri.EscapeDataString(message)}&mobiles={phoneNumber}";
 
-            var client = _httpClientFactory.CreateClient("sms-egypt");
+            var client = _httpClientFactory.CreateClient();
             var response = await client.GetAsync(fullUrl);
             var responseBody = await response.Content.ReadAsStringAsync();
 
@@ -223,7 +223,7 @@ namespace Voltyks.Application.Services.SMSEgypt
                 return false;
             }
 
-            _logger.LogDebug("SMS Egypt response for phone {Phone}: {Body}", phoneNumber, responseBody);
+            _logger.LogInformation("SMS Egypt response for phone {Phone}: {Body}", phoneNumber, responseBody);
             return true;
         }
 

@@ -4,9 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AutoMapper;
-using Voltyks.Application.Interfaces.Caching;
 using Voltyks.Application.Interfaces.FeesConfig;
-using Voltyks.Application.Services.Caching;
 using Voltyks.Core.DTOs.FeesConfig;
 using Voltyks.Core.DTOs;
 using Voltyks.Infrastructure.UnitOfWork;
@@ -26,25 +24,16 @@ namespace Voltyks.Application.Services.FeesConfig
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IHttpContextAccessor _httpContext;
-        private readonly ICacheService _cacheService;
 
-        public FeesConfigService(IUnitOfWork unitOfWork, IMapper mapper, IHttpContextAccessor httpContext, ICacheService cacheService)
+        public FeesConfigService(IUnitOfWork unitOfWork, IMapper mapper, IHttpContextAccessor httpContext)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _httpContext = httpContext;
-            _cacheService = cacheService;
         }
 
         public async Task<ApiResponse<FeesConfigDto>> GetAsync()
         {
-            FeesConfigDto? cached = null;
-            try { cached = await _cacheService.GetAsync<FeesConfigDto>(CacheKeys.FeesConfig); }
-            catch { /* cache backend unavailable — fall through to DB */ }
-
-            if (cached is not null)
-                return new ApiResponse<FeesConfigDto>(cached, "Fees configuration retrieved successfully", status: true);
-
             var repo = _unitOfWork.GetRepository<FeesConfigEntity, int>();
             var row = await repo.GetFirstOrDefaultAsync(x => x.Id == SINGLE_ROW_ID);
 
@@ -63,10 +52,6 @@ namespace Voltyks.Application.Services.FeesConfig
             }
 
             var dto = _mapper.Map<FeesConfigDto>(row);
-
-            try { await _cacheService.SetAsync(CacheKeys.FeesConfig, dto, CacheKeys.Duration.ThirtyMinutes); }
-            catch { /* cache backend unavailable — proceed with DB result */ }
-
             return new ApiResponse<FeesConfigDto>(dto, "Fees configuration retrieved successfully", status: true);
         }
 
@@ -108,10 +93,6 @@ namespace Voltyks.Application.Services.FeesConfig
             await _unitOfWork.SaveChangesAsync();
 
             var outDto = _mapper.Map<FeesConfigDto>(row);
-
-            try { await _cacheService.RemoveAsync(CacheKeys.FeesConfig); }
-            catch { /* cache backend unavailable — staleness bounded by TTL */ }
-
             return new ApiResponse<FeesConfigDto>(outDto, "Fees configuration updated successfully", status: true);
         }
 

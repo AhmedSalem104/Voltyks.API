@@ -22,7 +22,6 @@ using Voltyks.Core.Constants;
 using Voltyks.Core.Enums;
 using Voltyks.Core.DTOs.ChargerRequest;
 using Voltyks.Core.Localization;
-using Microsoft.Extensions.Logging;
 using Voltyks.Application.Interfaces.Firebase;
 using Voltyks.Application.Interfaces.Notifications;
 using Voltyks.Application.Interfaces.Processes;
@@ -41,9 +40,8 @@ namespace Voltyks.Application.Services.UserReport
         private readonly ISignalRService _signalRService;
         private readonly IProcessesService _processesService;
         private readonly INotificationTemplateResolver _templateResolver;
-        private readonly ILogger<UserReportService> _logger;
 
-        public UserReportService(VoltyksDbContext ctx, IMapper mapper, IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase, ISignalRService signalRService, IProcessesService processesService, INotificationTemplateResolver templateResolver, ILogger<UserReportService> logger)
+        public UserReportService(VoltyksDbContext ctx, IMapper mapper, IUnitOfWork unitOfWork, IHttpContextAccessor httpContextAccessor, IFirebaseService firebase, ISignalRService signalRService, IProcessesService processesService, INotificationTemplateResolver templateResolver)
         {
             _ctx = ctx;
             _mapper = mapper;
@@ -53,7 +51,6 @@ namespace Voltyks.Application.Services.UserReport
             _signalRService = signalRService;
             _processesService = processesService;
             _templateResolver = templateResolver;
-            _logger = logger;
         }
 
         public async Task<ApiResponse<object>> CreateReportAsync(ReportDataDto dto, CancellationToken ct = default)
@@ -343,23 +340,10 @@ namespace Voltyks.Application.Services.UserReport
                                    .Select(t => t.Token)
                                    .ToListAsync(ct);
 
-            // Per-token isolation so a single failing device can't abort the whole
-            // notification path and leave the Notification DB row unsent. Same pattern
-            // as TerminateProcessAsync / AdminNotificationCenterService.
             if (tokens.Count > 0)
-                await Task.WhenAll(tokens.Select(async tk =>
-                {
-                    try
-                    {
-                        await _firebase.SendNotificationAsync(tk, title, body, requestId, notificationType, data);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex,
-                            "FCM send failed for one token; continuing batch. NotificationType={NotificationType} RequestId={RequestId}",
-                            notificationType, requestId);
-                    }
-                }));
+                await Task.WhenAll(tokens.Select(tk =>
+                    _firebase.SendNotificationAsync(tk, title, body, requestId, notificationType, data)
+                ));
 
             var notification = await AddNotificationAsync(receiverUserId, requestId, title, body, userTypeId, ct);
 

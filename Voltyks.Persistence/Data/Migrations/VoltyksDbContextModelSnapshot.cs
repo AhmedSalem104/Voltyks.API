@@ -360,7 +360,7 @@ namespace Voltyks.Persistence.Data.Migrations
                             Id = 1,
                             AdminsModeActivated = false,
                             ChargingModeEnabled = false,
-                            UpdatedAt = new DateTime(2026, 5, 28, 14, 15, 52, 384, DateTimeKind.Utc).AddTicks(5177)
+                            UpdatedAt = new DateTime(2026, 5, 10, 20, 4, 57, 865, DateTimeKind.Utc).AddTicks(3894)
                         });
                 });
 
@@ -463,9 +463,6 @@ namespace Voltyks.Persistence.Data.Migrations
 
                     b.HasIndex("IsDeleted", "IsActive", "ProtocolId")
                         .HasDatabaseName("IX_Chargers_IsDeleted_IsActive_ProtocolId");
-
-                    b.HasIndex("UserId", "IsActive", "IsDeleted")
-                        .HasDatabaseName("IX_Chargers_UserId_IsActive_IsDeleted");
 
                     b.ToTable("Chargers");
                 });
@@ -593,10 +590,6 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.HasIndex("Status", "RequestedAt")
                         .HasDatabaseName("IX_ChargingRequests_Status_RequestedAt");
 
-                    b.HasIndex("RecipientUserId", "Status", "RequestedAt")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("IX_ChargingRequests_RecipientUserId_Status_RequestedAt");
-
                     b.ToTable("ChargingRequests");
                 });
 
@@ -698,7 +691,7 @@ namespace Voltyks.Persistence.Data.Migrations
                             Id = 1,
                             MinimumFee = 40m,
                             Percentage = 10m,
-                            UpdatedAt = new DateTime(2026, 5, 28, 14, 15, 52, 391, DateTimeKind.Utc).AddTicks(3958),
+                            UpdatedAt = new DateTime(2026, 5, 10, 20, 4, 57, 871, DateTimeKind.Utc).AddTicks(4290),
                             UpdatedBy = "system"
                         });
                 });
@@ -817,11 +810,9 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.HasIndex("RelatedRequestId")
                         .HasDatabaseName("IX_Notifications_RelatedRequestId");
 
-                    b.HasIndex("UserTypeId");
+                    b.HasIndex("UserId");
 
-                    b.HasIndex("UserId", "SentAt")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_Notifications_UserId_SentAt");
+                    b.HasIndex("UserTypeId");
 
                     b.ToTable("Notifications");
                 });
@@ -1382,16 +1373,8 @@ namespace Voltyks.Persistence.Data.Migrations
                     b.HasIndex("ChargerRequestId")
                         .HasDatabaseName("IX_Processes_ChargerRequestId");
 
-                    b.HasIndex("ChargerOwnerId", "DateCreated")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_Processes_ChargerOwnerId_DateCreated");
-
                     b.HasIndex("ChargerOwnerId", "Status")
                         .HasDatabaseName("IX_Processes_ChargerOwnerId_Status");
-
-                    b.HasIndex("VehicleOwnerId", "DateCreated")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_Processes_VehicleOwnerId_DateCreated");
 
                     b.HasIndex("VehicleOwnerId", "Status")
                         .HasDatabaseName("IX_Processes_VehicleOwnerId_Status");
@@ -1681,10 +1664,6 @@ namespace Voltyks.Persistence.Data.Migrations
                         .HasDatabaseName("IX_StoreReservations_CreatedAt");
 
                     b.HasIndex("ProductId");
-
-                    b.HasIndex("UserId", "CreatedAt")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_StoreReservations_UserId_CreatedAt");
 
                     b.HasIndex("UserId", "ProductId")
                         .IsUnique()

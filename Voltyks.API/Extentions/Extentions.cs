@@ -43,7 +43,6 @@ using Voltyks.Application.Services.Terms;
 using Voltyks.AdminControlDashboard;
 using Voltyks.Application.Interfaces.Caching;
 using Voltyks.Application.Services.Caching;
-using CacheKeys = Voltyks.Application.Services.Caching.CacheKeys;
 using Voltyks.Application.Interfaces.Pagination;
 using Voltyks.Application.Services.Pagination;
 using Voltyks.API.Hubs;
@@ -195,17 +194,6 @@ namespace Voltyks.API.Extentions
             {
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
-
-            // Named clients with explicit timeouts so an unresponsive upstream can't
-            // hang the request thread indefinitely.
-            services.AddHttpClient("firebase-fcm", client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(30);
-            });
-            services.AddHttpClient("sms-egypt", client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(15);
-            });
             services.Configure<PaymobOptions>(configuration.GetSection("Paymob"));
             services.AddScoped<PaymobService>();
 
@@ -253,14 +241,11 @@ namespace Voltyks.API.Extentions
                 catch { /* Skip Firebase if initialization fails */ }
             }
 
-            // Add Interceptor — stateless (no fields, reads ChangeTracker per call),
-            // so it must be Singleton to be consumed by the singleton DbContext pool.
-            services.AddSingleton<ChargingRequestCleanupInterceptor>();
+            // Add Interceptor
+            services.AddScoped<ChargingRequestCleanupInterceptor>();
 
-            // Pooled DbContext registration with stateless interceptor + resilience.
-            // ChargingRequestCleanupInterceptor reads ChangeTracker state per-call and
-            // holds no fields, so the pool can recycle contexts safely between requests.
-            services.AddDbContextPool<VoltyksDbContext>((sp, options) =>
+            // Single DbContext registration with interceptor + resilience
+            services.AddDbContext<VoltyksDbContext>((sp, options) =>
             {
                 options.UseSqlServer(configuration.GetConnectionString("DefaultConnection"), sqlOptions =>
                 {
@@ -544,10 +529,8 @@ namespace Voltyks.API.Extentions
                     },
                     // After signature/lifetime/issuer/audience pass, confirm the
                     // user behind the token still exists and is not deleted or
-                    // banned. Cached with short TTL via ICacheService (Redis) to
-                    // avoid a DB round-trip on every authenticated request;
-                    // staleness window is bounded by NinetySeconds and the cache
-                    // is invalidated on ban/unban/soft-delete/restore.
+                    // banned. JWT is stateless so a token issued before a user
+                    // was deleted would otherwise remain usable until expiry.
                     OnTokenValidated = async context =>
                     {
                         var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -557,32 +540,16 @@ namespace Voltyks.API.Extentions
                             return;
                         }
 
-                        var sp = context.HttpContext.RequestServices;
-                        var cache = sp.GetRequiredService<ICacheService>();
-                        var key = CacheKeys.UserStatusById(userId);
+                        var db = context.HttpContext.RequestServices
+                            .GetRequiredService<VoltyksDbContext>();
 
-                        UserStatusEntry? entry = null;
-                        try { entry = await cache.GetAsync<UserStatusEntry>(key); }
-                        catch { /* cache backend unavailable — fall through to DB */ }
+                        var status = await db.Users
+                            .AsNoTracking()
+                            .Where(u => u.Id == userId)
+                            .Select(u => new { u.IsDeleted, u.IsBanned })
+                            .FirstOrDefaultAsync();
 
-                        if (entry == null)
-                        {
-                            var db = sp.GetRequiredService<VoltyksDbContext>();
-                            var status = await db.Users
-                                .AsNoTracking()
-                                .Where(u => u.Id == userId)
-                                .Select(u => new { u.IsDeleted, u.IsBanned })
-                                .FirstOrDefaultAsync();
-
-                            entry = status == null
-                                ? new UserStatusEntry { Exists = false }
-                                : new UserStatusEntry { Exists = true, IsDeleted = status.IsDeleted, IsBanned = status.IsBanned };
-
-                            try { await cache.SetAsync(key, entry, CacheKeys.Duration.NinetySeconds); }
-                            catch { /* cache backend unavailable — proceed with DB result */ }
-                        }
-
-                        if (!entry.Exists || entry.IsDeleted || entry.IsBanned)
+                        if (status == null || status.IsDeleted || status.IsBanned)
                         {
                             context.Fail("User account is no longer active.");
                         }

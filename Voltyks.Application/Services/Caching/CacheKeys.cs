@@ -13,18 +13,14 @@ namespace Voltyks.Application.Services.Caching
         // Dynamic data cache keys with patterns
         public static string ModelsByBrand(int brandId) => $"models:brand:{brandId}";
         public static string UserById(string userId) => $"user:{userId}";
-        public static string UserStatusById(string userId) => $"user-status:{userId}";
-        public const string AppSettings = "app:settings";
 
         // Cache durations
         public static class Duration
         {
             public static readonly TimeSpan OneHour = TimeSpan.FromHours(1);
             public static readonly TimeSpan ThirtyMinutes = TimeSpan.FromMinutes(30);
-            public static readonly TimeSpan FifteenMinutes = TimeSpan.FromMinutes(15);
             public static readonly TimeSpan TenMinutes = TimeSpan.FromMinutes(10);
             public static readonly TimeSpan FiveMinutes = TimeSpan.FromMinutes(5);
-            public static readonly TimeSpan NinetySeconds = TimeSpan.FromSeconds(90);
         }
     }
 }

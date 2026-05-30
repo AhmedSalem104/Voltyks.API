@@ -1276,25 +1276,13 @@ namespace Voltyks.Core.DTOs.Processes
                                    .Select(t => t.Token)
                                    .ToListAsync(ct);
 
-            // Per-token isolation so a single failing device can't abort the whole
-            // notification path and leave the Notification DB row + downstream SignalR
-            // broadcast unsent. Same pattern as TerminateProcessAsync (line 1726).
             if (tokens.Count > 0)
             {
-                await Task.WhenAll(tokens.Select(async tk =>
-                {
-                    try
-                    {
-                        await _firebase.SendNotificationAsync(
-                            tk, title, body, requestId, notificationType, data);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex,
-                            "FCM send failed for one token; continuing batch. NotificationType={NotificationType} RequestId={RequestId} ProcessId={ProcessId}",
-                            notificationType, requestId, processId);
-                    }
-                }));
+                await Task.WhenAll(tokens.Select(tk =>
+                    _firebase.SendNotificationAsync(
+                        tk, title, body, requestId, notificationType, data
+                    )
+                ));
             }
 
             var notification = await AddNotificationAsync(
@@ -1673,37 +1661,6 @@ namespace Voltyks.Core.DTOs.Processes
                 }
             }
 
-            // Concurrent invocations (e.g. UI submitting "aborted" while the background
-            // StaleProcessCleanupService also fires for the same processId) race past
-            // the in-memory isAlreadyTerminal check above before any SaveChanges commits
-            // the new status. A short-lived Redis SETNX lock makes the notification
-            // dispatch atomic across instances — only the first caller fires FCM /
-            // persists the Process_Terminated notification rows. The status updates +
-            // CurrentActivities cleanup below still run for every caller so the DB ends
-            // up in the correct terminal state regardless of who won the lock.
-            // Redis down → graceful fallback: lock treated as acquired, original
-            // behaviour preserved.
-            bool notificationDispatchAcquired = true;
-            if (!isAlreadyTerminal)
-            {
-                try
-                {
-                    notificationDispatchAcquired = await _redisService.TrySetIfNotExistsAsync(
-                        $"notify-terminated:{processId}", "1", TimeSpan.FromSeconds(60));
-                }
-                catch
-                {
-                    notificationDispatchAcquired = true;
-                }
-
-                if (!notificationDispatchAcquired)
-                {
-                    _logger.LogInformation(
-                        "Skipping duplicate Process_Terminated dispatch for process {ProcessId} (another invocation already in flight)",
-                        processId);
-                }
-            }
-
             // Cleanup users + send notifications
             foreach (var uid in new[] { process.VehicleOwnerId, process.ChargerOwnerId })
             {
@@ -1729,9 +1686,8 @@ namespace Voltyks.Core.DTOs.Processes
                         _ctx.Entry(user).Property(u => u.IsAvailable).IsModified = true;
                     }
 
-                    // Send Process_Terminated notification (only if not already terminal AND
-                    // this invocation is the one that won the cross-instance dispatch lock).
-                    if (!isAlreadyTerminal && notificationDispatchAcquired)
+                    // Send Process_Terminated notification (only if not already terminal)
+                    if (!isAlreadyTerminal)
                     {
                         var extraData = new Dictionary<string, string>
                         {

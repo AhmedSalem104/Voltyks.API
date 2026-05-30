@@ -32,7 +32,7 @@ namespace Voltyks.Persistence
             try
             {
                 // Create For The Data If it's doesn't Exists & Apply any Pending Migrations
-                if ((await _context.Database.GetPendingMigrationsAsync()).Any())
+                if (_context.Database.GetPendingMigrations().Any())
                 {
                     await _context.Database.MigrateAsync();
                 }
@@ -42,7 +42,7 @@ namespace Voltyks.Persistence
 
                 //// Data Seeding
                 //// Seeding For Brands Form Json File
-                if (!await _context.Brands.AsNoTracking().AnyAsync())
+                if (!_context.Brands.Any())
                 {
                     try
                     {
@@ -59,7 +59,7 @@ namespace Voltyks.Persistence
                 }
 
                 //// Seeding For Models Form Json File
-                if (!await _context.Models.AsNoTracking().AnyAsync())
+                if (!_context.Models.Any())
                 {
                     try
                     {
@@ -76,7 +76,7 @@ namespace Voltyks.Persistence
                 }                    
 
                 //// Seeding For Protocols Form Json File
-                if (!await _context.Protocols.AsNoTracking().AnyAsync())
+                if (!_context.Protocols.Any())
                 {
                     try
                     {
@@ -93,7 +93,7 @@ namespace Voltyks.Persistence
                 }
 
                 //// Seeding For priceOption Form Json File
-                if (!await _context.PriceOptions.AsNoTracking().AnyAsync())
+                if (!_context.PriceOptions.Any())
                 {
                     try
                     {
@@ -110,7 +110,7 @@ namespace Voltyks.Persistence
                 }
 
                 //// Seeding For Capacities Form Json File
-                if (!await _context.Capacities.AsNoTracking().AnyAsync())
+                if (!_context.Capacities.Any())
                 {
                     try
                     {
@@ -127,7 +127,7 @@ namespace Voltyks.Persistence
                 }
 
                 //// Seeding For UserTypes Form Json File
-                if (!await _context.UserTypes.AsNoTracking().AnyAsync())
+                if (!_context.UserTypes.Any())
                 {
                     try
                     {
@@ -145,7 +145,7 @@ namespace Voltyks.Persistence
 
 
                 //// Seeding For ComplaintCategories From Json File
-                if (!await _context.ComplaintCategories.AsNoTracking().AnyAsync())
+                if (!_context.ComplaintCategories.Any())
                 {
                     try
                     {
@@ -168,7 +168,7 @@ namespace Voltyks.Persistence
                 }
 
                 //// Seeding For TermsDocuments From Json File
-                if (!await _context.termsDocuments.AsNoTracking().AnyAsync())
+                if (!_context.termsDocuments.Any())
                 {
                     try
                     {
@@ -214,17 +214,21 @@ namespace Voltyks.Persistence
         }
         public async Task InitializeIdentityAsync()
         {
-            // Migrations are applied in InitializeAsync (invoked just before this from
-            // Extentions.cs); skip the duplicate GetPendingMigrations round-trip here.
 
-            // Data Seeding
-            // Seeding For Roles
-            if (!await _roleManager.Roles.AnyAsync())
+            // Create For The Data If it's doesn't Exists & Apply any Pending Migrations
+            if (_context.Database.GetPendingMigrations().Any())
+            {
+                await _context.Database.MigrateAsync();
+            }
+
+            // Data Seeding 
+            // Seeding For Roles 
+            if (!_roleManager.Roles.Any())
             {
                 await _roleManager.CreateAsync(new IdentityRole()
                 {
                     Name = "Admin"
-                });
+                });               
             }
 
 
