@@ -89,6 +89,8 @@ namespace Voltyks.Application.Services.Store
         {
             try
             {
+                var currentUserId = GetCurrentUserId();
+
                 var query = _context.StoreProducts
                     .AsNoTracking()
                     .Include(p => p.Category)
@@ -122,7 +124,7 @@ namespace Voltyks.Application.Services.Store
                         ThumbnailImage = GetFirstImage(p.ImagesJson),
                         Status = p.Status,
                         IsReservable = p.IsReservable,
-                        IsReserved = p.Reservations.Any(r => r.Status != "cancelled" && r.Status != "completed")
+                        IsReserved = currentUserId != null && p.Reservations.Any(r => r.UserId == currentUserId && r.Status != "cancelled" && r.Status != "completed")
                     })
                     .ToListAsync(ct);
 
@@ -153,7 +155,8 @@ namespace Voltyks.Application.Services.Store
                     return new ApiResponse<StoreProductDto>("Product not found", false);
                 }
 
-                var isReserved = product.Reservations.Any(r => r.Status != "cancelled" && r.Status != "completed");
+                var currentUserId = GetCurrentUserId();
+                var isReserved = currentUserId != null && product.Reservations.Any(r => r.UserId == currentUserId && r.Status != "cancelled" && r.Status != "completed");
                 var dto = MapToProductDto(product, isReserved);
                 return new ApiResponse<StoreProductDto>(dto, "Product retrieved successfully", true);
             }
@@ -181,7 +184,8 @@ namespace Voltyks.Application.Services.Store
                     return new ApiResponse<StoreProductDto>("Product not found", false);
                 }
 
-                var isReserved = product.Reservations.Any(r => r.Status != "cancelled" && r.Status != "completed");
+                var currentUserId = GetCurrentUserId();
+                var isReserved = currentUserId != null && product.Reservations.Any(r => r.UserId == currentUserId && r.Status != "cancelled" && r.Status != "completed");
                 var dto = MapToProductDto(product, isReserved);
                 return new ApiResponse<StoreProductDto>(dto, "Product retrieved successfully", true);
             }
