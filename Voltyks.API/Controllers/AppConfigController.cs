@@ -97,6 +97,8 @@ namespace Voltyks.API.Controllers
             var mobileStatus = await _serviceManager.MobileAppConfigService.GetStatusAsync(platform, version);
             var chargingEnabled = await _appSettingsService.IsChargingModeEnabledAsync(ct);
             var adminsModeActivated = await _appSettingsService.IsAdminsModeActivatedAsync(ct);
+            var antiOtpRestrictionMode = await _appSettingsService.IsAntiOtpRestrictionModeAsync(ct);
+            var antiPaymentRestrictionMode = await _appSettingsService.IsAntiPaymentRestrictionModeAsync(ct);
 
             var dto = new AppInfoDto
             {
@@ -104,7 +106,9 @@ namespace Voltyks.API.Controllers
                 IsVersionValid = mobileStatus.Data?.IsVersionValid ?? true,
                 MinVersion = mobileStatus.Data?.MinVersion,
                 ChargingModeEnabled = chargingEnabled,
-                AdminsModeActivated = adminsModeActivated
+                AdminsModeActivated = adminsModeActivated,
+                AntiOtpRestrictionMode = antiOtpRestrictionMode,
+                AntiPaymentRestrictionMode = antiPaymentRestrictionMode
             };
 
             return Ok(new ApiResponse<AppInfoDto>(dto, "Success", true));

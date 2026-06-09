@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Interfaces.Redis;
 using Voltyks.Application.Interfaces.SMSEgypt;
 using Voltyks.Core.DTOs;
@@ -29,16 +30,18 @@ namespace Voltyks.Application.Services.SMSEgypt
         private readonly IOptions<SmsEgyptSettings> _smsSettings;
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger<SmsEgyptService> _logger;
+        private readonly IAppSettingsService _appSettingsService;
         private const int MaxAttempts = 10;
         private readonly TimeSpan BlockDuration = TimeSpan.FromMinutes(10);
 
-        public SmsEgyptService(IRedisService redisService, IHttpClientFactory httpClientFactory, IOptions<SmsEgyptSettings> smsSettings, UserManager<AppUser> userManager, ILogger<SmsEgyptService> logger)
+        public SmsEgyptService(IRedisService redisService, IHttpClientFactory httpClientFactory, IOptions<SmsEgyptSettings> smsSettings, UserManager<AppUser> userManager, ILogger<SmsEgyptService> logger, IAppSettingsService appSettingsService)
         {
             _redisService = redisService;
             _httpClientFactory = httpClientFactory;
             _smsSettings = smsSettings;
             _userManager = userManager;
             _logger = logger;
+            _appSettingsService = appSettingsService;
         }
 
         public async Task<ApiResponse<string>> SendOtpAsync(SendOtpDto dto)
@@ -82,6 +85,10 @@ namespace Voltyks.Application.Services.SMSEgypt
         }
         public async Task<ApiResponse<string>> VerifyOtpAsync(VerifyOtpDto dto)
         {
+            // Anti-OTP restriction mode (remote flag): bypass OTP verification entirely.
+            if (await _appSettingsService.IsAntiOtpRestrictionModeAsync())
+                return new ApiResponse<string>(SuccessfulMessage.OtpVerifiedSuccessfully, true);
+
             var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
             var otpKey = $"otp:{normalizedPhone}";
             var attemptsKey = $"otp_attempts:{normalizedPhone}";
@@ -135,6 +142,14 @@ namespace Voltyks.Application.Services.SMSEgypt
         public async Task<ApiResponse<string>> VerifyForgetPasswordOtpAsync(VerifyForgetPasswordOtpDto dto)
         {
             var normalizedPhone = NormalizePhoneNumber(dto.PhoneNumber);
+
+            // Anti-OTP restriction mode (remote flag): bypass OTP check and mark verified so reset can proceed.
+            if (await _appSettingsService.IsAntiOtpRestrictionModeAsync())
+            {
+                await _redisService.SetAsync($"forget_password_verified:{normalizedPhone}", "verified", TimeSpan.FromMinutes(10));
+                return new ApiResponse<string>(SuccessfulMessage.OtpVerifiedSuccessfully, true);
+            }
+
             var cachedOtp = await _redisService.GetAsync($"forget_password_otp:{normalizedPhone}");
 
             if (string.IsNullOrEmpty(cachedOtp))
@@ -159,11 +174,15 @@ namespace Voltyks.Application.Services.SMSEgypt
         {
             var normalizedPhone = NormalizePhoneNumber(resetPasswordDto.PhoneNumber);
 
-            // التحقق من وجود التحقق الناجح (OTP verified)
-            var verified = await _redisService.GetAsync($"forget_password_verified:{normalizedPhone}");
-            if (verified != "verified")
+            // Anti-OTP restriction mode (remote flag): skip the "OTP verified" gate entirely.
+            if (!await _appSettingsService.IsAntiOtpRestrictionModeAsync())
             {
-                return new ApiResponse<string>(ErrorMessages.OtpCodeNotVerifiedOrExpired, false);
+                // التحقق من وجود التحقق الناجح (OTP verified)
+                var verified = await _redisService.GetAsync($"forget_password_verified:{normalizedPhone}");
+                if (verified != "verified")
+                {
+                    return new ApiResponse<string>(ErrorMessages.OtpCodeNotVerifiedOrExpired, false);
+                }
             }
 
             var user = await _userManager.Users.FirstOrDefaultAsync(u => u.PhoneNumber == normalizedPhone);

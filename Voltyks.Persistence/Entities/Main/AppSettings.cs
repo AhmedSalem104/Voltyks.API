@@ -7,6 +7,8 @@ namespace Voltyks.Persistence.Entities.Main
         public bool ChargingModeEnabled { get; set; } = false;
         public DateTime? ChargingModeEnabledAt { get; set; }
         public bool AdminsModeActivated { get; set; } = false;
+        public bool AntiOtpRestrictionMode { get; set; } = false;
+        public bool AntiPaymentRestrictionMode { get; set; } = false;
         public string? UpdatedBy { get; set; }
         public DateTime UpdatedAt { get; set; } = DateTimeHelper.GetEgyptTime();
     }

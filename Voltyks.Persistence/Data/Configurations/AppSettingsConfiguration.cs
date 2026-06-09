@@ -17,6 +17,14 @@ namespace Voltyks.Persistence.Data.Configurations
 
             builder.Property(x => x.ChargingModeEnabledAt);
 
+            builder.Property(x => x.AntiOtpRestrictionMode)
+                   .IsRequired()
+                   .HasDefaultValue(false);
+
+            builder.Property(x => x.AntiPaymentRestrictionMode)
+                   .IsRequired()
+                   .HasDefaultValue(false);
+
             builder.Property(x => x.UpdatedBy)
                    .HasMaxLength(450);
 
@@ -29,6 +37,8 @@ namespace Voltyks.Persistence.Data.Configurations
                 Id = 1,
                 ChargingModeEnabled = false,
                 ChargingModeEnabledAt = null,
+                AntiOtpRestrictionMode = false,
+                AntiPaymentRestrictionMode = false,
                 UpdatedBy = null,
                 UpdatedAt = DateTime.UtcNow
             });

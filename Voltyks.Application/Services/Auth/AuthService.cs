@@ -879,6 +879,13 @@ namespace Voltyks.Application.Services.Auth
 
         public async Task<ApiResponse<object>> DeductFeesFromWalletAsync(int requestId, CancellationToken ct = default)
         {
+            // Anti-payment restriction mode (remote flag): skip fee deduction entirely.
+            if (await appSettingsService.IsAntiPaymentRestrictionModeAsync(ct))
+                return new ApiResponse<object>(
+                    data: new { RequestId = requestId, Skipped = true },
+                    message: "Fee deduction skipped (anti-payment restriction mode enabled)",
+                    status: true);
+
             // 1. Get the charging request
             var chargingRequest = await context.Set<ChargingRequestEntity>()
                 .FirstOrDefaultAsync(r => r.Id == requestId, ct);
@@ -1174,8 +1181,8 @@ namespace Voltyks.Application.Services.Auth
             if (!storedEmail.Equals(dto.NewEmail, StringComparison.OrdinalIgnoreCase))
                 return new ApiResponse<object>("Email mismatch", status: false);
 
-            // Validate OTP
-            if (storedOtp != dto.OtpCode)
+            // Validate OTP (skipped when anti-OTP restriction mode is enabled remotely)
+            if (!await appSettingsService.IsAntiOtpRestrictionModeAsync(ct) && storedOtp != dto.OtpCode)
                 return new ApiResponse<object>("Invalid OTP", status: false);
 
             // Update user email

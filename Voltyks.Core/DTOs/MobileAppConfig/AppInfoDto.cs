@@ -18,5 +18,9 @@ namespace Voltyks.Core.DTOs.MobileAppConfig
 
         // --- from registration-status ---
         public bool AdminsModeActivated { get; set; }
+
+        // --- restriction-bypass flags (frontend hides the step when true) ---
+        public bool AntiOtpRestrictionMode { get; set; }
+        public bool AntiPaymentRestrictionMode { get; set; }
     }
 }

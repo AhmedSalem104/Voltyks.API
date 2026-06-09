@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using Voltyks.Application.Interfaces;
+using Voltyks.Application.Interfaces.AppSettings;
 using Voltyks.Application.Interfaces.ChargingRequest;
 using Voltyks.Application.Interfaces.FeesConfig;
 using Voltyks.Application.Interfaces.Firebase;
@@ -45,10 +46,11 @@ namespace Voltyks.Application.Services.ChargingRequest
         private readonly ILogger<ChargingRequestService> _logger;
         private readonly INotificationTemplateResolver _templateResolver;
         private readonly IGeocodingService _geocodingService;
+        private readonly IAppSettingsService _appSettingsService;
 
 
 
-        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService, ILogger<ChargingRequestService> logger, INotificationTemplateResolver templateResolver, IGeocodingService geocodingService)
+        public ChargingRequestService(IUnitOfWork unitOfWork, IFirebaseService firebaseService , IHttpContextAccessor httpContext , IVehicleService vehicleService, IFeesConfigService feesConfigService, VoltyksDbContext db, IHttpClientFactory httpClientFactory, ISignalRService signalRService, IProcessesService processesService, ILogger<ChargingRequestService> logger, INotificationTemplateResolver templateResolver, IGeocodingService geocodingService, IAppSettingsService appSettingsService)
         {
             _unitOfWork = unitOfWork;
             _firebaseService = firebaseService;
@@ -62,6 +64,7 @@ namespace Voltyks.Application.Services.ChargingRequest
             _logger = logger;
             _templateResolver = templateResolver;
             _geocodingService = geocodingService;
+            _appSettingsService = appSettingsService;
         }
 
         public async Task<ApiResponse<NotificationResultDto>> SendChargingRequestAsync(SendChargingRequestDto dto)
@@ -746,6 +749,13 @@ namespace Voltyks.Application.Services.ChargingRequest
 
         public async Task<ApiResponse<object>> TransferVoltyksFeesAsync(RequestIdDto dto, CancellationToken ct = default)
         {
+            // Anti-payment restriction mode (remote flag): skip the Voltyks fee transfer entirely.
+            if (await _appSettingsService.IsAntiPaymentRestrictionModeAsync(ct))
+                return new ApiResponse<object>(
+                    data: new { requestId = dto.RequestId, skipped = true },
+                    message: "Fee transfer skipped (anti-payment restriction mode enabled)",
+                    status: true);
+
             // نجيب UserId, RecipientUserId, Fees (read-only to get the data for wallet update)
             var req = await _db.Set<ChargingRequestEntity>()
                 .AsNoTracking()

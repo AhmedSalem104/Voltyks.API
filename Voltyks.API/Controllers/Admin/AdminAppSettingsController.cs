@@ -54,5 +54,35 @@ namespace Voltyks.API.Controllers.Admin
             var result = await _appSettingsService.SetAdminsModeAsync(dto.Activated, adminId, ct);
             return Ok(result);
         }
+
+        [HttpGet("anti-otp-restriction-mode")]
+        public async Task<IActionResult> GetAntiOtpRestrictionMode(CancellationToken ct)
+        {
+            var result = await _appSettingsService.GetAntiOtpRestrictionModeStatusAsync(ct);
+            return Ok(result);
+        }
+
+        [HttpPatch("anti-otp-restriction-mode")]
+        public async Task<IActionResult> SetAntiOtpRestrictionMode([FromBody] SetAntiOtpRestrictionModeDto dto, CancellationToken ct)
+        {
+            var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var result = await _appSettingsService.SetAntiOtpRestrictionModeAsync(dto.Enabled, adminId, ct);
+            return Ok(result);
+        }
+
+        [HttpGet("anti-payment-restriction-mode")]
+        public async Task<IActionResult> GetAntiPaymentRestrictionMode(CancellationToken ct)
+        {
+            var result = await _appSettingsService.GetAntiPaymentRestrictionModeStatusAsync(ct);
+            return Ok(result);
+        }
+
+        [HttpPatch("anti-payment-restriction-mode")]
+        public async Task<IActionResult> SetAntiPaymentRestrictionMode([FromBody] SetAntiPaymentRestrictionModeDto dto, CancellationToken ct)
+        {
+            var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var result = await _appSettingsService.SetAntiPaymentRestrictionModeAsync(dto.Enabled, adminId, ct);
+            return Ok(result);
+        }
     }
 }

@@ -119,6 +119,88 @@ namespace Voltyks.Application.Services.AppSettings
             return new ApiResponse<bool>(true, message, true);
         }
 
+        public async Task<bool> IsAntiOtpRestrictionModeAsync(CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+            return settings.AntiOtpRestrictionMode;
+        }
+
+        public async Task<ApiResponse<object>> GetAntiOtpRestrictionModeStatusAsync(CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+
+            var data = new
+            {
+                antiOtpRestrictionMode = settings.AntiOtpRestrictionMode,
+                updatedBy = settings.UpdatedBy,
+                updatedAt = settings.UpdatedAt,
+                message = settings.AntiOtpRestrictionMode
+                    ? "Anti-OTP restriction mode is ON — OTP verification is bypassed."
+                    : "Anti-OTP restriction mode is OFF — OTP verification is enforced."
+            };
+
+            return new ApiResponse<object>(data, "Success", true);
+        }
+
+        public async Task<ApiResponse<bool>> SetAntiOtpRestrictionModeAsync(bool enabled, string adminId, CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+
+            settings.AntiOtpRestrictionMode = enabled;
+            settings.UpdatedBy = adminId;
+            settings.UpdatedAt = DateTime.UtcNow;
+
+            _context.AppSettings.Update(settings);
+            await _context.SaveChangesAsync(ct);
+
+            var message = enabled
+                ? "Anti-OTP restriction mode enabled — OTP step is now bypassed"
+                : "Anti-OTP restriction mode disabled — OTP step is now enforced";
+
+            return new ApiResponse<bool>(true, message, true);
+        }
+
+        public async Task<bool> IsAntiPaymentRestrictionModeAsync(CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+            return settings.AntiPaymentRestrictionMode;
+        }
+
+        public async Task<ApiResponse<object>> GetAntiPaymentRestrictionModeStatusAsync(CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+
+            var data = new
+            {
+                antiPaymentRestrictionMode = settings.AntiPaymentRestrictionMode,
+                updatedBy = settings.UpdatedBy,
+                updatedAt = settings.UpdatedAt,
+                message = settings.AntiPaymentRestrictionMode
+                    ? "Anti-payment restriction mode is ON — Voltyks fee payment is bypassed."
+                    : "Anti-payment restriction mode is OFF — Voltyks fee payment is enforced."
+            };
+
+            return new ApiResponse<object>(data, "Success", true);
+        }
+
+        public async Task<ApiResponse<bool>> SetAntiPaymentRestrictionModeAsync(bool enabled, string adminId, CancellationToken ct = default)
+        {
+            var settings = await GetOrCreateSettingsAsync(ct);
+
+            settings.AntiPaymentRestrictionMode = enabled;
+            settings.UpdatedBy = adminId;
+            settings.UpdatedAt = DateTime.UtcNow;
+
+            _context.AppSettings.Update(settings);
+            await _context.SaveChangesAsync(ct);
+
+            var message = enabled
+                ? "Anti-payment restriction mode enabled — Voltyks fee payment is now bypassed"
+                : "Anti-payment restriction mode disabled — Voltyks fee payment is now enforced";
+
+            return new ApiResponse<bool>(true, message, true);
+        }
+
         public async Task<ApiResponse<int>> ActivateAllInactiveChargersAsync(CancellationToken ct = default)
         {
             var inactiveChargers = await _context.Chargers
